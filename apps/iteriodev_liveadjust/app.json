@@ -1,8 +1,12 @@
 {
  "id": "iteriodev_liveadjust",
- "version": "1.0.1",
+ "version": "1.0.2",
  "title": "Live Adjustments",
  "description": "Live adjustments for an MHD-tuned DME: switch engine maps 1-4 with the car standing still, MHD Max Cooling on (engine running) or off, and open or close the exhaust flap (BMW's own DME job; the DME takes control back after about 20 s). Map and cooling show what the DME accepted: MHD has no read-back.",
+ "mguHmi": [
+  "ID7",
+  "ID8"
+ ],
  "needs": [
   "renderer"
  ]

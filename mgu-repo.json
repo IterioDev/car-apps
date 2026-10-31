@@ -6,9 +6,6 @@
    "node": "tools/prebuilt.js",
    "output": "{dir}/{id}@{version}.tgz"
   },
-  "mguHmi": [
-   "ID8"
-  ],
   "uninstallable": true
  },
  "tools": [

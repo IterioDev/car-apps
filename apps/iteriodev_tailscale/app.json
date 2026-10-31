@@ -1,8 +1,12 @@
 {
  "id": "iteriodev_tailscale",
- "version": "1.0.1",
+ "version": "1.0.2",
  "title": "Tailscale",
  "description": "Log the head unit in to your tailnet without a computer: shows Tailscale's state, the login link as a QR code to scan with your phone, the head unit's tailnet name and address, Rename (default mgu) and Log out. Needs the Tailscale tool from the same source.",
+ "mguHmi": [
+  "ID7",
+  "ID8"
+ ],
  "needs": [
   "renderer"
  ],

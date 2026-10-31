@@ -1,11 +1,12 @@
 # car-apps
 
 > [!WARNING]
-> **Do not install any app from this repository yet.** The apps are being tested on a car with the new setup
-> described below. This notice will be removed once that testing is done and this README is updated.
+> **Not tested on iDrive 7.** These apps and tools have been tested only on iDrive 8, in the emulator and on a real
+> car.
 
 Apps and tools by IterioDev for BMW head units with iDrive 8 (MGU). The apps run in the head unit's own app platform
-and show up in *All apps* like BMW's apps.
+and show up in *All apps* like BMW's apps. Live Adjustments and Tailscale (app and tool) also install on iDrive 7;
+the others are for iDrive 8 only.
 
 ## The apps
 
@@ -17,7 +18,8 @@ and show up in *All apps* like BMW's apps.
 | Live Adjustments | `iteriodev_liveadjust` | For an MHD-tuned DME: engine map 1-4 and MHD Max Cooling, plus the exhaust flap (open, close, back to the DME). See below. |
 | Tailscale | `iteriodev_tailscale` | The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`) and Log out. Needs the Tailscale tool below (the Store installs it with the app). |
 
-All of them draw their screens through the GPU renderer `mgu-render`.
+All of them draw their screens through the GPU renderer `mgu-render`. On iDrive 7 the screens are scaled down to fit
+right of the HMI's back arrow, under its title strip.
 
 **Live Adjustments** (one screen, sends a command only when you tap a button). Car-tested: the engine map switch
 works (1.0.1, MHD). Max Cooling and the exhaust flap are not car-tested yet.
@@ -116,7 +118,7 @@ top of `screencast.js`.
 ## What is in this repository
 
 - `apps/<id>/`: one folder per app with its package `<id>@<version>.tgz`, ready to install, its `app.json`
-  (version, title, description, what it needs and requires) and `icon.png`.
+  (version, title, description, the head units it is for, what it needs and requires) and `icon.png`.
 - `tools/<id>/`: one folder per tool with its prebuilt files and `component.json`.
 - `mgu-repo.json`: what mgu-store reads. Every folder under `apps/` is an app and the tools are listed; the apps'
   build step, `tools/prebuilt.js`, does nothing because the package is already here.

@@ -7,7 +7,7 @@
   "optional": true,
   "uninstallable": true,
   "requires": { "mgu-uplink": "0.4.0" },
-  "mguHmi": ["ID8"],
+  "mguHmi": ["ID7", "ID8"],
   "files": [
     { "path": "tailscaled", "from": "tailscaled", "mode": "0755" },
     { "path": "runas", "from": "runas/runas", "mode": "0755" },
