@@ -1,0 +1,15 @@
+[Unit]
+Description=Screen share: the centre display in a browser over the tailnet, clicks become touches
+After=winston.service
+
+[Service]
+# BMW's own grabber user (centerscreengrabber.service): group mgu_wayland (winston's screenshot-group) + video (DRM)
+User=os_7011
+Environment=XDG_RUNTIME_DIR=/run/wayland
+# idle until a viewer connects; winston-grabber runs as its child only while someone watches
+ExecStart=/usr/bin/node /var/opt/iteriodev-screencast/current/screencast.js
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

@@ -10,5 +10,15 @@
    "ID8"
   ],
   "uninstallable": true
- }
+ },
+ "tools": [
+  {
+   "id": "iteriodev-screencast",
+   "path": "tools/iteriodev-screencast"
+  },
+  {
+   "id": "iteriodev-tailscale",
+   "path": "tools/iteriodev-tailscale"
+  }
+ ]
 }

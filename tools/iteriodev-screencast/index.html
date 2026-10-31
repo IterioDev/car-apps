@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MGU screen</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #111; color: #bbb; font: 13px system-ui, sans-serif; }
+  body { display: flex; flex-direction: column; }
+  #bar { display: flex; gap: 12px; align-items: center; padding: 6px 12px; }
+  #bar b { color: #eee; }
+  #bar span:last-of-type { flex: 1; }
+  button { background: #333; color: #eee; border: 0; border-radius: 4px; padding: 4px 10px; font: inherit; cursor: pointer; }
+  #stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  video { width: 100%; height: 100%; object-fit: contain; touch-action: none; cursor: crosshair; user-select: none; }
+</style>
+</head>
+<body>
+<div id="bar"><b>MGU screen</b><span id="st">connecting...</span><span></span><button id="fs">Full screen</button></div>
+<div id="stage"><video id="v" muted autoplay playsinline disablepictureinpicture></video></div>
+<script src="mux.js"></script>
+<script>
+'use strict';
+const v = document.getElementById('v'), st = document.getElementById('st');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let info, frames = 0, bytes = 0, delay = null;
+
+// ---- video: /video access units -> Mux -> MediaSource; stay at the live edge ------------------------------
+// iPhone / iPad Safari (17.1+) have only ManagedMediaSource, which opens only with remote playback off
+const MS = window.MediaSource || window.ManagedMediaSource;
+async function play() {
+  if (!MS) throw new Error('this browser has no MediaSource');
+  const ms = new MS();
+  if (MS === window.ManagedMediaSource) v.disableRemotePlayback = true;
+  st.textContent = 'opening the video...';
+  v.preload = 'auto';
+  v.src = URL.createObjectURL(ms);
+  v.play().catch(() => {});   // iOS loads a media element (and opens its source) only once it is asked to play
+  await new Promise((r, j) => {
+    ms.addEventListener('sourceopen', r, { once: true });
+    setTimeout(() => j(new Error(`the video did not open (${MS.name}) - tap the page`)), 8000);
+  });
+  const res = await fetch('video', { cache: 'no-store' });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const rd = res.body.getReader(), q = [];
+  // tell the server what has arrived: it holds frames back while too much is still on the way (slow uplink)
+  const id = res.headers.get('X-Screencast-Viewer');
+  let got = 0, acked = 0, acking = false;
+  const acker = setInterval(async () => {
+    if (!id || acking || got === acked) return;
+    acking = true;
+    const n = got;
+    try {
+      const r = await fetch('ack', { method: 'POST', headers: { 'X-Screencast': '1' }, body: `${id} ${n}` });
+      if (r.ok) { acked = n; delay = +(await r.text()); }
+    } catch (e) {}
+    acking = false;
+  }, 100);
+  let buf = new Uint8Array(0), sb = null, mux = null, failed = null;
+  const fail = (e) => { failed = failed || e; rd.cancel().catch(() => {}); };   // the pending read ends
+  v.onerror = () => fail(new Error(`video: ${v.error && (v.error.message || v.error.code)}`));
+  const pump = () => {
+    if (!sb || sb.updating || !q.length) return;
+    try { sb.appendBuffer(q.shift()); } catch (e) { fail(e); }
+  };
+  // frames come in clumps (LTE): keep a few in hand and catch up by playing faster - a jump to the end each time
+  // left nothing in hand, so it stalled and jumped all the time (6 of 10 fps shown); jump only when far behind
+  const live = () => {
+    const b = sb.buffered;
+    if (!b.length) return;
+    const end = b.end(b.length - 1), ahead = end - v.currentTime;
+    if (ahead > 3 || v.currentTime < b.start(0)) v.currentTime = end - 0.3;
+    else v.playbackRate = ahead > 1 ? 1.5 : ahead > 0.3 ? 1.15 : 1;
+    if (v.currentTime - b.start(0) > 30 && !sb.updating) sb.remove(0, v.currentTime - 10);
+    if (v.paused) v.play().catch(() => {});
+  };
+  st.textContent = 'waiting for a keyframe...';
+  try {
+    for (;;) {
+      const { value, done } = await rd.read();
+      if (done) throw failed || new Error('stream ended');
+      bytes += value.length;
+      const nb = new Uint8Array(buf.length + value.length);
+      nb.set(buf); nb.set(value, buf.length); buf = nb;
+      while (buf.length >= 4) {
+        const len = (buf[0] << 24 | buf[1] << 16 | buf[2] << 8 | buf[3]) >>> 0;
+        if (buf.length < 4 + len) break;
+        const f = Mux.frame(buf.subarray(4, 4 + len));
+        buf = buf.slice(4 + len);
+        got++;
+        if (!mux) {
+          if (!f.key || !f.sps || !f.pps) continue;
+          mux = new Mux(f.sps, f.pps, info.width, info.height, info.fps);
+          if (!MS.isTypeSupported(mux.type)) throw new Error(`this browser can't play ${mux.type}`);
+          sb = ms.addSourceBuffer(mux.type);
+          sb.addEventListener('updateend', () => { live(); pump(); });
+          q.push(mux.init());
+        }
+        q.push(mux.fragment(f));
+        frames++;
+        pump();
+      }
+    }
+  } finally {
+    clearInterval(acker);
+    delay = null;
+    rd.cancel().catch(() => {});
+    v.onerror = null;
+    URL.revokeObjectURL(v.src);
+  }
+}
+
+setInterval(() => {
+  if (frames) st.textContent = `live, ${frames} fps, ${Math.round(bytes * 8 / 1000)} kbit/s` +
+    (delay === null ? '' : `, ${(delay / 1000).toFixed(1)} s on the way`);
+  frames = bytes = 0;
+}, 1000);
+
+// ---- mouse / finger -> /touch, one request at a time so down, moves and up stay in order ------------------
+const sendq = [];
+let sending = false, down = null, beat = null;
+async function flush() {
+  if (sending) return;
+  sending = true;
+  while (sendq.length) {
+    try {
+      await fetch('touch', { method: 'POST', headers: { 'X-Screencast': '1' }, body: sendq.shift() });
+    } catch (e) { st.textContent = 'touch: ' + e.message; }
+  }
+  sending = false;
+}
+function send(ev, p) {
+  const msg = `${ev} ${p[0].toFixed(4)} ${p[1].toFixed(4)}`;
+  if (ev === 2 && sendq.length && sendq[sendq.length - 1][0] === '2') sendq[sendq.length - 1] = msg;  // latest move only
+  else sendq.push(msg);
+  flush();
+}
+// the picture inside the element (object-fit: contain) as 0..1, clamped; null = beside the picture
+function at(e) {
+  const r = v.getBoundingClientRect(), s = Math.min(r.width / info.width, r.height / info.height);
+  const w = info.width * s, h = info.height * s;
+  const x = (e.clientX - r.left - (r.width - w) / 2) / w, y = (e.clientY - r.top - (r.height - h) / 2) / h;
+  const c = (n) => Math.min(1, Math.max(0, n));
+  return { p: [c(x), c(y)], inside: x >= 0 && x <= 1 && y >= 0 && y <= 1 };
+}
+v.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || !info || down) return;
+  const a = at(e);
+  if (!a.inside) return;
+  e.preventDefault();
+  v.setPointerCapture(e.pointerId);
+  down = a.p;
+  send(1, down);
+  beat = setInterval(() => send(2, down), 500);   // still held: the server lifts a finger after 2 s of silence
+});
+v.addEventListener('pointermove', (e) => { if (down) { down = at(e).p; send(2, down); } });
+const lift = () => { if (!down) return; clearInterval(beat); send(3, down); down = null; };
+v.addEventListener('pointerup', lift);
+v.addEventListener('pointercancel', lift);
+v.addEventListener('contextmenu', (e) => e.preventDefault());
+document.getElementById('fs').onclick = () => {
+  const s = document.getElementById('stage');
+  (s.requestFullscreen ? s.requestFullscreen() : v.webkitEnterFullscreen && v.webkitEnterFullscreen());
+};
+// a tap counts as a user gesture: lets a browser that waits for one start the video
+document.addEventListener('click', () => { if (v.paused) v.play().catch(() => {}); });
+
+(async () => {
+  for (;;) {
+    try {
+      info = await (await fetch('info', { cache: 'no-store' })).json();
+      await play();
+    } catch (e) { st.textContent = `${e.message} - reconnecting`; }
+    await sleep(2000);
+  }
+})();
+</script>
+</body>
+</html>

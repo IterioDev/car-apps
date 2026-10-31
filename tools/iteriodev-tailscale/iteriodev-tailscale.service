@@ -1,0 +1,19 @@
+[Unit]
+Description=Tailscale (userspace networking) for remote access to the head unit
+After=network.target mgu-uplink.service
+
+[Service]
+# root: state folder, the runtime folder and the resolv.conf bound below, all for uid 3910 (no RuntimeDirectory=:
+# systemd gives that back to the unit's user, root, before every command)
+ExecStartPre=/bin/sh /var/opt/iteriodev-tailscale/current/setup.sh
+# uid 3910: no account (this systemd refuses User= without one), not in any app range; the uplink routes it
+# (component.json "internet", "uids"). runas drops root to it.
+# the unit's own resolver has no internet: tailscaled resolves through the uplink lease's DNS (run.sh keeps that
+# file), bound over /etc/resolv.conf in a mount namespace of its own. Not BindReadOnlyPaths=: systemd 237 fails
+# the whole unit ("Failed to set up mount namespacing") while the file does not exist yet, "-" or not.
+ExecStart=/usr/bin/unshare -m /bin/sh -c 'mount --bind /run/iteriodev-tailscale/resolv.conf /etc/resolv.conf || echo "resolv.conf not bound" >&2; exec /var/opt/iteriodev-tailscale/current/runas 3910:3910 /var/opt/iteriodev-tailscale/current/run.sh'
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

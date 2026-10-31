@@ -1,0 +1,5 @@
+#!/bin/sh
+# The tailscale CLI (linked into tailscaled), talking to this tool's daemon. As root, e.g.:
+#   /var/opt/iteriodev-tailscale/current/ts up --hostname=bmw-mgu     (prints the login link once)
+#   /var/opt/iteriodev-tailscale/current/ts status
+TS_BE_CLI=1 exec /var/opt/iteriodev-tailscale/current/tailscaled --socket=/run/iteriodev-tailscale/tailscaled.sock "$@"

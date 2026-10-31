@@ -1,0 +1,20 @@
+{
+  "id": "iteriodev-screencast",
+  "kind": "tool",
+  "version": "1.0.7",
+  "title": "Screen share",
+  "description": "The centre display in a browser over your tailnet (http://<head unit>:5880/), clicks and drags become touches",
+  "optional": true,
+  "uninstallable": true,
+  "requires": { "iteriodev-tailscale": "1.104.4" },
+  "mguHmi": ["ID8"],
+  "files": [
+    { "path": "screencast.js", "from": "screencast.js", "mode": "0644" },
+    { "path": "index.html", "from": "index.html", "mode": "0644" },
+    { "path": "mux.js", "from": "mux.js", "mode": "0644" }
+  ],
+  "units": [{ "name": "iteriodev-screencast.service", "from": "iteriodev-screencast.service" }],
+  "enable": [{ "unit": "iteriodev-screencast.service", "target": "multi-user.target" }],
+  "recmgr": ["iteriodev-screencast"],
+  "restart": ["iteriodev-screencast.service"]
+}

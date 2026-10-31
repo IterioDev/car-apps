@@ -1,0 +1,26 @@
+{
+  "id": "iteriodev-tailscale",
+  "kind": "tool",
+  "version": "1.104.5",
+  "title": "Tailscale",
+  "description": "Remote access to the head unit over your tailnet (Tailscale in userspace networking, through the internet uplink)",
+  "optional": true,
+  "uninstallable": true,
+  "requires": { "mgu-uplink": "0.4.0" },
+  "mguHmi": ["ID8"],
+  "files": [
+    { "path": "tailscaled", "from": "tailscaled", "mode": "0755" },
+    { "path": "runas", "from": "runas/runas", "mode": "0755" },
+    { "path": "run.sh", "from": "run.sh", "mode": "0755" },
+    { "path": "setup.sh", "from": "setup.sh", "mode": "0755" },
+    { "path": "ts", "from": "ts", "mode": "0755" },
+    { "path": "LICENSE", "from": "LICENSE", "mode": "0644" }
+  ],
+  "units": [{ "name": "iteriodev-tailscale.service", "from": "iteriodev-tailscale.service" }],
+  "enable": [{ "unit": "iteriodev-tailscale.service", "target": "multi-user.target" }],
+  "recmgr": ["iteriodev-tailscale"],
+  "crashNames": ["tailscaled", "runas"],
+  "restart": ["iteriodev-tailscale.service"],
+  "internet": true,
+  "uids": [3910]
+}
