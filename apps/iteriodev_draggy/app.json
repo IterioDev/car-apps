@@ -1,0 +1,9 @@
+{
+ "id": "iteriodev_draggy",
+ "version": "1.1.4",
+ "title": "Drag Timer",
+ "description": "Acceleration timer: stand still, launch, and it times the run with splits and a speed-over-time chart, timed from the launch. Keeps your best times; km/h or mph.",
+ "needs": [
+  "renderer"
+ ]
+}

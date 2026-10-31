@@ -1,0 +1,9 @@
+{
+ "id": "iteriodev_cardash",
+ "version": "1.1.5",
+ "title": "Car Data",
+ "description": "Live engine data on your iDrive screen: engine speed, boost, power and torque bars with peak hold, oil, coolant and intake temperatures. Bar ends and red zones are set per car on the Settings page.",
+ "needs": [
+  "renderer"
+ ]
+}
