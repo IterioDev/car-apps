@@ -2,11 +2,10 @@
 
 > [!WARNING]
 > **Not tested on iDrive 7.** These apps and tools have been tested only on iDrive 8, in the emulator and on a real
-> car.
+> car. Every app also installs on iDrive 7; there it is checked only as far as building against iDrive 7's app SDK.
 
-Apps and tools by IterioDev for BMW head units with iDrive 8 (MGU). The apps run in the head unit's own app platform
-and show up in *All apps* like BMW's apps. Live Adjustments and Tailscale (app and tool) also install on iDrive 7;
-the others are for iDrive 8 only.
+Apps and tools by IterioDev for BMW head units with iDrive 7 and iDrive 8 (MGU). The apps run in the head unit's own
+app platform and show up in *All apps* like BMW's apps.
 
 ## The apps
 
@@ -117,13 +116,15 @@ top of `screencast.js`.
 
 ## What is in this repository
 
-- `apps/<id>/`: one folder per app with its package `<id>@<version>.tgz`, ready to install, its `app.json`
-  (version, title, description, the head units it is for, what it needs and requires) and `icon.png`.
+- `apps/<id>/`: one folder per app with its package `<id>@<version>.tgz`, its `app.json` (version, title,
+  description, the head units it is for, what it needs and requires) and `icon.png`. A package is a source
+  package (`mgu-app.json`, as the Store itself ships): the Store's deploy tool builds it on the head unit with that
+  unit's own app SDK when it installs it, so one package serves iDrive 7 and iDrive 8.
 - `tools/<id>/`: one folder per tool with its prebuilt files and `component.json`.
 - `mgu-repo.json`: what mgu-store reads. Every folder under `apps/` is an app and the tools are listed; the apps'
   build step, `tools/prebuilt.js`, does nothing because the package is already here.
 
-Each release is a tag `x.y.z`. The apps' sources are not published here.
+Each release is a tag `x.y.z`. The apps need the Store's deploy tool 0.7.5 or newer (the Store installs it first).
 
 ## Disclaimer
 
