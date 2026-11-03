@@ -51,7 +51,7 @@ That link is gone: remove that source, then add `IterioDev/car-apps` as above. I
 > [!NOTE]
 > **Car-tested** (G82): the shortcuts (tap, hold to save), seat heating / ventilation and steering wheel heating in
 > the bar's own spots (0.3.1), M1 -> SPORT and back to ROAD as the car reports M setups (0.3.2). Not car-tested yet:
-> the level segments, the shift lights, TRACK, and the app's picker and settings pages.
+> the level segments, the shift lights, TRACK, *Start in M SPORT* (0.3.3), and the app's picker and settings pages.
 
 An iDrive 8.5-style strip drawn over the climate bar, always there (also over the reversing camera):
 
@@ -63,8 +63,10 @@ An iDrive 8.5-style strip drawn over the climate bar, always there (also over th
   status, also when changed in the climate menu. Only what the car has is shown.
 - **Steering wheel heating** at the bar's far left, one tap on / off.
 - **M1 / M2** (M cars): switching an M setup on also switches the M Mode (cluster and head-up display, as the M Mode
-  button), switching it off goes back; which mode for M1, M2 and off is set in the app. The app's M Mode page shows
-  once the car has reported an M setup.
+  button), switching it off goes back; which mode for M1, M2 and off is set in the app. Only M1 / M2 switch it: a
+  mode picked with the M Mode button stays. The app's M Mode page shows once the car has reported an M setup.
+- **Start in M SPORT** (M cars, off unless set in the app): after a start, once the cluster is up (it reports its
+  view; the head unit wakes before it), the M Mode goes to SPORT if the cluster shows its standard view.
 - **Shift lights** on the instrument cluster, for any car (iDrive 8): 8 bars a side at the top centre of the
   cluster, over the map, lit from the outside in and flashing at the shift point; on cars without their own (not
   M) also in the head-up display above the speed. Lit from the engine speed against a start and a flash rpm (set in

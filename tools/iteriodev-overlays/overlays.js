@@ -63,11 +63,14 @@ const SCREENS = [
 const RED = [255, 48, 49], BLUE = [29, 120, 223], WHITE = [255, 255, 255];   // the HMI's accent colours
 const OFF_ALPHA = 0.6;
 const MODES = ['road', 'sport', 'track'];
-const SETTINGS = { shortcuts: true, seats: true, wheel: true, order: 'up', mmode: { on: true, m1: 'sport', m2: 'sport', off: 'road' },
-    shift: shift.DEFAULTS };
+const SETTINGS = { shortcuts: true, seats: true, wheel: true, order: 'up',
+    mmode: { on: true, m1: 'sport', m2: 'sport', off: 'road', boot: false }, shift: shift.DEFAULTS };
 // MDrive 0xB51F, the active M setup: statusMConfigurationMDrive 0x8018 byte 0 (Hmi8's ...SP21: 0 none, 1 M1, 2 M2,
 // 3 unset) or, older, statusMDriveTwo 0x8001 byte 0 (...SP18: statusMDrive2 0 off, 1 on); SP21 wins once seen
 const MDRIVE = 0xb51f, MDRIVE_SUB = `sub 0xb51f 1 1 1 0x8018 0x8001 0x${shift.DME.ev.toString(16)}`;
+// Vehicle2 0xB519 statusDisplayKombi 0x807C (getter 124): the cluster's view, 1 standard, 2 M view, 3 M view plus,
+// 15 not filled in (mgu-m4 2026-11-03: 02 in SPORT, the getter answers)
+const VEHICLE2 = 0xb519, KOMBI_EV = 0x807c, KOMBI_SUB = 'sub 0xb519 1 1 1 0x807c';
 
 const log = (m) => console.log(m);
 
@@ -152,7 +155,7 @@ function mergeSettings(cur, p) {
     ['shortcuts', 'seats', 'wheel'].forEach((k) => { if (typeof p[k] === 'boolean') out[k] = p[k]; });
     if (p.order === 'up' || p.order === 'down') out.order = p.order;
     if (p.mmode && typeof p.mmode === 'object') {
-        if (typeof p.mmode.on === 'boolean') out.mmode.on = p.mmode.on;
+        ['on', 'boot'].forEach((k) => { if (typeof p.mmode[k] === 'boolean') out.mmode[k] = p.mmode[k]; });
         ['m1', 'm2', 'off'].forEach((k) => { if (MODES.indexOf(p.mmode[k]) >= 0) out.mmode[k] = p.mmode[k]; });
     }
     out.shift = shift.mergeSettings(out.shift, p.shift);
@@ -177,17 +180,29 @@ function saveData(file, data) {
  * that, unset, or SP18 after SP21 was seen. SP21's 0x8018 is a state. SP18's statusMDriveTwo 0x8001 is NOT
  * (mgu-m4 2026-11-03): each M button action sends ONE "EIN" frame with the configuration it applies (entering M1, also
  * by the double press DSC off needs: M1's; leaving: the car's normal one) and at once "AUS" again. So an EIN frame
- * toggles (at a start no M setup is active); AUS frames and repeats within PULSE_MS are ignored. A direct M1 -> M2
- * switch would read as leaving (not seen on the car yet). */
+ * toggles (at a start no M setup is active); AUS frames and repeats within PULSE_MS are ignored. Only frames with
+ * byte 1 controlDisplayMDrive2 = 1 (M1_M2_TASTE_AKTIV) come from the M buttons: the car also sends EIN frames with 0
+ * there and the normal settings by itself (5 in 13 min on mgu-m4, 2026-11-03), which must not toggle. A direct
+ * M1 -> M2 switch would read as leaving (not seen on the car yet). */
 const PULSE_MS = 1000;
 function mSetupOf(m, ev, hex, now) {
     const v = parseInt((hex || '').slice(0, 2), 16);
     if (ev === 0x8018 && v <= 2) { m.sp21 = true; return v; }
-    if (ev !== 0x8001 || m.sp21 || v !== 1) return null;
+    if (ev !== 0x8001 || m.sp21 || v !== 1 || parseInt(hex.slice(2, 4), 16) !== 1) return null;
     if (now - (m.pulseAt || -Infinity) < PULSE_MS) return null;
     m.pulseAt = now;
     m.sp18 = m.sp18 ? 0 : 1;
     return m.sp18;
+}
+/* the cluster's view (statusDisplayKombi byte 0) -> it, when the cluster just came up: the first filled-in value
+ * since the tool started or since it read 15. "Start in M SPORT" waits for that, not for the head unit's own start:
+ * the head unit wakes before the cluster does */
+function clusterUp(k, hex) {
+    const v = parseInt((hex || '').slice(0, 2), 16);
+    if (!(v >= 1 && v <= 3)) { k.up = false; return null; }
+    if (k.up) return null;
+    k.up = true;
+    return v;
 }
 /* the next level of a tap: 1 -> 2 -> 3 -> off ('up'), or 3 -> 2 -> 1 -> off ('down') */
 const nextLevel = (level, max, order) => (order === 'down' ? (level > 0 ? level - 1 : max) : seats.next(level, max));
@@ -400,6 +415,7 @@ function main() {
         const w = line.split(' '), svc = parseInt(w[1], 16), ev = parseInt(w[2], 16);
         if (svc === MDRIVE && ev === shift.DME.ev) sl.dme(w[3]);
         else if (svc === MDRIVE) mSetup(ev, w[3]);
+        else if (svc === VEHICLE2 && ev === KOMBI_EV) kombi(w[3]);
         else if (svc === shift.RPM.svc && ev === shift.RPM.ev) sl.rpm(w[3]);
         else if (svc === shift.LIMIT.svc && ev === shift.LIMIT.ev) sl.limit(w[3]);
         else seatChanged(seats.apply(st, svc, ev, w[3]));
@@ -467,9 +483,16 @@ function main() {
         const mode = s === 0 ? settings.mmode.off : s === 1 ? settings.mmode.m1 : settings.mmode.m2;
         hmi(`mmode ${mode}`).then((r) => log(`M setup ${s} (0x${ev.toString(16)} ${hex}): mmode ${mode}: ${r}`));
     }
+    const k = { up: false, view: null };
+    function kombi(hex) {                             // Start in M SPORT (M cars): once the cluster is up, in its standard view
+        const v = parseInt(hex.slice(0, 2), 16), up = clusterUp(k, hex);
+        if (v !== k.view) { log(`cluster view ${k.view} -> ${v}`); k.view = v; }
+        if (up === 1 && mcar && settings.mmode.boot) hmi('mmode sport').then((r) => log(`cluster up: mmode sport: ${r}`));
+    }
     function subscribe() {
         if (st.backend !== 'demo') seats.SUBS.forEach((l) => hmi(l));
         hmi(MDRIVE_SUB);
+        hmi(KOMBI_SUB);
         hmi(shift.LIMIT.sub);
         sl.settings();                                // the rpm poll (hmictl's own thread), when the shift lights are on
     }
@@ -641,8 +664,8 @@ function test() {
     assert.strictEqual(keys(all, mergeSettings(SETTINGS, { seats: false })), 'driver.wheel@20');
     assert.strictEqual(keys(all, mergeSettings(SETTINGS, { wheel: false, seats: 'no' })), 'driver.cool@222 driver.heat@864 passenger.cool@1844 passenger.heat@2486');
     // settings: known keys of the right kind only
-    const s2 = mergeSettings(SETTINGS, { order: 'down', mmode: { m2: 'track', off: 'warp', on: false }, extra: 1, shortcuts: 0 });
-    assert.deepStrictEqual(s2, { shortcuts: true, seats: true, wheel: true, order: 'down', mmode: { on: false, m1: 'sport', m2: 'track', off: 'road' },
+    const s2 = mergeSettings(SETTINGS, { order: 'down', mmode: { m2: 'track', off: 'warp', on: false, boot: 1 }, extra: 1, shortcuts: 0 });
+    assert.deepStrictEqual(s2, { shortcuts: true, seats: true, wheel: true, order: 'down', mmode: { on: false, m1: 'sport', m2: 'track', off: 'road', boot: false },
         shift: shift.DEFAULTS });
     assert.deepStrictEqual(mergeSettings(SETTINGS, { shift: { on: false, flash: 7000 } }).shift, { on: false, auto: true, start: 4500, flash: 7000, hud: true });
     assert.strictEqual(SETTINGS.order, 'up', 'defaults untouched');
@@ -654,9 +677,15 @@ function test() {
     // repeats within a second don't count
     const ms = { sp21: false };
     const ENTER = '01010302020202020000010001', LEAVE = '01010202010101010000010000', IDLE = '00000002000000000000000003';
-    assert.deepStrictEqual([mSetupOf(ms, 0x8001, IDLE, 0), mSetupOf(ms, 0x8001, ENTER, 15000), mSetupOf(ms, 0x8001, IDLE, 15010),
-        mSetupOf(ms, 0x8001, ENTER, 15500), mSetupOf(ms, 0x8001, LEAVE, 27000), mSetupOf(ms, 0x8001, IDLE, 27010), mSetupOf(ms, 0x8001, '02', 30000)],
-        [null, 1, null, null, 0, null, null]);
+    const CAR = '01000202010101010000010000', CAR2 = '01000002000000000000000003';   // EIN frames not from the M buttons
+    assert.deepStrictEqual([mSetupOf(ms, 0x8001, IDLE, 0), mSetupOf(ms, 0x8001, CAR, 5000), mSetupOf(ms, 0x8001, ENTER, 15000),
+        mSetupOf(ms, 0x8001, IDLE, 15010), mSetupOf(ms, 0x8001, ENTER, 15500), mSetupOf(ms, 0x8001, CAR2, 20000), mSetupOf(ms, 0x8001, CAR, 22000),
+        mSetupOf(ms, 0x8001, LEAVE, 27000), mSetupOf(ms, 0x8001, IDLE, 27010), mSetupOf(ms, 0x8001, '02', 30000), mSetupOf(ms, 0x8001, '01', 31000)],
+        [null, null, 1, null, null, null, null, 0, null, null, null]);
+    // the cluster comes up: its first filled-in view counts once, again after 15 (not filled in)
+    const kb = { up: false };
+    assert.deepStrictEqual(['0f', '01', '01', '02', '0f', '0f', '02', '01', '00', '01'].map((h) => clusterUp(kb, h)),
+        [null, 1, null, null, null, null, 2, null, null, 1]);
     // SP21 (0 none, 1 M1, 2 M2) is a state and wins once seen; other fields -> null
     assert.deepStrictEqual([mSetupOf(ms, 0x8018, '0201', 40000), mSetupOf(ms, 0x8001, ENTER, 50000), mSetupOf(ms, 0x8018, '00', 50000),
         mSetupOf(ms, 0x8018, '03', 50000), mSetupOf(ms, 0x8005, '01', 50000)], [2, null, 0, null, null]);
