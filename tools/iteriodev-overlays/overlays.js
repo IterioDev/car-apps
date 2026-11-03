@@ -63,7 +63,7 @@ const SCREENS = [
 const RED = [255, 48, 49], BLUE = [29, 120, 223], WHITE = [255, 255, 255];   // the HMI's accent colours
 const OFF_ALPHA = 0.6;
 const MODES = ['road', 'sport', 'track'];
-const SETTINGS = { shortcuts: true, seats: true, wheel: true, order: 'up',
+const SETTINGS = { shortcuts: true, seats: true, wheel: true, ambient: true, ambientHeat: 3, ambientCool: 9, order: 'up',
     mmode: { on: true, m1: 'sport', m2: 'sport', off: 'road', boot: false }, shift: shift.DEFAULTS };
 // MDrive 0xB51F, the active M setup: statusMConfigurationMDrive 0x8018 byte 0 (Hmi8's ...SP21: 0 none, 1 M1, 2 M2,
 // 3 unset) or, older, statusMDriveTwo 0x8001 byte 0 (...SP18: statusMDrive2 0 off, 1 on); SP21 wins once seen
@@ -71,6 +71,14 @@ const MDRIVE = 0xb51f, MDRIVE_SUB = `sub 0xb51f 1 1 1 0x8018 0x8001 0x${shift.DM
 // Vehicle2 0xB519 statusDisplayKombi 0x807C (getter 124): the cluster's view, 1 standard, 2 M view, 3 M view plus,
 // 15 not filled in (mgu-m4 2026-11-03: 02 in SPORT, the getter answers)
 const VEHICLE2 = 0xb519, KOMBI_EV = 0x807c, KOMBI_SUB = 'sub 0xb519 1 1 1 0x807c';
+// the ambient light flash when a seat or the wheel heating goes on: ComfortFunctionIuK 0xB512, the 12-colour ambient
+// light (G8x): status getter 3 / setter 26, 10 bytes {hue u16, colour 1-12, layer 1-3, brightness, mode (1 on),
+// dynamic x2}; 0fff / ff / 03 = no change. The colour byte is the 0-based place in the HMI's list (sqltext.db: Ivory,
+// Citrine, Coral, ... Azure 9th); mgu-m4 2026-11-03 (user): 3rd red, 9th azure. Back to the colour read before after FLASH_MS.
+// The settings hold the colours' numbers as the menu counts them (1-12): ambientHeat, ambientCool.
+const AMBIENT = { get: 'call 0xb512 1 3 1', set: (c) => `call 0xb512 1 26 1 0fff${c}ffffffff030303`,
+    byte: (n) => (n - 1).toString(16).padStart(2, '0') };
+const FLASH_MS = 5000, FLASH_AFTER_MS = 10000;      // ponytail: no flash for the start's first statuses (grace window)
 
 const log = (m) => console.log(m);
 
@@ -152,7 +160,8 @@ function describe(slot, apps) {
 function mergeSettings(cur, p) {
     const out = JSON.parse(JSON.stringify(cur));
     if (!p || typeof p !== 'object') return out;
-    ['shortcuts', 'seats', 'wheel'].forEach((k) => { if (typeof p[k] === 'boolean') out[k] = p[k]; });
+    ['shortcuts', 'seats', 'wheel', 'ambient'].forEach((k) => { if (typeof p[k] === 'boolean') out[k] = p[k]; });
+    ['ambientHeat', 'ambientCool'].forEach((k) => { if (Number.isInteger(p[k]) && p[k] >= 1 && p[k] <= 12) out[k] = p[k]; });
     if (p.order === 'up' || p.order === 'down') out.order = p.order;
     if (p.mmode && typeof p.mmode === 'object') {
         ['on', 'boot'].forEach((k) => { if (typeof p.mmode[k] === 'boolean') out.mmode[k] = p.mmode[k]; });
@@ -193,6 +202,16 @@ function mSetupOf(m, ev, hex, now) {
     m.pulseAt = now;
     m.sp18 = m.sp18 ? 0 : 1;
     return m.sp18;
+}
+/* which flash for levels (one per key, 0 off) going from off to on: 'heat' (seat, wheel; also when both) or 'cool'
+ * (ventilation); null when nothing went on */
+function flashKind(keys, before, after) {
+    const on = keys.filter((k, i) => !before[i] && after[i]);
+    return !on.length ? null : on.some((k) => !k.endsWith('.cool')) ? 'heat' : 'cool';
+}
+/* the ambient light's colour number from its status (hex), or null when it is off or unreadable */
+function ambientColour(hex) {
+    return hex && hex.length === 20 && hex.slice(14, 16) === '01' ? hex.slice(4, 6) : null;
 }
 /* the cluster's view (statusDisplayKombi byte 0) -> it, when the cluster just came up: the first filled-in value
  * since the tool started or since it read 15. "Start in M SPORT" waits for that, not for the head unit's own start:
@@ -418,7 +437,30 @@ function main() {
         else if (svc === VEHICLE2 && ev === KOMBI_EV) kombi(w[3]);
         else if (svc === shift.RPM.svc && ev === shift.RPM.ev) sl.rpm(w[3]);
         else if (svc === shift.LIMIT.svc && ev === shift.LIMIT.ev) sl.limit(w[3]);
-        else seatChanged(seats.apply(st, svc, ev, w[3]));
+        else {
+            const before = levels(), changed = seats.apply(st, svc, ev, w[3]), k = flashKind(KEYS, before, levels());
+            if (k && settings.ambient && Date.now() > flashFrom) {
+                ambientFlash(AMBIENT.byte(k === 'heat' ? settings.ambientHeat : settings.ambientCool));
+            }
+            seatChanged(changed);
+        }
+    }
+    const KEYS = Object.keys(PIX), flashFrom = Date.now() + FLASH_AFTER_MS;
+    const levels = () => KEYS.map((k) => (state(k).have ? state(k).level : 0));
+    const amb = { orig: null, timer: null };
+    async function ambientFlash(c) {                  // the colour for FLASH_MS, then the one read before
+        if (!amb.orig) {
+            const r = await hmi(AMBIENT.get), o = ambientColour(r.slice(3));
+            if (!o) return;                               // off, or no answer: no flash
+            if (!amb.orig) amb.orig = o;
+        }
+        clearTimeout(amb.timer);
+        hmi(AMBIENT.set(c));
+        amb.timer = setTimeout(() => {
+            const o = amb.orig;
+            amb.orig = null;
+            hmi(AMBIENT.set(o)).then((r) => log(`ambient flash ${c} -> back to ${o}: ${r.split(' ')[0]}`));
+        }, FLASH_MS);
     }
 
     /* shift lights in cluster-render's `guide` target, and in `hud` on cars without their own (no M setup, no DME shift
@@ -664,8 +706,10 @@ function test() {
     assert.strictEqual(keys(all, mergeSettings(SETTINGS, { seats: false })), 'driver.wheel@20');
     assert.strictEqual(keys(all, mergeSettings(SETTINGS, { wheel: false, seats: 'no' })), 'driver.cool@222 driver.heat@864 passenger.cool@1844 passenger.heat@2486');
     // settings: known keys of the right kind only
-    const s2 = mergeSettings(SETTINGS, { order: 'down', mmode: { m2: 'track', off: 'warp', on: false, boot: 1 }, extra: 1, shortcuts: 0 });
-    assert.deepStrictEqual(s2, { shortcuts: true, seats: true, wheel: true, order: 'down', mmode: { on: false, m1: 'sport', m2: 'track', off: 'road', boot: false },
+    const s2 = mergeSettings(SETTINGS, { order: 'down', mmode: { m2: 'track', off: 'warp', on: false, boot: 1 }, extra: 1, shortcuts: 0,
+        ambientHeat: 4, ambientCool: 13 });
+    assert.deepStrictEqual(s2, { shortcuts: true, seats: true, wheel: true, ambient: true, ambientHeat: 4, ambientCool: 9, order: 'down',
+        mmode: { on: false, m1: 'sport', m2: 'track', off: 'road', boot: false },
         shift: shift.DEFAULTS });
     assert.deepStrictEqual(mergeSettings(SETTINGS, { shift: { on: false, flash: 7000 } }).shift, { on: false, auto: true, start: 4500, flash: 7000, hud: true });
     assert.strictEqual(SETTINGS.order, 'up', 'defaults untouched');
@@ -682,6 +726,16 @@ function test() {
         mSetupOf(ms, 0x8001, IDLE, 15010), mSetupOf(ms, 0x8001, ENTER, 15500), mSetupOf(ms, 0x8001, CAR2, 20000), mSetupOf(ms, 0x8001, CAR, 22000),
         mSetupOf(ms, 0x8001, LEAVE, 27000), mSetupOf(ms, 0x8001, IDLE, 27010), mSetupOf(ms, 0x8001, '02', 30000), mSetupOf(ms, 0x8001, '01', 31000)],
         [null, null, 1, null, null, null, null, 0, null, null, null]);
+    // ambient flash: off -> on only; heat / wheel 'heat', ventilation 'cool', heat wins; the colour only while it is on;
+    // the menu's 3rd colour = byte 02
+    const K = ['driver.wheel', 'driver.cool', 'driver.heat', 'passenger.cool', 'passenger.heat'];
+    assert.deepStrictEqual([flashKind(K, [0, 0, 0, 0, 0], [0, 2, 0, 0, 0]), flashKind(K, [0, 0, 0, 0, 0], [0, 0, 0, 0, 3]),
+        flashKind(K, [0, 0, 0, 0, 0], [1, 0, 0, 0, 0]), flashKind(K, [0, 0, 0, 0, 0], [0, 1, 0, 1, 2]),
+        flashKind(K, [0, 1, 0, 0, 0], [0, 2, 0, 0, 0]), flashKind(K, [0, 0, 2, 0, 0], [0, 0, 0, 0, 0])], ['cool', 'heat', 'heat', 'heat', null, null]);
+    assert.deepStrictEqual([ambientColour('00000602fffffa010001'), ambientColour('00000602fffffa000001'), ambientColour(''),
+        ambientColour('rror service 0xb512.1 not there')], ['06', null, null, null]);
+    assert.deepStrictEqual([AMBIENT.byte(SETTINGS.ambientHeat), AMBIENT.byte(SETTINGS.ambientCool), AMBIENT.byte(12)], ['02', '08', '0b']);
+    assert.strictEqual(AMBIENT.set(AMBIENT.byte(3)), 'call 0xb512 1 26 1 0fff02ffffffff030303');
     // the cluster comes up: its first filled-in view counts once, again after 15 (not filled in)
     const kb = { up: false };
     assert.deepStrictEqual(['0f', '01', '01', '02', '0f', '0f', '02', '01', '00', '01'].map((h) => clusterUp(kb, h)),

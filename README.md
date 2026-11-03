@@ -50,8 +50,9 @@ That link is gone: remove that source, then add `IterioDev/car-apps` as above. I
 
 > [!NOTE]
 > **Car-tested** (G82): the shortcuts (tap, hold to save), seat heating / ventilation and steering wheel heating in
-> the bar's own spots (0.3.1), M1 -> SPORT and back to ROAD as the car reports M setups (0.3.2). Not car-tested yet:
-> the level segments, the shift lights, TRACK, *Start in M SPORT* (0.3.3), and the app's picker and settings pages.
+> the bar's own spots (0.3.1), M1 -> SPORT and back to ROAD as the car reports M setups (0.3.2, only M1 / M2 since
+> 0.3.3), the ambient light flash with its default colours (0.3.4). Not car-tested yet: the level segments, the shift
+> lights, TRACK, *Start in M SPORT* (0.3.3), other flash colours, and the app's picker and settings pages.
 
 An iDrive 8.5-style strip drawn over the climate bar, always there (also over the reversing camera):
 
@@ -62,6 +63,10 @@ An iDrive 8.5-style strip drawn over the climate bar, always there (also over th
   turns red / blue and the line under it shows the level (three segments). What it shows is always the car's live
   status, also when changed in the climate menu. Only what the car has is shown.
 - **Steering wheel heating** at the bar's far left, one tap on / off.
+- **Ambient light flash** (on unless switched off in the app): when seat or steering wheel heating goes on, the
+  ambient light turns red for 5 s, for ventilation blue, then back to your colour; from the strip, the climate menu
+  or the seat buttons alike. The colours are picked in the app by their number in the car's ambient light menu
+  (default 3 and 9: Coral and Azure). Cars with the 12-colour ambient light (G8x); nothing while it is off.
 - **M1 / M2** (M cars): switching an M setup on also switches the M Mode (cluster and head-up display, as the M Mode
   button), switching it off goes back; which mode for M1, M2 and off is set in the app. Only M1 / M2 switch it: a
   mode picked with the M Mode button stays. The app's M Mode page shows once the car has reported an M setup.
