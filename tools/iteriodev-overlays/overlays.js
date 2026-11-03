@@ -31,22 +31,25 @@ const path = require('path');
 const { spawn } = require('child_process');
 const png = require('./png');
 const seats = require('./seats');
+const shift = require('./shiftlights');
 
 const DATA = process.env.OVERLAYS_DATA || '/var/opt/iteriodev-overlays/slots.json';
 const CTL = process.env.OVERLAYS_CTL || '/run/iteriodev-overlays/ctl.sock';
 const OAP = process.env.OVERLAYS_OAP || '/var/opt/public/oap';
 const CLIENT = process.env.MGU_RENDER_CLIENT || '/var/opt/mgu-render/current/mgu_render_client.js';
+const CLUSTER = process.env.CLUSTER_RENDER_CLIENT || '/var/opt/cluster-render/current/cluster_render_client.js';
 const HMICTL = path.join(__dirname, 'hmictl');
 const SELF = 'iteriodev_overlays';               // the control-panel app: not offered as a slot
 const HOLD_MS = 1000, PENDING_MS = 3000, REREAD_MS = 60000;
 const OFFSETS = [0, 3000];                   // an app's RHMI application against its appletId (oap-sdk)
-// screen px. The M4's bar (screenshot 2026-11-02): temperatures 365-843 | 1987-2465, CLIMATE MENU 1386-1495. The HMI's
-// seat buttons are 120 px wide, 21 px off a temperature: driver heat measured (864-983, its icon 24.5 px off the
-// button's centre away from the temperature, the accent line at y 99-104 of the bar), the other spots by symmetry
+// screen px. The M4's bar (screenshots 2026-11-02 / -03): temperatures 365-843 | 1987-2465, CLIMATE MENU 1386-1495.
+// The HMI's seat buttons are 120 px wide, their accent line at y 99-104 of the bar, and the icon sits ICON_DX right of
+// the button's centre on every button (not mirrored): heat 864-983 (21 px right of a temperature), ventilation
+// 222-341 / 1844-1963 (24 px left of one), measured with the HMI's own icons on; passenger heat by the driver's
 const LAYOUT = { x: 0, y: 840, w: 2880, h: 120, slots: [1055, 1200, 1540, 1685], slotW: 140, buttonW: 120,
-    buttons: { 'driver.wheel': 20, 'driver.cool': 224, 'driver.heat': 864, 'passenger.cool': 1846, 'passenger.heat': 2486 },
+    buttons: { 'driver.wheel': 20, 'driver.cool': 222, 'driver.heat': 864, 'passenger.cool': 1844, 'passenger.heat': 2486 },
     iconY: 55, lineY: 99, lineH: 6 };
-const AWAY = { wheel: -1, cool: -1, heat: 1 };   // which way a button's icon sits off its centre
+const ICON_DX = 24;
 const DEFAULTS = [{ state: 2, applet: 23 }, { state: 1, applet: 32 }, { state: 24, applet: 34 }, { state: 20, applet: 4 }];
 // the BMW screens the app offers (a slot can hold any other one, saved by a hold): strip picture, the app's icon
 const SCREENS = [
@@ -60,10 +63,11 @@ const SCREENS = [
 const RED = [255, 48, 49], BLUE = [29, 120, 223], WHITE = [255, 255, 255];   // the HMI's accent colours
 const OFF_ALPHA = 0.6;
 const MODES = ['road', 'sport', 'track'];
-const SETTINGS = { shortcuts: true, seats: true, wheel: true, order: 'up', mmode: { on: true, m1: 'sport', m2: 'sport', off: 'road' } };
+const SETTINGS = { shortcuts: true, seats: true, wheel: true, order: 'up', mmode: { on: true, m1: 'sport', m2: 'sport', off: 'road' },
+    shift: shift.DEFAULTS };
 // MDrive 0xB51F, the active M setup: statusMConfigurationMDrive 0x8018 byte 0 (Hmi8's ...SP21: 0 none, 1 M1, 2 M2,
 // 3 unset) or, older, statusMDriveTwo 0x8001 byte 0 (...SP18: statusMDrive2 0 off, 1 on); SP21 wins once seen
-const MDRIVE = 0xb51f, MDRIVE_SUB = 'sub 0xb51f 1 1 1 0x8018 0x8001';
+const MDRIVE = 0xb51f, MDRIVE_SUB = `sub 0xb51f 1 1 1 0x8018 0x8001 0x${shift.DME.ev.toString(16)}`;
 
 const log = (m) => console.log(m);
 
@@ -118,8 +122,9 @@ function findFile(dir, name, depth) {
     }
     return null;
 }
-/* an app's name (its package's productName) and the screen its tile opens (the lowest RHMI state; ids from 3000 =
- * the oap-sdk's offset, the AppletID is then appletId + 3000) */
+/* an app's name (its package's productName) and the screen its tile opens (the lowest RHMI state). The AppletID is the
+ * appletId itself on the car (mgu-m4 2026-11-03: Car Data, Fault Codes held at state 3000 with offset 0); some SDK
+ * builds add 3000 (the VM's older apps): tap() tries the other offset when this one fails, and keeps the one that works */
 function appInfo(a) {
     let title = a.id, state = null;
     try { title = JSON.parse(fs.readFileSync(path.join(a.dir, 'source', 'package.json'), 'utf8')).productName || title; } catch (e) { /* none */ }
@@ -129,7 +134,7 @@ function appInfo(a) {
         const c = JSON.parse(fs.readFileSync(ui, 'utf8')).containers || {};
         Object.keys(c).filter((k) => c[k].type === 'state').forEach((k) => { if (state === null || +k < state) state = +k; });
     } catch (e) { /* no description */ }
-    return state === null ? null : { id: a.id, title, state, offset: state >= 3000 ? 3000 : 0 };
+    return state === null ? null : { id: a.id, title, state, offset: 0 };
 }
 /* a slot as the app shows it */
 function describe(slot, apps) {
@@ -150,6 +155,7 @@ function mergeSettings(cur, p) {
         if (typeof p.mmode.on === 'boolean') out.mmode.on = p.mmode.on;
         ['m1', 'm2', 'off'].forEach((k) => { if (MODES.indexOf(p.mmode[k]) >= 0) out.mmode[k] = p.mmode[k]; });
     }
+    out.shift = shift.mergeSettings(out.shift, p.shift);
     return out;
 }
 const slotOk = (s) => s && Number.isInteger(s.state) &&
@@ -168,12 +174,20 @@ function saveData(file, data) {
     fs.renameSync(file + '.tmp', file);
 }
 /* an MDrive notification -> the active M setup (0 none, 1 M1 - SP18: an M setup on -, 2 M2), or null: not about
- * that, unset, or SP18 after SP21 was seen */
-function mSetupOf(m, ev, hex) {
+ * that, unset, or SP18 after SP21 was seen. SP21's 0x8018 is a state. SP18's statusMDriveTwo 0x8001 is NOT
+ * (mgu-m4 2026-11-03): each M button action sends ONE "EIN" frame with the configuration it applies (entering M1, also
+ * by the double press DSC off needs: M1's; leaving: the car's normal one) and at once "AUS" again. So an EIN frame
+ * toggles (at a start no M setup is active); AUS frames and repeats within PULSE_MS are ignored. A direct M1 -> M2
+ * switch would read as leaving (not seen on the car yet). */
+const PULSE_MS = 1000;
+function mSetupOf(m, ev, hex, now) {
     const v = parseInt((hex || '').slice(0, 2), 16);
     if (ev === 0x8018 && v <= 2) { m.sp21 = true; return v; }
-    if (ev === 0x8001 && !m.sp21 && v <= 1) return v;
-    return null;
+    if (ev !== 0x8001 || m.sp21 || v !== 1) return null;
+    if (now - (m.pulseAt || -Infinity) < PULSE_MS) return null;
+    m.pulseAt = now;
+    m.sp18 = m.sp18 ? 0 : 1;
+    return m.sp18;
 }
 /* the next level of a tap: 1 -> 2 -> 3 -> off ('up'), or 3 -> 2 -> 1 -> off ('down') */
 const nextLevel = (level, max, order) => (order === 'down' ? (level > 0 ? level - 1 : max) : seats.next(level, max));
@@ -243,14 +257,23 @@ function tint(img, rgb) {                            // the HMI's icons are grey
     return { w: img.w, h: img.h, data };
 }
 /* one seat / wheel button (buttonW x h): the icon off its centre, the accent line when on */
-function drawButton(px, L, kind, img, level, pressed) {
+/* on, the accent line shows the level: `max` segments, `level` of them lit, the rest dim; over the bar's own colour,
+ * so the HMI's full line under it doesn't show through (one segment: the whole line, the wheel's on / off) */
+const BAR_BG = [1, 4, 8], DIM_SEG = [80, 86, 94], SEG_GAP = 6;
+function drawButton(px, L, kind, img, level, pressed, max) {
     const BW = L.buttonW, on = level > 0, rgb = kind === 'cool' ? BLUE : RED;
     if (pressed) blend(px, BW, 0, 0, pill(BW, L.h, 6, 16, 0.18), 1);
     if (img) {
-        const cx = BW / 2 + 24.5 * AWAY[kind];
+        const cx = BW / 2 + ICON_DX;
         blend(px, BW, Math.round(cx - img.w / 2), Math.round(L.iconY - img.h / 2), tint(img, on ? rgb : WHITE), on ? 1 : OFF_ALPHA);
     }
-    if (on) blend(px, BW, 0, L.lineY, pill(BW, L.lineH, 0, 0, 1, rgb), 1);
+    if (!on) return;
+    const n = Math.max(1, max || 1), sw = (BW - (n - 1) * SEG_GAP) / n;
+    blend(px, BW, 0, L.lineY, pill(BW, L.lineH, 0, 0, 1, BAR_BG), 1);
+    for (let i = 0; i < n; i++) {
+        const x0 = Math.round(i * (sw + SEG_GAP)), x1 = Math.round(i * (sw + SEG_GAP) + sw);
+        blend(px, BW, x0, L.lineY, pill(x1 - x0, L.lineH, 0, 0, 1, i < level ? rgb : DIM_SEG), 1);
+    }
 }
 
 /* ---- the service ---- */
@@ -306,7 +329,7 @@ function main() {
         const [seat, kind] = key.split('.');
         picture({ builtin: kind === 'wheel' ? 'hmi-wheel' : `hmi-${kind}-${seat}` }, (img) => {
             const px = Buffer.alloc(BW * H * 4);
-            drawButton(px, L, kind, img, shown(key), gestures.pressed() === key);
+            drawButton(px, L, kind, img, shown(key), gestures.pressed() === key, state(key).max);
             gpu.pixels(PIX[key], [{ x: 0, y: 0, w: BW, h: H }], px);
             frame();
         }, HMI_PX);
@@ -375,11 +398,67 @@ function main() {
     }
     function onEvent(line) {
         const w = line.split(' '), svc = parseInt(w[1], 16), ev = parseInt(w[2], 16);
-        if (svc === MDRIVE) mSetup(ev, w[3]); else seatChanged(seats.apply(st, svc, ev, w[3]));
+        if (svc === MDRIVE && ev === shift.DME.ev) sl.dme(w[3]);
+        else if (svc === MDRIVE) mSetup(ev, w[3]);
+        else if (svc === shift.RPM.svc && ev === shift.RPM.ev) sl.rpm(w[3]);
+        else if (svc === shift.LIMIT.svc && ev === shift.LIMIT.ev) sl.limit(w[3]);
+        else seatChanged(seats.apply(st, svc, ev, w[3]));
     }
+
+    /* shift lights in cluster-render's `guide` target, and in `hud` on cars without their own (no M setup, no DME shift
+     * lights seen) (shiftlights.js); off: no rpm polling, no layer shown */
+    const sl = (() => {
+        const v = { rpm: 0, limit: null, dme: null, dmeAt: 0, seg: -1, flash: null, shown: {}, vis: { shown: false, lowSince: 0 },
+            renderer: 'missing', layer: '' };
+        let cr = null;
+        const layers = {};                            // target -> layer ref
+        if (fs.existsSync(CLUSTER)) {
+            try {
+                const { ClusterRender } = require(CLUSTER);
+                cr = new ClusterRender('iteriodev-overlays');
+                Object.keys(shift.TARGETS).forEach((t) => {
+                    const g = shift.TARGETS[t];
+                    layers[t] = cr.effect({ target: t, klass: 'overlay', x: 0, y: 0, w: g.w, h: g.h, fs: shift.fs(g), time: true, visible: 0 });
+                    cr.uniform(layers[t], 'u_seg', [0]); cr.uniform(layers[t], 'u_flash', [0]);
+                });
+                cr.on('layer', (ref, state, reason) => {
+                    if (ref === layers.guide) { v.layer = state; push(); }
+                    log(`shift lights: ${ref === layers.hud ? 'hud' : 'guide'} layer ${state}${reason ? ` (${reason})` : ''}`);
+                });
+                cr.on('target', (name, state, holder, reason) => log(`shift lights: target ${name} ${state}${reason ? ` (${reason})` : ''}`));
+                cr.on('ready', () => { v.renderer = 'connected'; push(); });
+                cr.on('disconnected', () => { v.renderer = 'not running'; push(); });
+                cr.on('refused', (op, ref, reason) => { v.layer = `refused: ${reason}`; log(`shift lights: ${op} refused: ${reason}`); push(); });
+                cr.connect();
+                v.renderer = 'connecting';
+            } catch (e) { log('shift lights: cluster-render client: ' + e.message); }
+        } else log('shift lights: cluster-render is not installed');
+        function update() {
+            const s = settings.shift, now = Date.now(), th = shift.thresholds(s, v.limit);
+            const l = v.dme && now - v.dmeAt < shift.DME_FRESH_MS ? v.dme : shift.lights(v.rpm, th);
+            const near = s.on && shift.visible(v.vis, v.rpm, th, l.seg, now);
+            const shown = { guide: near, hud: near && s.hud && !mcar && !v.dmeAt };   // an M car's HUD has its own
+            if (!cr) return;
+            const all = (name, val) => Object.keys(layers).forEach((t) => cr.uniform(layers[t], name, [val]));
+            if (l.seg !== v.seg) { v.seg = l.seg; all('u_seg', l.seg); }
+            if (l.flash !== v.flash) { v.flash = l.flash; all('u_flash', l.flash ? 1 : 0); }
+            Object.keys(layers).forEach((t) => {
+                if (shown[t] !== v.shown[t]) { v.shown[t] = shown[t]; cr.set(layers[t], { visible: shown[t] ? 1 : 0 }); }
+            });
+        }
+        return {
+            rpm(hex) { const r = shift.rpmOf(hex); if (r !== null) { v.rpm = r; update(); } },
+            limit(hex) { const l = shift.limitOf(hex); if (l !== v.limit) { v.limit = l; update(); push(); } },
+            dme(hex) { const d = shift.dmeOf(hex); if (d) { v.dme = d; v.dmeAt = Date.now(); update(); } },
+            settings() { hmi(settings.shift.on ? shift.RPM.poll : shift.RPM.poll.replace(/ 50 /, ' 0 ')); update(); },
+            status: () => ({ renderer: v.renderer, layer: v.layer, limit: v.limit, dme: v.dmeAt > 0, th: shift.thresholds(settings.shift, v.limit) }),
+            tick: update,                             // the hysteresis' timeout
+            close() { if (cr) cr.close(); },
+        };
+    })();
     const m = { sp21: false, setup: 0 };
     function mSetup(ev, hex) {                        // a setup on (also already on at start) -> its mode, off -> 'off'
-        const s = mSetupOf(m, ev, hex);
+        const s = mSetupOf(m, ev, hex, Date.now());
         if (s === null) return;
         if (!mcar || (m.sp21 && !m.told)) { mcar = true; m.told = m.sp21; save(); push(); }   // an M car: the app shows M Mode
         if (s === m.setup) return;
@@ -391,6 +470,8 @@ function main() {
     function subscribe() {
         if (st.backend !== 'demo') seats.SUBS.forEach((l) => hmi(l));
         hmi(MDRIVE_SUB);
+        hmi(shift.LIMIT.sub);
+        sl.settings();                                // the rpm poll (hmictl's own thread), when the shift lights are on
     }
     async function reread() {                         // the notifications keep it current; this is the safety net
         for (const g of seats.rereads(st)) {
@@ -404,6 +485,14 @@ function main() {
         const s = slots[i], t = target(s, apps);
         if (!t) { log(`slot ${i}: ${s.app} is not installed`); return; }
         let r = await hmi(`open ${t.state} ${t.applet}`);
+        if (r !== 'ok' && s.app) {                    // the other offset (appInfo): kept when it opens
+            const other = OFFSETS.find((o) => o !== s.offset), alt = target(Object.assign({}, s, { offset: other }), apps);
+            if (await hmi(`open ${alt.state} ${alt.applet}`) === 'ok') {
+                log(`slot ${i}: ${s.app} opens at offset ${other}`);
+                setSlot(i, Object.assign({}, s, { offset: other }));
+                return;
+            }
+        }
         if (r !== 'ok' && s.app) {                    // not registered with the HMI yet: launch it, then again
             log(`slot ${i}: open ${t.state} ${t.applet}: ${r}, starting ${s.app}`);
             await hmi(`start ${s.app}`);
@@ -445,7 +534,7 @@ function main() {
     const has = (s) => ({ heat: s.heat.have, cool: s.cool.have });
     const status = () => ({ state: { settings, slots: slots.map((s) => describe(s, apps)),
         car: { backend: st.backend, seats: { driver: has(st.seats.driver), passenger: has(st.seats.passenger) }, wheel: st.wheel.have,
-            mcar, setups: m.sp21 ? 2 : 1 } } });
+            mcar, setups: m.sp21 ? 2 : 1 }, shift: sl.status() } });
     function push() { const l = JSON.stringify(status()) + '\n'; clients.forEach((c) => c.write(l)); }
     function targets() {
         apps = installedApps(OAP);
@@ -459,8 +548,10 @@ function main() {
     }
     function request(c, q) {
         if (q.op === 'set') {
+            const was = settings.shift.on;
             settings = mergeSettings(settings, q.settings);
             save(); redrawAll(); push();
+            if (settings.shift.on !== was) sl.settings(); else sl.tick();
         } else if (q.op === 'slot' && Number.isInteger(q.i) && q.i >= 0 && q.i < 4 && slotOk(q.target)) {
             const t = q.target;
             setSlot(q.i, t.app ? { app: t.app, state: t.state, offset: t.offset } : { state: t.state, applet: t.applet });
@@ -516,7 +607,8 @@ function main() {
         slots.forEach((s, i) => { if (JSON.stringify(iconOf(s, apps)) !== looks[i] && settings.shortcuts) drawSlot(i); });
     }, 30000);
     setInterval(reread, REREAD_MS);
-    process.on('SIGTERM', () => { gpu.close(); if (child) child.kill(); process.exit(0); });
+    setInterval(sl.tick, 500);
+    process.on('SIGTERM', () => { gpu.close(); sl.close(); if (child) child.kill(); process.exit(0); });
     gpu.connect();
     log(`overlays: ${JSON.stringify(slots)} ${JSON.stringify(settings)}${st.backend === 'demo' ? ', seats: demo' : ''}`);
 }
@@ -542,24 +634,32 @@ function test() {
     // buttons: only what the car has and the settings allow, in the HMI's spots
     const keys = (st, set) => buttons(LAYOUT, st, set).map((b) => b.key + '@' + b.x).join(' ');
     const all = seats.state(true);
-    assert.strictEqual(keys(all, SETTINGS), 'driver.wheel@20 driver.cool@224 driver.heat@864 passenger.cool@1846 passenger.heat@2486');
+    assert.strictEqual(keys(all, SETTINGS), 'driver.wheel@20 driver.cool@222 driver.heat@864 passenger.cool@1844 passenger.heat@2486');
     const heatOnly = seats.state(false);
     heatOnly.seats.driver.heat.have = heatOnly.seats.passenger.heat.have = true;
     assert.strictEqual(keys(heatOnly, SETTINGS), 'driver.heat@864 passenger.heat@2486');
     assert.strictEqual(keys(all, mergeSettings(SETTINGS, { seats: false })), 'driver.wheel@20');
-    assert.strictEqual(keys(all, mergeSettings(SETTINGS, { wheel: false, seats: 'no' })), 'driver.cool@224 driver.heat@864 passenger.cool@1846 passenger.heat@2486');
+    assert.strictEqual(keys(all, mergeSettings(SETTINGS, { wheel: false, seats: 'no' })), 'driver.cool@222 driver.heat@864 passenger.cool@1844 passenger.heat@2486');
     // settings: known keys of the right kind only
     const s2 = mergeSettings(SETTINGS, { order: 'down', mmode: { m2: 'track', off: 'warp', on: false }, extra: 1, shortcuts: 0 });
-    assert.deepStrictEqual(s2, { shortcuts: true, seats: true, wheel: true, order: 'down', mmode: { on: false, m1: 'sport', m2: 'track', off: 'road' } });
+    assert.deepStrictEqual(s2, { shortcuts: true, seats: true, wheel: true, order: 'down', mmode: { on: false, m1: 'sport', m2: 'track', off: 'road' },
+        shift: shift.DEFAULTS });
+    assert.deepStrictEqual(mergeSettings(SETTINGS, { shift: { on: false, flash: 7000 } }).shift, { on: false, auto: true, start: 4500, flash: 7000, hud: true });
     assert.strictEqual(SETTINGS.order, 'up', 'defaults untouched');
     // taps: up 1 -> 2 -> 3 -> off, down 3 -> 2 -> 1 -> off
     assert.deepStrictEqual([0, 1, 2, 3].map((l) => nextLevel(l, 3, 'up')), [1, 2, 3, 0]);
     assert.deepStrictEqual([0, 3, 2, 1].map((l) => nextLevel(l, 3, 'down')), [3, 2, 1, 0]);
-    // M setups: SP18 (on = 1) until SP21 shows up (0 none, 1 M1, 2 M2), unset / unchanged / other fields -> null
+    // M setups, SP18 as the G82 sends them (2026-11-03 capture): entering M1 (double press, DSC off) = an EIN frame with
+    // M1's settings and at once AUS; leaving (one press) = EIN with the normal settings and AUS: EIN toggles, AUS and
+    // repeats within a second don't count
     const ms = { sp21: false };
-    assert.deepStrictEqual([mSetupOf(ms, 0x8001, '01000000'), mSetupOf(ms, 0x8001, '02'), mSetupOf(ms, 0x8018, '03')], [1, null, null]);
-    assert.deepStrictEqual([mSetupOf(ms, 0x8018, '0201'), mSetupOf(ms, 0x8001, '00'), mSetupOf(ms, 0x8018, '00'), mSetupOf(ms, 0x8005, '01')],
-        [2, null, 0, null]);
+    const ENTER = '01010302020202020000010001', LEAVE = '01010202010101010000010000', IDLE = '00000002000000000000000003';
+    assert.deepStrictEqual([mSetupOf(ms, 0x8001, IDLE, 0), mSetupOf(ms, 0x8001, ENTER, 15000), mSetupOf(ms, 0x8001, IDLE, 15010),
+        mSetupOf(ms, 0x8001, ENTER, 15500), mSetupOf(ms, 0x8001, LEAVE, 27000), mSetupOf(ms, 0x8001, IDLE, 27010), mSetupOf(ms, 0x8001, '02', 30000)],
+        [null, 1, null, null, 0, null, null]);
+    // SP21 (0 none, 1 M1, 2 M2) is a state and wins once seen; other fields -> null
+    assert.deepStrictEqual([mSetupOf(ms, 0x8018, '0201', 40000), mSetupOf(ms, 0x8001, ENTER, 50000), mSetupOf(ms, 0x8018, '00', 50000),
+        mSetupOf(ms, 0x8018, '03', 50000), mSetupOf(ms, 0x8005, '01', 50000)], [2, null, 0, null, null]);
     // gestures: tap, hold, slide off, nothing; a button key taps but never holds
     let timers = [], ev = [];
     const T = { set: (f) => { timers.push(f); return f; }, clear: (f) => { timers = timers.filter((x) => x !== f); } };
@@ -573,18 +673,24 @@ function test() {
     assert.deepStrictEqual(ev, ['tap0', 'hold2', 'tappassenger.heat']);
     // a button: off = white icon, no line; on = coloured icon + the accent line under the whole button
     const icon = { w: 10, h: 10, data: Buffer.alloc(400, 255) };
-    const btn = (kind, level) => { const px = Buffer.alloc(LAYOUT.buttonW * LAYOUT.h * 4); drawButton(px, LAYOUT, kind, icon, level, false); return px; };
+    const btn = (kind, level, max) => { const px = Buffer.alloc(LAYOUT.buttonW * LAYOUT.h * 4); drawButton(px, LAYOUT, kind, icon, level, false, max); return px; };
     const at4 = (px, x, y) => Array.from(px.slice((y * LAYOUT.buttonW + x) * 4, (y * LAYOUT.buttonW + x) * 4 + 4));
-    const heatOn = btn('heat', 2), coolOn = btn('cool', 1), heatOff = btn('heat', 0);
+    const heatOn = btn('heat', 2, 3), coolOn = btn('cool', 1, 3), heatOff = btn('heat', 0, 3), wheelOn = btn('wheel', 1, 1);
     assert.deepStrictEqual(at4(heatOn, 0, LAYOUT.lineY), RED.concat(255), 'heat on: red line from the button\'s left');
-    assert.deepStrictEqual(at4(coolOn, LAYOUT.buttonW - 1, LAYOUT.lineY + 5), BLUE.concat(255), 'vent on: blue line');
+    // the level: 3 segments of 36 px, 6 px apart (0-35, 42-77, 84-119); the gaps the bar's colour (the HMI's line hidden)
+    assert.deepStrictEqual([at4(heatOn, 50, LAYOUT.lineY), at4(heatOn, 100, LAYOUT.lineY), at4(heatOn, 38, LAYOUT.lineY)],
+        [RED.concat(255), DIM_SEG.concat(255), BAR_BG.concat(255)], 'heat 2 of 3: two red segments, one dim');
+    assert.deepStrictEqual([at4(coolOn, 0, LAYOUT.lineY + 5), at4(coolOn, 60, LAYOUT.lineY)], [BLUE.concat(255), DIM_SEG.concat(255)], 'vent 1 of 3');
+    assert.deepStrictEqual(at4(wheelOn, 60, LAYOUT.lineY), RED.concat(255), 'the wheel: one segment, the whole line');
     assert.deepStrictEqual(at4(heatOff, 0, LAYOUT.lineY), [0, 0, 0, 0], 'off: no line');
-    assert.deepStrictEqual(at4(heatOn, 84, LAYOUT.iconY), RED.concat(255), 'heat icon right of the centre (60 + 24.5)');
+    assert.deepStrictEqual(at4(heatOn, 84, LAYOUT.iconY), RED.concat(255), 'heat icon right of the centre (60 + 24)');
     assert.deepStrictEqual(at4(heatOff, 84, LAYOUT.iconY).slice(3), [Math.round(255 * OFF_ALPHA)], 'off: white, dimmed');
-    assert.deepStrictEqual(at4(coolOn, 36, LAYOUT.iconY), BLUE.concat(255), 'vent icon left of the centre');
+    assert.deepStrictEqual(at4(coolOn, 84, LAYOUT.iconY), BLUE.concat(255), 'vent icon right of the centre too');
+    assert.deepStrictEqual(at4(coolOn, 36, LAYOUT.iconY), [0, 0, 0, 0], '... not left of it');
     const p = pill(150, 120, 10, 20, 1);
     assert.strictEqual(p.data[(60 * 150 + 75) * 4 + 3], 255); assert.strictEqual(p.data[3], 0);
     seats.test();
+    shift.test();
     console.log('overlays self-check ok');
 }
 

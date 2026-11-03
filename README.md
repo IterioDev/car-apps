@@ -15,7 +15,7 @@ app platform and show up in *All apps* like BMW's apps.
 | Drag Timer | `iteriodev_draggy` | Acceleration timer: stand still, launch, and it times the run with splits and a speed-over-time chart. Keeps your best times; km/h or mph. |
 | Fault Codes | `iteriodev_dtcscan` | Reads the fault memory of every control unit in the car, shows each fault with its text and clears it when you ask. Also lists the car's Check Control messages. |
 | Live Adjustments | `iteriodev_liveadjust` | For an MHD-tuned DME: engine map 1-4 and MHD Max Cooling, plus the exhaust flap (open, close, back to the DME). See below. |
-| Overlays | `iteriodev_overlays` | **iDrive 8 only.** Sets up the Overlays strip in the climate bar: four shortcuts to BMW screens or apps, seat heating / ventilation and steering wheel heating buttons, and on M cars the M Mode that M1 / M2 switch to. Needs the Overlays tool below (the Store installs it with the app). |
+| Overlays | `iteriodev_overlays` | **iDrive 8 only.** Sets up the Overlays strip in the climate bar: four shortcuts to BMW screens or apps, seat heating / ventilation and steering wheel heating buttons, shift lights on the cluster (any car), and on M cars the M Mode that M1 / M2 switch to. Needs the Overlays tool below (the Store installs it with the app). |
 | Tailscale | `iteriodev_tailscale` | The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`) and Log out. Needs the Tailscale tool below (the Store installs it with the app). |
 
 All of them draw their screens through the GPU renderer `mgu-render`. On iDrive 7 the screens are scaled down to fit
@@ -49,9 +49,9 @@ That link is gone: remove that source, then add `IterioDev/car-apps` as above. I
 ## Overlays (tool `iteriodev-overlays`, iDrive 8 only)
 
 > [!NOTE]
-> **Car-tested** (0.1.5 on a G82): the shortcuts (tap, hold to save), seat heating / ventilation and steering wheel
-> heating from the bar, M1 / M2 -> SPORT and back to ROAD. 0.2.0's new bar layout, the Overlays app, TRACK and the
-> M car check are not car-tested yet.
+> **Car-tested** (G82): the shortcuts (tap, hold to save), seat heating / ventilation and steering wheel heating in
+> the bar's own spots (0.3.1), M1 -> SPORT and back to ROAD as the car reports M setups (0.3.2). Not car-tested yet:
+> the level segments, the shift lights, TRACK, and the app's picker and settings pages.
 
 An iDrive 8.5-style strip drawn over the climate bar, always there (also over the reversing camera):
 
@@ -59,12 +59,18 @@ An iDrive 8.5-style strip drawn over the climate bar, always there (also over th
   the screen you are on into it (any BMW screen or app). The app picks them from a list too.
 - **Seat heating / ventilation** in the HMI's own spots and with its own icons: ventilation left of each
   temperature, heating right of it. A tap steps the level (1 -> 2 -> 3 -> off, or 3 -> 2 -> 1 -> off); on, the icon
-  turns red / blue with the HMI's line under it. What it shows is always the car's live status, also when changed
-  in the climate menu. Only what the car has is shown.
+  turns red / blue and the line under it shows the level (three segments). What it shows is always the car's live
+  status, also when changed in the climate menu. Only what the car has is shown.
 - **Steering wheel heating** at the bar's far left, one tap on / off.
 - **M1 / M2** (M cars): switching an M setup on also switches the M Mode (cluster and head-up display, as the M Mode
   button), switching it off goes back; which mode for M1, M2 and off is set in the app. The app's M Mode page shows
   once the car has reported an M setup.
+- **Shift lights** on the instrument cluster, for any car (iDrive 8): 8 bars a side at the top centre of the
+  cluster, over the map, lit from the outside in and flashing at the shift point; on cars without their own (not
+  M) also in the head-up display above the speed. Lit from the engine speed against a start and a flash rpm (set in
+  the app, or following the engine's current limit, lower while it is cold), or from an M car's own shift-light
+  signal. Needs **Cluster renderer (`cluster-render`) 0.3.6 or newer** from
+  [robertnisipeanu/idrive-apps](https://github.com/robertnisipeanu/idrive-apps); without it the rest works as before.
 
 The tool runs as the root service `iteriodev-overlays.service` and asks the HMI and the car over SOME/IP through its
 helper `hmictl`. It needs **Renderer (`mgu-render`) 0.6.10 or newer**, which can draw it as an overlay: the tool adds
