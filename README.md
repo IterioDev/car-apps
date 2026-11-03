@@ -15,6 +15,7 @@ app platform and show up in *All apps* like BMW's apps.
 | Drag Timer | `iteriodev_draggy` | Acceleration timer: stand still, launch, and it times the run with splits and a speed-over-time chart. Keeps your best times; km/h or mph. |
 | Fault Codes | `iteriodev_dtcscan` | Reads the fault memory of every control unit in the car, shows each fault with its text and clears it when you ask. Also lists the car's Check Control messages. |
 | Live Adjustments | `iteriodev_liveadjust` | For an MHD-tuned DME: engine map 1-4 and MHD Max Cooling, plus the exhaust flap (open, close, back to the DME). See below. |
+| Overlays | `iteriodev_overlays` | **iDrive 8 only.** Sets up the Overlays strip in the climate bar: four shortcuts to BMW screens or apps, seat heating / ventilation and steering wheel heating buttons, and on M cars the M Mode that M1 / M2 switch to. Needs the Overlays tool below (the Store installs it with the app). |
 | Tailscale | `iteriodev_tailscale` | The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`) and Log out. Needs the Tailscale tool below (the Store installs it with the app). |
 
 All of them draw their screens through the GPU renderer `mgu-render`. On iDrive 7 the screens are scaled down to fit
@@ -44,6 +45,34 @@ works (1.0.1, MHD). Max Cooling and the exhaust flap are not car-tested yet.
 
 Coming from IterioDev's earlier App Manager? Your Store has a source named `car-apps` (the old `index.json` link).
 That link is gone: remove that source, then add `IterioDev/car-apps` as above. It then updates the apps you have.
+
+## Overlays (tool `iteriodev-overlays`, iDrive 8 only)
+
+> [!NOTE]
+> **Car-tested** (0.1.5 on a G82): the shortcuts (tap, hold to save), seat heating / ventilation and steering wheel
+> heating from the bar, M1 / M2 -> SPORT and back to ROAD. 0.2.0's new bar layout, the Overlays app, TRACK and the
+> M car check are not car-tested yet.
+
+An iDrive 8.5-style strip drawn over the climate bar, always there (also over the reversing camera):
+
+- **Shortcuts:** two left and two right of *CLIMATE MENU*. A tap opens the slot's screen; holding one for 1 s saves
+  the screen you are on into it (any BMW screen or app). The app picks them from a list too.
+- **Seat heating / ventilation** in the HMI's own spots and with its own icons: ventilation left of each
+  temperature, heating right of it. A tap steps the level (1 -> 2 -> 3 -> off, or 3 -> 2 -> 1 -> off); on, the icon
+  turns red / blue with the HMI's line under it. What it shows is always the car's live status, also when changed
+  in the climate menu. Only what the car has is shown.
+- **Steering wheel heating** at the bar's far left, one tap on / off.
+- **M1 / M2** (M cars): switching an M setup on also switches the M Mode (cluster and head-up display, as the M Mode
+  button), switching it off goes back; which mode for M1, M2 and off is set in the app. The app's M Mode page shows
+  once the car has reported an M setup.
+
+The tool runs as the root service `iteriodev-overlays.service` and asks the HMI and the car over SOME/IP through its
+helper `hmictl`. It needs **Renderer (`mgu-render`) 0.6.10 or newer**, which can draw it as an overlay: the tool adds
+the drop-in `mgu-render.service.d/iteriodev-overlays.conf` that lists it (`overlay_apps`), read when the renderer
+next starts, so restart the head unit once after installing. The deploy tool puts `hmictl` and the service on the
+head unit's crash and restart whitelists (`crashNames`, `recmgr`) and limits its core dumps, so a crash of either
+never restarts the head unit. The app talks to the tool over `/run/iteriodev-overlays/ctl.sock`; settings and
+slots are kept in `/var/opt/iteriodev-overlays/slots.json`.
 
 ## Tailscale (tool `iteriodev-tailscale`)
 

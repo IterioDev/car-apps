@@ -1,0 +1,131 @@
+{
+  "id": "iteriodev-overlays",
+  "kind": "tool",
+  "version": "0.2.0",
+  "title": "Overlays",
+  "description": "QuickSelect strip (iDrive 8.5 style) in the climate bar: four shortcuts (tap opens, hold 1 s saves the screen you are on), seat heating / ventilation in the HMI's own spots, steering wheel heating, M1 / M2 switch the M Mode. Set up in the Overlays app. Needs Renderer (mgu-render) 0.6.10 or newer.",
+  "optional": true,
+  "uninstallable": true,
+  "mguHmi": [
+    "ID8"
+  ],
+  "requires": {
+    "mgu-render": "0.6.10",
+    "mgu-deploy": "0.7.11"
+  },
+  "files": [
+    {
+      "path": "overlays.js",
+      "from": "overlays.js",
+      "mode": "0644"
+    },
+    {
+      "path": "png.js",
+      "from": "png.js",
+      "mode": "0644"
+    },
+    {
+      "path": "seats.js",
+      "from": "seats.js",
+      "mode": "0644"
+    },
+    {
+      "path": "hmictl",
+      "from": "hmictl",
+      "mode": "0755"
+    },
+    {
+      "path": "icons/media.png",
+      "from": "icons/media.png",
+      "mode": "0644"
+    },
+    {
+      "path": "icons/nav.png",
+      "from": "icons/nav.png",
+      "mode": "0644"
+    },
+    {
+      "path": "icons/phone.png",
+      "from": "icons/phone.png",
+      "mode": "0644"
+    },
+    {
+      "path": "icons/apps.png",
+      "from": "icons/apps.png",
+      "mode": "0644"
+    },
+    {
+      "path": "icons/home.png",
+      "from": "icons/home.png",
+      "mode": "0644"
+    },
+    {
+      "path": "icons/climate.png",
+      "from": "icons/climate.png",
+      "mode": "0644"
+    },
+    {
+      "path": "icons/screen.png",
+      "from": "icons/screen.png",
+      "mode": "0644"
+    },
+    {
+      "path": "icons/app.png",
+      "from": "icons/app.png",
+      "mode": "0644"
+    },
+    {
+      "path": "icons/hmi-heat-driver.png",
+      "from": "icons/hmi-heat-driver.png",
+      "mode": "0644"
+    },
+    {
+      "path": "icons/hmi-heat-passenger.png",
+      "from": "icons/hmi-heat-passenger.png",
+      "mode": "0644"
+    },
+    {
+      "path": "icons/hmi-cool-driver.png",
+      "from": "icons/hmi-cool-driver.png",
+      "mode": "0644"
+    },
+    {
+      "path": "icons/hmi-cool-passenger.png",
+      "from": "icons/hmi-cool-passenger.png",
+      "mode": "0644"
+    },
+    {
+      "path": "icons/hmi-wheel.png",
+      "from": "icons/hmi-wheel.png",
+      "mode": "0644"
+    }
+  ],
+  "units": [
+    {
+      "name": "iteriodev-overlays.service",
+      "from": "iteriodev-overlays.service"
+    }
+  ],
+  "enable": [
+    {
+      "unit": "iteriodev-overlays.service",
+      "target": "multi-user.target"
+    }
+  ],
+  "dropins": [
+    {
+      "unit": "mgu-render.service",
+      "name": "iteriodev-overlays.conf",
+      "from": "mgu-render-overlays.conf"
+    }
+  ],
+  "recmgr": [
+    "iteriodev-overlays"
+  ],
+  "crashNames": [
+    "hmictl"
+  ],
+  "restart": [
+    "iteriodev-overlays.service"
+  ]
+}

@@ -1,0 +1,18 @@
+[Unit]
+Description=Overlays: the QuickSelect strip in the climate bar (drawn by mgu-render, screens opened over SOME/IP)
+After=vsomeipd.service mgu-render.socket
+
+[Service]
+# root: the vsomeip policy lets uid 0 call the HMI's HMIControl2 / HMIContext2 and MainApp's AppStart; mgu-render
+# lets only root clients be overlays. Slots in /var/opt/iteriodev-overlays/slots.json (kept over updates).
+# the Overlays app's control socket: /run/iteriodev-overlays/ctl.sock (0666, the app runs as its own uid)
+RuntimeDirectory=iteriodev-overlays
+RuntimeDirectoryMode=0755
+ExecStart=/usr/bin/node /var/opt/iteriodev-overlays/current/overlays.js
+# the car's system.conf has DefaultStandardOutput=null: the log would never reach the journal
+StandardOutput=journal
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

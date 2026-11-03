@@ -10,6 +10,10 @@
  },
  "tools": [
   {
+   "id": "iteriodev-overlays",
+   "path": "tools/iteriodev-overlays"
+  },
+  {
    "id": "iteriodev-screencast",
    "path": "tools/iteriodev-screencast"
   },
