@@ -121,14 +121,16 @@ Consider turning off key expiry for this device in the Tailscale admin console.
 
 > [!NOTE]
 > **Car-tested** (1.0.6): picture and taps on the HMI work. 1.0.7 also hands taps to apps drawn by `mgu-render`;
-> that part is not car-tested yet.
+> that part is not car-tested yet. 1.0.8 is one build for both ID7 and ID8: it auto-detects the panel's own
+> resolution (picture shape and touch) with no per-car setting — not car-tested yet.
 
 The head unit's centre display in a browser on your computer, over your tailnet. Clicks and drags on the picture
 become touches on the screen. Needs the Tailscale tool above (logged in) and a browser: Chrome, Edge, Firefox,
 Safari, or on an iPhone / iPad iOS 17.1 or newer (any browser there).
 
 - **Picture:** the head unit's own screen grabber (`winston-grabber`) encodes the screen as H.264 in hardware:
-  1440x480 at 10 fps, about 1 Mbit/s (about 450 MB an hour on a SIM uplink). It runs only while a browser has the
+  at the panel's own resolution (auto-detected, capped to 1600 px wide) at 10 fps, about 1 Mbit/s (about 450 MB an
+  hour on a SIM uplink). It runs only while a browser has the
   page open and stops 5 s after the last one closes. Playback stays about 0.2 s behind the screen, plus the network.
   The status line shows the frame rate, the bit rate and how long frames take to arrive; when the uplink can't carry
   the stream, the server skips frames so the picture stays at most about 1 s behind instead of falling further back.

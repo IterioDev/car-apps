@@ -24,11 +24,70 @@ const size = (s) => { const m = /^(\d+)x(\d+)$/.exec(s); if (!m) throw new Error
 const PORT = +env('SCREENCAST_PORT', 5880);
 const HOST = env('SCREENCAST_HOST', '127.0.0.1');
 const GRABBER = env('SCREENCAST_GRABBER', '/usr/bin/winston-grabber');
-const [W, H] = size(env('SCREENCAST_SIZE', '1440x480'));
-const [SW, SH] = size(env('SCREENCAST_SCREEN', '2880x960'));   // touch coordinates are screen pixels
 const FPS = +env('SCREENCAST_FPS', 10);
 // gop_ref_dist=1: no B-frames (the viewer's MP4 has no composition offsets, and they'd add delay)
 const PIPELINE = env('SCREENCAST_PIPELINE', 'h264_msdk(gop=10,gop_ref_dist=1,cbr=1M)');
+
+// One build for every head unit (ID7, ID8, any panel size): read the centre screen's native
+// resolution and shape the stream to it, so the picture keeps the right proportions and a tap
+// lands where it is clicked, with no per-car configuration.
+//   touch space (SW x SH) = the native panel; the viewer sends 0..1 fractions, we map to these pixels
+//   stream  (W x H)       = native, capped to SCREENCAST_MAXW wide (bitrate/sharpness stay sane on big panels)
+// Override either with SCREENCAST_SCREEN / SCREENCAST_SIZE (if you set SIZE, set SCREEN too, or touch drifts).
+const MAXW = +env('SCREENCAST_MAXW', 1600);
+const even = (n) => n - (n % 2);
+
+// jpegSize: [width, height] from a JPEG's SOF marker. The probe frame is a native-size JPEG.
+function jpegSize(b) {
+    for (let i = 2; i + 9 < b.length;) {
+        if (b[i] !== 0xFF) { i++; continue; }
+        const m = b[i + 1];
+        if (m === 0xD8 || m === 0xD9 || (m >= 0xD0 && m <= 0xD7)) { i += 2; continue; }   // no length
+        const len = b.readUInt16BE(i + 2);
+        if (m >= 0xC0 && m <= 0xCF && m !== 0xC4 && m !== 0xC8 && m !== 0xCC) {            // SOF0..SOF15
+            const h = b.readUInt16BE(i + 5), w = b.readUInt16BE(i + 7);
+            if (w > 0 && h > 0) return [w, h];
+        }
+        i += 2 + len;
+    }
+    return null;
+}
+
+if (process.argv.includes('--selftest')) {   // node screencast.js --selftest
+    const j = Buffer.from([0xFF, 0xD8, 0xFF, 0xC0, 0, 17, 8, 0x01, 0xE0, 0x02, 0x80,
+        3, 1, 0x22, 0, 2, 0x11, 0, 3, 0x11, 0, 0xFF, 0xD9]);  // SOF0 640x480
+    const s = jpegSize(j);
+    if (!s || s[0] !== 640 || s[1] !== 480) { console.error('jpegSize FAIL', s); process.exit(1); }
+    console.error('jpegSize OK', s); process.exit(0);
+}
+
+// detectScreen: one native JPEG frame from the grabber -> [w, h], or null. winston may still be
+// coming up at boot, so it is retried a few times.
+function detectScreen() {
+    const tmp = path.join(os.tmpdir(), `screencast-probe-${process.pid}.jpg`);
+    for (let n = 0; n < 4; n++) {
+        const r = spawnSync(GRABBER, ['--screen=center', '--num-frames=1', '-p', 'jpeg_msdk(num_frames=1),file', tmp],
+            { timeout: 8000, stdio: ['ignore', 'ignore', 'ignore'] });
+        try {
+            const sz = jpegSize(fs.readFileSync(tmp));
+            fs.unlinkSync(tmp);
+            if (sz) return sz;
+        } catch (e) { /* no file yet */ }
+        if (r && r.error) log(`screen probe: ${r.error.message}`);
+    }
+    return null;
+}
+
+let SW, SH, W, H;
+{
+    const envScreen = process.env.SCREENCAST_SCREEN, envSize = process.env.SCREENCAST_SIZE;
+    let native = envScreen ? size(envScreen) : detectScreen();
+    if (!native) { native = [2880, 960]; log('screen size not detected; using 2880x960 (set SCREENCAST_SCREEN to override)'); }
+    [SW, SH] = native;                                   // touch coordinates are screen pixels
+    if (envSize) [W, H] = size(envSize);
+    else if (SW > MAXW) { W = even(MAXW); H = even(Math.round(SH * W / SW)); }
+    else [W, H] = [SW, SH];
+}
 // the file plugin open()s its path: a FIFO, not /dev/stdout (node's stdout pipe is a socket: open() -> ENXIO)
 const ARGS = ['--screen=center', `--geometry=${W}x${H}`, `--fps=${FPS}`, '--num-frames=0',
     `--pipeline=${PIPELINE},file`];
