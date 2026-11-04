@@ -2,12 +2,30 @@
 
 Required Notice: Copyright (c) 2026 IterioDev (https://github.com/IterioDev)
 
-Everything in this repository is licensed under the PolyForm Strict License 1.0.0 below, except the parts listed
-under "Not covered", which keep their own licenses.
+Everything in this repository is licensed under the PolyForm Strict License 1.0.0 below, together with the
+additional permission for paid installation, except the parts listed under "Not covered", which keep their own
+licenses.
 
-In short (the license text below is what counts): you may install these apps and tools as they are and use them on
-your own car for noncommercial purposes. You may not sell them or charge for them, redistribute them, or change
-them or make new works based on them.
+In short (the texts below are what counts): you may install these apps and tools as they are and use them on your
+own car for noncommercial purposes, and you may charge someone for installing them on their car. You may not sell
+the apps or tools themselves or charge for them, redistribute them, or change them or make new works based on them.
+
+## Additional permission: paid installation
+
+As the licensor, IterioDev grants you this permission in addition to the PolyForm Strict License 1.0.0 below.
+
+You may install the software on a vehicle for the vehicle's owner or keeper and charge for that installation work,
+and you may use the software as far as you need to install it and show that it works, as long as:
+
+1. you install the software unchanged, as it is published here (directly, or through a store app that installs it
+   from here);
+2. you charge only for your work, not for the software: you do not sell, rent or license the software, copies of it
+   or access to it, and you do not present any part of your price as a price for the software; and
+3. before the customer pays, you tell them that the software is free of charge, that it is made by IterioDev, and
+   that it is licensed under these terms.
+
+This permission does not allow changes, distribution in any other way, selling the software, or selling hardware
+with the software already on it. The customer uses the software under the PolyForm Strict License 1.0.0 below.
 
 ## Not covered
 
