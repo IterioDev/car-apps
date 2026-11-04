@@ -2,9 +2,9 @@
 
 > [!WARNING]
 > **Not tested on iDrive 7.** These apps and tools have been tested only on iDrive 8, in the emulator and on a real
-> car. Car Data also installs on iDrive 7 (its version before the Telemetry redesign); there it is checked only as far
-> as building against iDrive 7's app SDK. Drag Timer, eDrive, Fault Codes, Live Adjustments, Overlays, Service
-> and Tailscale are iDrive 8 only.
+> car. No app here installs on iDrive 7 any more: every app is iDrive 8 only. iDrive 7 cars keep the versions they
+> have: Car Data 1.1.10, Drag Timer 1.1.8, Fault Codes 1.1.4, Live Adjustments 1.0.7 and Tailscale 1.0.4 (checked
+> there only as far as building against iDrive 7's app SDK).
 
 Apps and tools by IterioDev for BMW head units with iDrive 7 and iDrive 8 (MGU). The apps run in the head unit's own
 app platform and show up in *All apps* like BMW's apps.
@@ -13,7 +13,7 @@ app platform and show up in *All apps* like BMW's apps.
 
 | App | Package id | What it does |
 |---|---|---|
-| Car Data | `iteriodev_cardash` | Live engine data: engine speed, boost, power and torque bars with peak hold, oil, coolant and intake temperatures. |
+| Car Data | `iteriodev_cardash` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep 1.1.10). Live engine data: engine speed, boost, power and torque bars with peak hold, oil, coolant and intake temperatures, battery voltage. |
 | Drag Timer | `iteriodev_draggy` | **iDrive 8 only** from 1.2.0 (iDrive 7 cars that have 1.1.8 keep it). Acceleration timer: stand still, launch, and it times the run with splits and a speed-over-time chart. Power run: floor it in one gear for power and torque over rpm, with a baseline to compare (from cauliflowermossgrape's idrive7-apps). Keeps your best times; km/h or mph. |
 | eDrive | `iteriodev_edrive` | **iDrive 8 only.** For plug-in hybrids: the real electric range, learned from how the car is driven, the charge level and battery health, live power and cell voltages, and a log of the charges with their cost. Read-only. On a car without a high-voltage battery it says so and shows the 12 V battery. Not tested on a hybrid yet. |
 | Fault Codes | `iteriodev_dtcscan` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep the version they have). Reads the fault memory of every control unit in the car, shows each fault with its text and clears it when you ask. Also lists the car's Check Control messages. |

@@ -1,10 +1,9 @@
 {
  "id": "iteriodev_cardash",
- "version": "1.1.10",
+ "version": "1.2.0",
  "title": "Car Data",
- "description": "Live engine data on your iDrive screen: engine speed, boost, power and torque bars with peak hold, oil, coolant and intake temperatures, and battery voltage. Bar ends and red zones are set per car on the Settings page.",
+ "description": "Live engine data on your iDrive 8 screen: engine speed, boost, power and torque bars with peak hold, oil, coolant and intake temperatures, and battery voltage. Bar ends and red zones are set per car on the Settings page.",
  "mguHmi": [
-  "ID7",
   "ID8"
  ],
  "needs": [
