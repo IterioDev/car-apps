@@ -3,8 +3,8 @@
 > [!WARNING]
 > **Not tested on iDrive 7.** These apps and tools have been tested only on iDrive 8, in the emulator and on a real
 > car. Car Data also installs on iDrive 7 (its version before the Telemetry redesign); there it is checked only as far
-> as building against iDrive 7's app SDK. Drag Timer, eDrive, Fault Codes, Live Adjustments, Overlays and
-> Tailscale are iDrive 8 only.
+> as building against iDrive 7's app SDK. Drag Timer, eDrive, Fault Codes, Live Adjustments, Overlays, Service
+> and Tailscale are iDrive 8 only.
 
 Apps and tools by IterioDev for BMW head units with iDrive 7 and iDrive 8 (MGU). The apps run in the head unit's own
 app platform and show up in *All apps* like BMW's apps.
@@ -19,6 +19,7 @@ app platform and show up in *All apps* like BMW's apps.
 | Fault Codes | `iteriodev_dtcscan` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep the version they have). Reads the fault memory of every control unit in the car, shows each fault with its text and clears it when you ask. Also lists the car's Check Control messages. |
 | Live Adjustments | `iteriodev_liveadjust` | **iDrive 8 only** (from 1.1.0; iDrive 7 cars keep 1.0.7). For an MHD-tuned DME: engine map 1-4 and MHD Max Cooling, plus the exhaust flap (open, close, back to the DME). See below. |
 | Overlays | `iteriodev_overlays` | **iDrive 8 only.** Sets up the Overlays strip in the climate bar: four shortcuts to BMW screens or apps, seat heating / ventilation and steering wheel heating buttons, shift lights on the cluster (any car), and on M cars the M Mode that M1 / M2 switch to. Needs the Overlays tool below (the Store installs it with the app). |
+| Service | `iteriodev_service` | **iDrive 8 only.** The car's service requirements as the instrument cluster has them: engine oil, brakes, brake fluid, vehicle check, inspections, each with the distance and date left and whether it is due, and what it is when you tap it. Read-only: a service is reset in the cluster's own menu or at a workshop. Not car-tested yet. |
 | Tailscale | `iteriodev_tailscale` | **iDrive 8 only** (iDrive 7 cars keep 1.0.4). The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`) and Log out. Needs the Tailscale tool below (the Store installs it with the app). |
 
 All of them draw their screens through the GPU renderer `mgu-render`. On iDrive 7 the screens are scaled down to fit
