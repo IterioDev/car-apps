@@ -9,6 +9,23 @@ licenses.
 In short (the texts below are what counts): you may install these apps and tools as they are and use them on your
 own car for noncommercial purposes, and you may charge someone for installing them on their car. You may not sell
 the apps or tools themselves or charge for them, redistribute them, or change them or make new works based on them.
+You may never remove the credits, put your own logo or name on them, or pass them off as yours.
+
+## Credits and branding
+
+These conditions apply to everyone, including anyone who installs the software for a fee. They are conditions of
+every license you have for the software (the PolyForm Strict License 1.0.0 below and the additional permission for
+paid installation). If you break one, your licenses end as the Violations section of the PolyForm Strict License
+1.0.0 describes.
+
+1. Do not remove, hide, cover, shorten or change the credit lines in the apps ("Developed by IterioDev and
+   RobertNisipeanu", on some pages "Developed by IterioDev, RobertNisipeanu and Cauliflowermossgrape"), the apps'
+   names and icons, or any copyright or license notice in the software or in this repository.
+2. Do not add your own name, logo, brand or any other mark to the software, its screens, icons, packages or store
+   listings, and do not show your name or logo over or beside the software in a way that suggests it is yours.
+3. Do not present the software, or any part of it, as yours or as made by anyone other than its authors, for
+   example in listings, advertising, videos, invoices or when talking to customers. An installer may name their own
+   business as the one that did the installation work, as long as they say the software is made by IterioDev.
 
 ## Additional permission: paid installation
 

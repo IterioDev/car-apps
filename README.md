@@ -181,4 +181,5 @@ apps only read from the car.
 PolyForm Strict License 1.0.0 with an additional permission for paid installation (see [LICENSE.md](LICENSE.md)):
 install the apps and tools as they are and use them on your own car for noncommercial purposes. You may charge for
 installing them on someone's car, but not for the apps or tools themselves. No selling them, no redistribution, no
-changes or new works based on them. Third-party parts keep their own licenses (listed in LICENSE.md).
+changes or new works based on them. Never remove the credits, put your own logo or name on them, or pass them off
+as yours. Third-party parts keep their own licenses (listed in LICENSE.md).
