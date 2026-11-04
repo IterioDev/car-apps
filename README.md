@@ -2,7 +2,9 @@
 
 > [!WARNING]
 > **Not tested on iDrive 7.** These apps and tools have been tested only on iDrive 8, in the emulator and on a real
-> car. Every app also installs on iDrive 7; there it is checked only as far as building against iDrive 7's app SDK.
+> car. Car Data, Drag Timer, Fault Codes and Live Adjustments also install on iDrive 7 (their versions before the
+> Telemetry redesign); there they are checked only as far as building against iDrive 7's app SDK. Overlays and
+> Tailscale are iDrive 8 only.
 
 Apps and tools by IterioDev for BMW head units with iDrive 7 and iDrive 8 (MGU). The apps run in the head unit's own
 app platform and show up in *All apps* like BMW's apps.
@@ -16,7 +18,7 @@ app platform and show up in *All apps* like BMW's apps.
 | Fault Codes | `iteriodev_dtcscan` | Reads the fault memory of every control unit in the car, shows each fault with its text and clears it when you ask. Also lists the car's Check Control messages. |
 | Live Adjustments | `iteriodev_liveadjust` | For an MHD-tuned DME: engine map 1-4 and MHD Max Cooling, plus the exhaust flap (open, close, back to the DME). See below. |
 | Overlays | `iteriodev_overlays` | **iDrive 8 only.** Sets up the Overlays strip in the climate bar: four shortcuts to BMW screens or apps, seat heating / ventilation and steering wheel heating buttons, shift lights on the cluster (any car), and on M cars the M Mode that M1 / M2 switch to. Needs the Overlays tool below (the Store installs it with the app). |
-| Tailscale | `iteriodev_tailscale` | The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`) and Log out. Needs the Tailscale tool below (the Store installs it with the app). |
+| Tailscale | `iteriodev_tailscale` | **iDrive 8 only** (iDrive 7 cars keep 1.0.4). The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`) and Log out. Needs the Tailscale tool below (the Store installs it with the app). |
 
 All of them draw their screens through the GPU renderer `mgu-render`. On iDrive 7 the screens are scaled down to fit
 right of the HMI's back arrow, under its title strip.
