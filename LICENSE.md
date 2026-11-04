@@ -55,6 +55,8 @@ robertnisipeanu/mgu-store's Store app. It is used here under these terms with Ro
 - `tools/iteriodev-tailscale/tailscaled` and `ts`: Tailscale, BSD 3-Clause License (`tools/iteriodev-tailscale/LICENSE`).
 - The drawing runtime inside the app packages (`renderer/kit/`): based on cauliflowermossgrape/idrive7-apps, MIT
   License (its `LICENSE` is in each package).
+- In Drag Timer's package, the run timer and the power run (`src/timer.js`, `src/powerrun.js`): ported from
+  cauliflowermossgrape/idrive7-apps, MIT License (`renderer/kit/NOTICE`).
 - Material that comes from the car's own software (fonts, icon shapes, fault-code texts) belongs to its owners and
   is not licensed here.
 

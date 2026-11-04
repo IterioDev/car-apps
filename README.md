@@ -2,9 +2,9 @@
 
 > [!WARNING]
 > **Not tested on iDrive 7.** These apps and tools have been tested only on iDrive 8, in the emulator and on a real
-> car. Car Data and Drag Timer also install on iDrive 7 (their versions before the Telemetry redesign); there they
-> are checked only as far as building against iDrive 7's app SDK. Fault Codes, Live Adjustments, Overlays and
-> Tailscale are iDrive 8 only.
+> car. Car Data also installs on iDrive 7 (its version before the Telemetry redesign); there it is checked only as far
+> as building against iDrive 7's app SDK. Drag Timer, Fault Codes, Live Adjustments, Overlays and Tailscale are
+> iDrive 8 only.
 
 Apps and tools by IterioDev for BMW head units with iDrive 7 and iDrive 8 (MGU). The apps run in the head unit's own
 app platform and show up in *All apps* like BMW's apps.
@@ -14,7 +14,7 @@ app platform and show up in *All apps* like BMW's apps.
 | App | Package id | What it does |
 |---|---|---|
 | Car Data | `iteriodev_cardash` | Live engine data: engine speed, boost, power and torque bars with peak hold, oil, coolant and intake temperatures. |
-| Drag Timer | `iteriodev_draggy` | Acceleration timer: stand still, launch, and it times the run with splits and a speed-over-time chart. Keeps your best times; km/h or mph. |
+| Drag Timer | `iteriodev_draggy` | **iDrive 8 only** from 1.2.0 (iDrive 7 cars that have 1.1.8 keep it). Acceleration timer: stand still, launch, and it times the run with splits and a speed-over-time chart. Power run: floor it in one gear for power and torque over rpm, with a baseline to compare (from cauliflowermossgrape's idrive7-apps). Keeps your best times; km/h or mph. |
 | Fault Codes | `iteriodev_dtcscan` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep the version they have). Reads the fault memory of every control unit in the car, shows each fault with its text and clears it when you ask. Also lists the car's Check Control messages. |
 | Live Adjustments | `iteriodev_liveadjust` | **iDrive 8 only** (from 1.1.0; iDrive 7 cars keep 1.0.7). For an MHD-tuned DME: engine map 1-4 and MHD Max Cooling, plus the exhaust flap (open, close, back to the DME). See below. |
 | Overlays | `iteriodev_overlays` | **iDrive 8 only.** Sets up the Overlays strip in the climate bar: four shortcuts to BMW screens or apps, seat heating / ventilation and steering wheel heating buttons, shift lights on the cluster (any car), and on M cars the M Mode that M1 / M2 switch to. Needs the Overlays tool below (the Store installs it with the app). |
