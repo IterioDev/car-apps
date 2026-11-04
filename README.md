@@ -2,8 +2,8 @@
 
 > [!WARNING]
 > **Not tested on iDrive 7.** These apps and tools have been tested only on iDrive 8, in the emulator and on a real
-> car. Car Data, Drag Timer and Live Adjustments also install on iDrive 7 (their versions before the Telemetry
-> redesign); there they are checked only as far as building against iDrive 7's app SDK. Fault Codes, Overlays and
+> car. Car Data and Drag Timer also install on iDrive 7 (their versions before the Telemetry redesign); there they
+> are checked only as far as building against iDrive 7's app SDK. Fault Codes, Live Adjustments, Overlays and
 > Tailscale are iDrive 8 only.
 
 Apps and tools by IterioDev for BMW head units with iDrive 7 and iDrive 8 (MGU). The apps run in the head unit's own
@@ -16,14 +16,14 @@ app platform and show up in *All apps* like BMW's apps.
 | Car Data | `iteriodev_cardash` | Live engine data: engine speed, boost, power and torque bars with peak hold, oil, coolant and intake temperatures. |
 | Drag Timer | `iteriodev_draggy` | Acceleration timer: stand still, launch, and it times the run with splits and a speed-over-time chart. Keeps your best times; km/h or mph. |
 | Fault Codes | `iteriodev_dtcscan` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep the version they have). Reads the fault memory of every control unit in the car, shows each fault with its text and clears it when you ask. Also lists the car's Check Control messages. |
-| Live Adjustments | `iteriodev_liveadjust` | For an MHD-tuned DME: engine map 1-4 and MHD Max Cooling, plus the exhaust flap (open, close, back to the DME). See below. |
+| Live Adjustments | `iteriodev_liveadjust` | **iDrive 8 only** (from 1.1.0; iDrive 7 cars keep 1.0.7). For an MHD-tuned DME: engine map 1-4 and MHD Max Cooling, plus the exhaust flap (open, close, back to the DME). See below. |
 | Overlays | `iteriodev_overlays` | **iDrive 8 only.** Sets up the Overlays strip in the climate bar: four shortcuts to BMW screens or apps, seat heating / ventilation and steering wheel heating buttons, shift lights on the cluster (any car), and on M cars the M Mode that M1 / M2 switch to. Needs the Overlays tool below (the Store installs it with the app). |
 | Tailscale | `iteriodev_tailscale` | **iDrive 8 only** (iDrive 7 cars keep 1.0.4). The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`) and Log out. Needs the Tailscale tool below (the Store installs it with the app). |
 
 All of them draw their screens through the GPU renderer `mgu-render`. On iDrive 7 the screens are scaled down to fit
 right of the HMI's back arrow, under its title strip.
 
-**Live Adjustments** (one screen, sends a command only when you tap a button). Car-tested: the engine map switch
+**Live Adjustments** (one screen, sends a command only when you tap a choice). Car-tested: the engine map switch
 works (1.0.1, MHD). BMW's regulated flap job opens and closes the flap on a G80 S58 MHD, but the DME drops it once
 the car moves (issue #3). Max Cooling and MHD's own flap control (1.0.7) are not car-tested yet.
 
@@ -37,7 +37,7 @@ the car moves (issue #3). Max Cooling and MHD's own flap control (1.0.7) are not
   flap (DID 611E, e.g. S58) or the plain one (DID 60FD), picked per car; *Open* / *Close* then hold for about 20 s or
   until the car moves, and the DME controls the flap again. The flap position is read from the DME every 2 s while the
   screen shows. A DME without an electric flap shows *NONE*.
-- A DME without MHD refuses map and cooling: the screen says *Not available on this car*.
+- A DME without MHD refuses map and cooling: after the first refusal the screen shows *MHD not found* and greys both out (the flap still works through BMW's job).
 
 ## Installing
 
