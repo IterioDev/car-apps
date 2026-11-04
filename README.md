@@ -175,3 +175,9 @@ Each release is a tag `x.y.z`. The apps need the Store's deploy tool 0.7.5 or ne
 Use at your own risk. These apps are not made or endorsed by BMW. Fault Codes can clear fault memories (only
 when you ask); Live Adjustments switches MHD maps and drives the exhaust flap (not affiliated with MHD); the other
 apps only read from the car.
+
+## License
+
+PolyForm Strict License 1.0.0 (see [LICENSE.md](LICENSE.md)): install the apps and tools as they are and use them
+on your own car for noncommercial purposes. No selling, no charging for them, no redistribution, no changes or new
+works based on them. Third-party parts keep their own licenses (listed in LICENSE.md).
