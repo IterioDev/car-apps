@@ -50,8 +50,10 @@ const LAYOUT = { x: 0, y: 840, w: 2880, h: 120, slots: [1055, 1200, 1540, 1685],
     buttons: { 'driver.wheel': 20, 'driver.cool': 222, 'driver.heat': 864, 'passenger.cool': 1844, 'passenger.heat': 2486 },
     iconY: 55, lineY: 99, lineH: 6 };
 const ICON_DX = 24;
-const DEFAULTS = [{ state: 2, applet: 23 }, { state: 1, applet: 32 }, { state: 24, applet: 34 }, { state: 20, applet: 4 }];
-// the BMW screens the app offers (a slot can hold any other one, saved by a hold): strip picture, the app's icon
+// the BMW screens the app offers (a slot can hold any other one, saved by a hold): strip picture, the app's icon.
+// The ids are the VM's (mgu-m4's HMI). Another HMI build can number a screen differently (a client's M2, 2026-11-04:
+// Navigation did nothing): a tap that leaves the screen as it was counts as failed, and a hold soon after it learns the
+// screen's own ids under that name (learned{}, kept in slots.json).
 const SCREENS = [
     { title: 'Media', state: 2, applet: 23, png: 'media', icon: 'Playlist' },
     { title: 'Navigation', state: 1, applet: 32, png: 'nav', icon: 'Navigation' },
@@ -60,11 +62,29 @@ const SCREENS = [
     { title: 'Home', state: 20000, applet: 4, png: 'home', icon: 'MainMenu' },
     { title: 'Climate', state: 3, applet: 517, png: 'climate', icon: 'Fan' },
 ];
+let learned = {};                                    // title -> { state, applet } this car's HMI uses instead
+const screenList = () => SCREENS.map((s) => (learned[s.title] ? Object.assign({}, s, learned[s.title]) : s));
+const DEFAULT_TITLES = ['Media', 'Navigation', 'Phone', 'All apps'];
+const defaults = () => DEFAULT_TITLES.map((t) => { const s = screenList().find((x) => x.title === t); return { state: s.state, applet: s.applet }; });
+const FAIL_MS = 800, REPAIR_MS = 10 * 60000;          // a tap's screen read again after; a hold that repairs it, within
+/* a tap that did nothing: the screen read before and after the open is the same, and is not the one asked for */
+function stuck(before, after, t) {
+    const p = (r) => { const m = /^ok (-?\d+) (-?\d+)/.exec(r || ''); return m ? [+m[1], +m[2]] : null; };
+    const b = p(before), a = p(after);
+    return !!(b && a && b[0] === a[0] && b[1] === a[1] && !(a[0] === t.state && a[1] === t.applet));
+}
+// the seat / wheel buttons in the bar: 'auto' = what the car reports, 'on' / 'off' = the user's choice (cars that report
+// a function they don't have: a client's M2 without ventilation showed its icon, 2026-11-04)
+const BUTTON_KEYS = ['driver.wheel', 'driver.cool', 'driver.heat', 'passenger.cool', 'passenger.heat'];
+const SHOW = ['auto', 'on', 'off'], MCAR = ['auto', 'yes', 'no'];
+/* an M car: the user's choice, else what the car reported (an M setup seen) */
+const mcarOf = (found, set) => (set.mmode.car === 'yes' ? true : set.mmode.car === 'no' ? false : !!found);
 const RED = [255, 48, 49], BLUE = [29, 120, 223], WHITE = [255, 255, 255];   // the HMI's accent colours
 const OFF_ALPHA = 0.6;
 const MODES = ['road', 'sport', 'track'];
 const SETTINGS = { shortcuts: true, seats: true, wheel: true, ambient: true, ambientHeat: 3, ambientCool: 9, order: 'up',
-    mmode: { on: true, m1: 'sport', m2: 'sport', off: 'road', boot: false }, shift: shift.DEFAULTS };
+    show: BUTTON_KEYS.reduce((o, k) => { o[k] = 'auto'; return o; }, {}),
+    mmode: { on: true, m1: 'sport', m2: 'sport', off: 'road', boot: false, car: 'auto' }, shift: shift.DEFAULTS };
 // MDrive 0xB51F, the active M setup: statusMConfigurationMDrive 0x8018 byte 0 (Hmi8's ...SP21: 0 none, 1 M1, 2 M2,
 // 3 unset) or, older, statusMDriveTwo 0x8001 byte 0 (...SP18: statusMDrive2 0 off, 1 on); SP21 wins once seen
 const MDRIVE = 0xb51f, MDRIVE_SUB = `sub 0xb51f 1 1 1 0x8018 0x8001 0x${shift.DME.ev.toString(16)}`;
@@ -115,7 +135,7 @@ function target(slot, apps) {
 }
 /* a slot -> its picture: { builtin: name } or { file } (+ missing for an app that is gone) */
 function iconOf(slot, apps) {
-    if (!slot.app) { const s = SCREENS.find((x) => x.state === slot.state && x.applet === slot.applet); return { builtin: s ? s.png : 'screen' }; }
+    if (!slot.app) { const s = screenList().find((x) => x.state === slot.state && x.applet === slot.applet); return { builtin: s ? s.png : 'screen' }; }
     const a = apps.find((x) => x.id === slot.app);
     if (!a) return { builtin: 'app', missing: true };
     const want = typeof a.icon === 'string' && !/^gid:/.test(a.icon) ? path.basename(a.icon) : null;
@@ -153,7 +173,7 @@ function describe(slot, apps) {
         const a = apps.find((x) => x.id === slot.app), i = a && appInfo(a);
         return { kind: 'app', app: slot.app, title: i ? i.title : slot.app, missing: !a };
     }
-    const s = SCREENS.find((x) => x.state === slot.state && x.applet === slot.applet);
+    const s = screenList().find((x) => x.state === slot.state && x.applet === slot.applet);
     return { kind: 'bmw', title: s ? s.title : 'BMW screen', icon: s ? s.icon : 'Display' };
 }
 /* settings from the app (or the file): only known keys of the right kind; the rest stays */
@@ -163,9 +183,11 @@ function mergeSettings(cur, p) {
     ['shortcuts', 'seats', 'wheel', 'ambient'].forEach((k) => { if (typeof p[k] === 'boolean') out[k] = p[k]; });
     ['ambientHeat', 'ambientCool'].forEach((k) => { if (Number.isInteger(p[k]) && p[k] >= 1 && p[k] <= 12) out[k] = p[k]; });
     if (p.order === 'up' || p.order === 'down') out.order = p.order;
+    if (p.show && typeof p.show === 'object') BUTTON_KEYS.forEach((k) => { if (SHOW.indexOf(p.show[k]) >= 0) out.show[k] = p.show[k]; });
     if (p.mmode && typeof p.mmode === 'object') {
         ['on', 'boot'].forEach((k) => { if (typeof p.mmode[k] === 'boolean') out.mmode[k] = p.mmode[k]; });
         ['m1', 'm2', 'off'].forEach((k) => { if (MODES.indexOf(p.mmode[k]) >= 0) out.mmode[k] = p.mmode[k]; });
+        if (MCAR.indexOf(p.mmode.car) >= 0) out.mmode.car = p.mmode.car;
     }
     out.shift = shift.mergeSettings(out.shift, p.shift);
     return out;
@@ -177,8 +199,21 @@ function loadData(file) {
     try { j = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { if (e.code !== 'ENOENT') log('slots.json: ' + e.message + ', the defaults instead'); }
     const good = Array.isArray(j.slots) && j.slots.length === 4 && j.slots.every(slotOk);
     if (j.slots && !good) log('slots.json: not 4 good slots, the defaults instead');
-    return { slots: good ? j.slots : DEFAULTS.map((s) => Object.assign({}, s)), layout: j.layout,
-        settings: mergeSettings(SETTINGS, j.settings), mcar: j.mcar === true };
+    const lr = {};
+    if (j.learned && typeof j.learned === 'object') {
+        SCREENS.forEach((s) => { const v = j.learned[s.title]; if (v && Number.isInteger(v.state) && Number.isInteger(v.applet)) lr[s.title] = { state: v.state, applet: v.applet }; });
+    }
+    learned = lr;
+    return { slots: good ? j.slots : defaults(), layout: j.layout, learned: lr, settings: migrate(mergeSettings(SETTINGS, j.settings), j.settings), mcar: j.mcar === true };
+}
+/* 0.3.5 and older had one switch for all seat buttons and one for the wheel; the per-button choice replaces them (the
+ * app shows only that): a switch that was off turns its buttons 'off' */
+function migrate(set, old) {
+    if (!old || typeof old !== 'object' || old.show) return set;
+    if (old.seats === false) BUTTON_KEYS.filter((k) => k !== 'driver.wheel').forEach((k) => { set.show[k] = 'off'; });
+    if (old.wheel === false) set.show['driver.wheel'] = 'off';
+    set.seats = set.wheel = true;
+    return set;
 }
 function saveData(file, data) {
     try { fs.mkdirSync(path.dirname(file)); } catch (e) { if (e.code !== 'EEXIST') throw e; }   // node 8: no recursive
@@ -225,13 +260,18 @@ function clusterUp(k, hex) {
 }
 /* the next level of a tap: 1 -> 2 -> 3 -> off ('up'), or 3 -> 2 -> 1 -> off ('down') */
 const nextLevel = (level, max, order) => (order === 'down' ? (level > 0 ? level - 1 : max) : seats.next(level, max));
-/* the seat / wheel buttons to show: what the car has and the settings allow, [{ key, x }] */
+/* the seat / wheel buttons to show, [{ key, x }]: per button the user's choice ('on' / 'off'), on 'auto' what the car has;
+ * the old master switches (seats, wheel) still hide theirs */
 function buttons(L, st, set) {
+    const want = (key, have) => (set.show[key] === 'on' || (set.show[key] !== 'off' && have));
     const out = [];
-    if (set.wheel && st.wheel.have) out.push({ key: 'driver.wheel', x: L.buttons['driver.wheel'] });
+    if (set.wheel && want('driver.wheel', st.wheel.have)) out.push({ key: 'driver.wheel', x: L.buttons['driver.wheel'] });
     if (set.seats) {
         for (const seat of seats.SEATS) {
-            for (const kind of ['cool', 'heat']) if (st.seats[seat][kind].have) out.push({ key: `${seat}.${kind}`, x: L.buttons[`${seat}.${kind}`] });
+            for (const kind of ['cool', 'heat']) {
+                const key = `${seat}.${kind}`;
+                if (want(key, st.seats[seat][kind].have)) out.push({ key, x: L.buttons[key] });
+            }
         }
     }
     return out;
@@ -315,9 +355,11 @@ function main() {
     const { RenderClient, imageOp } = require(CLIENT);
     const conf = loadData(DATA);
     const L = Object.assign({}, LAYOUT, conf.layout || {});
-    let slots = conf.slots, settings = conf.settings, mcar = conf.mcar, apps = installedApps(OAP);
+    let slots = conf.slots, settings = conf.settings, mcar = conf.mcar, apps = installedApps(OAP);   // mcar: an M setup was seen
+    const mEff = () => mcarOf(mcar, settings);       // an M car: the user's choice wins
     const SW = L.slotW, H = L.h, BW = L.buttonW, ICON_MAX = 76, HMI_PX = 84;
-    const pics = {}, flash = [0, 0, 0, 0], looks = [];
+    const pics = {}, flash = [0, 0, 0, 0], looks = [], failAt = [0, 0, 0, 0];
+    let notice = null;                                // the last tap that did nothing: { slot, title, at }
     const st = seats.state(!!process.env.OVERLAYS_SEAT_DEMO);
     const pending = {};                               // pending['driver.heat'] = { level, until }
     const gpu = new RenderClient('iteriodev-overlays', { info: log, warn: log, error: log });
@@ -337,15 +379,16 @@ function main() {
         });
     }
     const save = () => {
-        try { saveData(DATA, Object.assign(conf.layout ? { layout: conf.layout } : {}, { slots, settings, mcar })); } catch (e) { log('save: ' + e.message); }
+        try { saveData(DATA, Object.assign(conf.layout ? { layout: conf.layout } : {}, { slots, settings, mcar, learned })); } catch (e) { log('save: ' + e.message); }
     };
     function drawSlot(i) {
         const ic = iconOf(slots[i], apps);
         looks[i] = JSON.stringify(ic);
         picture(ic, (img) => {
             const px = Buffer.alloc(SW * H * 4);
-            const bg = flash[i] > Date.now() ? 0.4 : gestures.pressed() === i ? 0.18 : 0;
-            if (bg) blend(px, SW, 0, 0, pill(SW, H, 10, 20, bg), 1);
+            const failed = failAt[i] + 1500 > Date.now();  // the tap did nothing: red for a moment
+            const bg = failed ? 0.45 : flash[i] > Date.now() ? 0.4 : gestures.pressed() === i ? 0.18 : 0;
+            if (bg) blend(px, SW, 0, 0, pill(SW, H, 10, 20, bg, failed ? RED : null), 1);
             if (img) blend(px, SW, (SW - img.w) >> 1, (H - img.h) >> 1, img, ic.missing ? 0.4 : 1);
             gpu.pixels(i + 1, [{ x: 0, y: 0, w: SW, h: H }], px);
             frame();
@@ -495,7 +538,7 @@ function main() {
             const s = settings.shift, now = Date.now(), th = shift.thresholds(s, v.limit);
             const l = v.dme && now - v.dmeAt < shift.DME_FRESH_MS ? v.dme : shift.lights(v.rpm, th);
             const near = s.on && shift.visible(v.vis, v.rpm, th, l.seg, now);
-            const shown = { guide: near, hud: near && s.hud && !mcar && !v.dmeAt };   // an M car's HUD has its own
+            const shown = { guide: near, hud: near && s.hud && !mEff() && !v.dmeAt };   // an M car's HUD has its own
             if (!cr) return;
             const all = (name, val) => Object.keys(layers).forEach((t) => cr.uniform(layers[t], name, [val]));
             if (l.seg !== v.seg) { v.seg = l.seg; all('u_seg', l.seg); }
@@ -518,10 +561,10 @@ function main() {
     function mSetup(ev, hex) {                        // a setup on (also already on at start) -> its mode, off -> 'off'
         const s = mSetupOf(m, ev, hex, Date.now());
         if (s === null) return;
-        if (!mcar || (m.sp21 && !m.told)) { mcar = true; m.told = m.sp21; save(); push(); }   // an M car: the app shows M Mode
+        if (!mcar || (m.sp21 && !m.told)) { mcar = true; m.told = m.sp21; save(); push(); }   // an M car (found)
         if (s === m.setup) return;
         m.setup = s;
-        if (!settings.mmode.on) return;
+        if (!settings.mmode.on || !mEff()) return;     // the user said: not an M car
         const mode = s === 0 ? settings.mmode.off : s === 1 ? settings.mmode.m1 : settings.mmode.m2;
         hmi(`mmode ${mode}`).then((r) => log(`M setup ${s} (0x${ev.toString(16)} ${hex}): mmode ${mode}: ${r}`));
     }
@@ -529,7 +572,7 @@ function main() {
     function kombi(hex) {                             // Start in M SPORT (M cars): once the cluster is up, in its standard view
         const v = parseInt(hex.slice(0, 2), 16), up = clusterUp(k, hex);
         if (v !== k.view) { log(`cluster view ${k.view} -> ${v}`); k.view = v; }
-        if (up === 1 && mcar && settings.mmode.boot) hmi('mmode sport').then((r) => log(`cluster up: mmode sport: ${r}`));
+        if (up === 1 && mEff() && settings.mmode.boot) hmi('mmode sport').then((r) => log(`cluster up: mmode sport: ${r}`));
     }
     function subscribe() {
         if (st.backend !== 'demo') seats.SUBS.forEach((l) => hmi(l));
@@ -549,7 +592,21 @@ function main() {
         apps = installedApps(OAP);
         const s = slots[i], t = target(s, apps);
         if (!t) { log(`slot ${i}: ${s.app} is not installed`); return; }
+        const before = s.app ? null : await hmi('ctx');   // a BMW screen: did the tap change anything?
         let r = await hmi(`open ${t.state} ${t.applet}`);
+        if (!s.app) {
+            await new Promise((res) => setTimeout(res, FAIL_MS));
+            const after = await hmi('ctx');
+            if (stuck(before, after, t)) {
+                const title = describe(s, apps).title;
+                failAt[i] = Date.now();
+                notice = { slot: i, title, at: failAt[i] };
+                log(`slot ${i}: ${title} (${t.state} ${t.applet}) did not open: still ${after.slice(3)}`);
+                drawSlot(i); setTimeout(() => drawSlot(i), 1550);
+                push();
+                return;
+            }
+        }
         if (r !== 'ok' && s.app) {                    // the other offset (appInfo): kept when it opens
             const other = OFFSETS.find((o) => o !== s.offset), alt = target(Object.assign({}, s, { offset: other }), apps);
             if (await hmi(`open ${alt.state} ${alt.applet}`) === 'ok') {
@@ -579,7 +636,16 @@ function main() {
         const r = await hmi('ctx'), mm = /^ok (-?\d+) (-?\d+)/.exec(r);
         if (!mm) { log(`slot ${i}: no screen to save (${r})`); drawSlot(i); return; }
         apps = installedApps(OAP);
-        setSlot(i, classify(+mm[1], +mm[2], apps));
+        const c = classify(+mm[1], +mm[2], apps), was = describe(slots[i], apps);
+        // a hold soon after this slot's BMW screen did not open, on a screen we don't know: that screen's own ids here
+        if (Date.now() - failAt[i] < REPAIR_MS && !slots[i].app && !c.app && was.title !== 'BMW screen' &&
+            !screenList().some((x) => x.state === c.state && x.applet === c.applet)) {
+            learned[was.title] = { state: c.state, applet: c.applet };
+            log(`slot ${i}: ${was.title} is ${c.state} ${c.applet} on this car`);
+            failAt[i] = 0;
+            if (notice && notice.slot === i) notice = null;
+        }
+        setSlot(i, c);
     }
     async function buttonTap(key) {
         const [seat, kind] = key.split('.'), k = state(key);
@@ -599,7 +665,8 @@ function main() {
     const has = (s) => ({ heat: s.heat.have, cool: s.cool.have });
     const status = () => ({ state: { settings, slots: slots.map((s) => describe(s, apps)),
         car: { backend: st.backend, seats: { driver: has(st.seats.driver), passenger: has(st.seats.passenger) }, wheel: st.wheel.have,
-            mcar, setups: m.sp21 ? 2 : 1 }, shift: sl.status() } });
+            mcar: mEff(), mfound: mcar, setups: m.sp21 ? 2 : 1 }, shift: sl.status(),
+        notice: notice && Date.now() - notice.at < REPAIR_MS ? notice : null } });
     function push() { const l = JSON.stringify(status()) + '\n'; clients.forEach((c) => c.write(l)); }
     function targets() {
         apps = installedApps(OAP);
@@ -609,7 +676,7 @@ function main() {
             try { if (ic.file) pic = fs.readFileSync(ic.file).toString('base64'); } catch (e) { /* none */ }
             return i && Object.assign(i, { pic });
         }).filter(Boolean).sort((a, b) => a.title.localeCompare(b.title));
-        return { targets: { bmw: SCREENS.map((s) => ({ title: s.title, state: s.state, applet: s.applet, icon: s.icon })), apps: list } };
+        return { targets: { bmw: screenList().map((s) => ({ title: s.title, state: s.state, applet: s.applet, icon: s.icon })), apps: list } };
     }
     function request(c, q) {
         if (q.op === 'set') {
@@ -621,7 +688,7 @@ function main() {
             const t = q.target;
             setSlot(q.i, t.app ? { app: t.app, state: t.state, offset: t.offset } : { state: t.state, applet: t.applet });
         } else if (q.op === 'reset') {
-            slots = DEFAULTS.map((s) => Object.assign({}, s));
+            slots = defaults();
             save(); redrawAll(); push();
         } else if (q.op === 'targets') {
             c.write(JSON.stringify(targets()) + '\n');
@@ -709,8 +776,32 @@ function test() {
     const s2 = mergeSettings(SETTINGS, { order: 'down', mmode: { m2: 'track', off: 'warp', on: false, boot: 1 }, extra: 1, shortcuts: 0,
         ambientHeat: 4, ambientCool: 13 });
     assert.deepStrictEqual(s2, { shortcuts: true, seats: true, wheel: true, ambient: true, ambientHeat: 4, ambientCool: 9, order: 'down',
-        mmode: { on: false, m1: 'sport', m2: 'track', off: 'road', boot: false },
+        show: SETTINGS.show, mmode: { on: false, m1: 'sport', m2: 'track', off: 'road', boot: false, car: 'auto' },
         shift: shift.DEFAULTS });
+    // per-button choice: 'on' shows what the car doesn't report, 'off' hides what it does (an M2 without ventilation that
+    // reports it: the client's car, 2026-11-04); bad values are ignored
+    const s3 = mergeSettings(SETTINGS, { show: { 'driver.cool': 'off', 'passenger.cool': 'off', 'driver.wheel': 'maybe', x: 'on' } });
+    assert.strictEqual(keys(all, s3), 'driver.wheel@20 driver.heat@864 passenger.heat@2486');
+    assert.strictEqual(keys(heatOnly, mergeSettings(SETTINGS, { show: { 'driver.wheel': 'on', 'passenger.heat': 'off' } })), 'driver.wheel@20 driver.heat@864');
+    // the old master switches: off -> that group 'off', switches back on (the app no longer shows them); new files keep theirs
+    const mg = migrate(mergeSettings(SETTINGS, { seats: false, wheel: true }), { seats: false, wheel: true });
+    assert.deepStrictEqual([mg.seats, mg.wheel, mg.show['driver.heat'], mg.show['passenger.cool'], mg.show['driver.wheel']], [true, true, 'off', 'off', 'auto']);
+    assert.strictEqual(migrate(mergeSettings(SETTINGS, { seats: false, show: {} }), { seats: false, show: {} }).seats, false);
+    // M car: the user's choice wins over what was found
+    const car = (c) => mergeSettings(SETTINGS, { mmode: { car: c } });
+    assert.deepStrictEqual([mcarOf(false, car('auto')), mcarOf(true, car('auto')), mcarOf(false, car('yes')), mcarOf(true, car('no')), mcarOf(false, car('nope'))],
+        [false, true, true, false, false]);
+    // a tap that did nothing: the screen before and after the same and not the asked one
+    const nav = { state: 1, applet: 32 };
+    assert.deepStrictEqual([stuck('ok 20000 4', 'ok 20000 4', nav), stuck('ok 20000 4', 'ok 1 32', nav), stuck('ok 1 32', 'ok 1 32', nav),
+        stuck('ok 20000 4', 'ok 2 23', nav), stuck('error timeout', 'ok 20000 4', nav)], [true, false, false, false, false]);
+    // a screen learned under its name: the app offers it there, a slot with those ids is that screen, Restore uses it
+    learned = { Navigation: { state: 7, applet: 91 } };
+    assert.deepStrictEqual(describe({ state: 7, applet: 91 }, []), { kind: 'bmw', title: 'Navigation', icon: 'Navigation' });
+    assert.deepStrictEqual(iconOf({ state: 7, applet: 91 }, []), { builtin: 'nav' });
+    assert.deepStrictEqual(defaults()[1], { state: 7, applet: 91 });
+    learned = {};
+    assert.deepStrictEqual(defaults(), [{ state: 2, applet: 23 }, { state: 1, applet: 32 }, { state: 24, applet: 34 }, { state: 20, applet: 4 }]);
     assert.deepStrictEqual(mergeSettings(SETTINGS, { shift: { on: false, flash: 7000 } }).shift, { on: false, auto: true, start: 4500, flash: 7000, hud: true });
     assert.strictEqual(SETTINGS.order, 'up', 'defaults untouched');
     // taps: up 1 -> 2 -> 3 -> off, down 3 -> 2 -> 1 -> off
