@@ -44,6 +44,11 @@ and you may use the software as far as you need to install it and show that it w
 This permission does not allow changes, distribution in any other way, selling the software, or selling hardware
 with the software already on it. The customer uses the software under the PolyForm Strict License 1.0.0 below.
 
+## Code from robertnisipeanu/mgu-store
+
+The app host code inside every app package (`oap-shared/online-host.js`) follows and contains code from
+robertnisipeanu/mgu-store's Store app. It is used here under these terms with RobertNisipeanu's permission.
+
 ## Not covered
 
 - `tools/iteriodev-tailscale/tailscaled` and `ts`: Tailscale, BSD 3-Clause License (`tools/iteriodev-tailscale/LICENSE`).
