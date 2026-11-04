@@ -22,15 +22,18 @@ All of them draw their screens through the GPU renderer `mgu-render`. On iDrive 
 right of the HMI's back arrow, under its title strip.
 
 **Live Adjustments** (one screen, sends a command only when you tap a button). Car-tested: the engine map switch
-works (1.0.1, MHD). Max Cooling and the exhaust flap are not car-tested yet.
+works (1.0.1, MHD). BMW's regulated flap job opens and closes the flap on a G80 S58 MHD, but the DME drops it once
+the car moves (issue #3). Max Cooling and MHD's own flap control (1.0.7) are not car-tested yet.
 
 - **Engine map 1-4** (MHD): only with the car standing still. The DME has to echo the request back, or the screen
   says why it wasn't switched. MHD reports no active map, so the screen shows the map the DME accepted, not one it
   read back. The engine light may flash while the map changes; MHD does that.
 - **Max Cooling** (MHD): at any speed, accepted the same way. *On* only with the engine running (over 500 rpm);
   *Off* any time, and shown until you switch it on.
-- **Exhaust flap**: BMW's own DME job (DID 60FD), at any speed. *Open* / *Close* hold for about 20 s; then the DME
-  controls the flap again (*OEM* hands it back at once). The flap position is read from the DME every 2 s while the
+- **Exhaust flap**, at any speed. On an MHD DME through MHD's own flap control: *Open* / *Close* hold while you
+  drive, until you tap another button (*OEM* hands it back to the tune). Without MHD, BMW's own DME job: the regulated
+  flap (DID 611E, e.g. S58) or the plain one (DID 60FD), picked per car; *Open* / *Close* then hold for about 20 s or
+  until the car moves, and the DME controls the flap again. The flap position is read from the DME every 2 s while the
   screen shows. A DME without an electric flap shows *NONE*.
 - A DME without MHD refuses map and cooling: the screen says *Not available on this car*.
 
