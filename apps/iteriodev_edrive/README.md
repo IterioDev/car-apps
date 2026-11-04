@@ -1,11 +1,11 @@
 # eDrive
 
-For plug-in hybrids: the real electric range, learned from how the car is driven, the charge level and the battery's health, live power and cell voltages, and a log of the charges with their cost. Read-only. On a car without a high-voltage battery it says so and shows the 12 V battery. Not tested on a hybrid yet. iDrive 8.
+For plug-in hybrids: the real electric range, learned from how the car is driven, the charge level and the battery's health, live power and cell voltages, and a log of the charges with their cost. Read-only. On a car without a high-voltage battery it says so and shows the 12 V battery; on a 48 V mild hybrid also its 48 V battery (charge, health, power) and DC/DC converter. Not tested on a car yet. iDrive 8.
 
-Version 1.0.0 · iDrive 8 only · package `iteriodev_edrive` · [all apps and how to install](../../README.md)
+Version 1.1.0 · iDrive 8 only · package `iteriodev_edrive` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
-> Version 1.0.0 is not tested on a hybrid yet.
+> Version 1.1.0 is not tested on a car yet: not on a plug-in hybrid, not on a 48 V mild hybrid.
 
 ## Screens
 
@@ -40,3 +40,9 @@ Battery size when new, electricity price, currency, hybrid system (Auto / Yes / 
 ![Without a hybrid system](screenshots/nohybrid-range.png)
 
 A car without a high-voltage battery: the app says so and shows the 12 V battery.
+
+### A 48 V mild hybrid
+
+![A 48 V mild hybrid](screenshots/mild-battery.png)
+
+Its 48 V battery (power, charge, health) and the DC/DC converter (its mode, both sides). The values follow BMW's own descriptions of these units; not yet confirmed on a car. From jezikk82's patch to idrive7-apps.

@@ -1,8 +1,8 @@
 {
  "id": "iteriodev_edrive",
- "version": "1.0.0",
+ "version": "1.1.0",
  "title": "eDrive",
- "description": "For plug-in hybrids: the real electric range, learned from how the car is driven, the charge level and the battery's health, live power and cell voltages, and a log of the charges with their cost. Read-only. On a car without a high-voltage battery it says so and shows the 12 V battery. Not tested on a hybrid yet. iDrive 8.",
+ "description": "For plug-in hybrids: the real electric range, learned from how the car is driven, the charge level and the battery's health, live power and cell voltages, and a log of the charges with their cost. Read-only. On a car without a high-voltage battery it says so and shows the 12 V battery; on a 48 V mild hybrid also its 48 V battery (charge, health, power) and DC/DC converter. Not tested on a car yet. iDrive 8.",
  "mguHmi": [
   "ID8"
  ],

@@ -58,7 +58,8 @@ robertnisipeanu/mgu-store's Store app. It is used here under these terms with Ro
 - The drawing runtime inside the app packages (`renderer/kit/`): based on cauliflowermossgrape/idrive7-apps, MIT
   License (its `LICENSE` is in each package).
 - In Drag Timer's package, the run timer and the power run (`src/timer.js`, `src/powerrun.js`), in eDrive's
-  package `src/battery.js`, `src/range.js`, `src/chargelog.js` and `src/diag.js`, and in Service's package
+  package `src/battery.js`, `src/range.js`, `src/chargelog.js`, `src/diag.js` and `src/mild.js` (the 48 V values, after
+  jezikk82's patch to the same repository), and in Service's package
   `src/cbs.js`: ported from cauliflowermossgrape/idrive7-apps, MIT License (`renderer/kit/NOTICE`).
 - Material that comes from the car's own software (fonts, icon shapes, fault-code texts) belongs to its owners and
   is not licensed here.
