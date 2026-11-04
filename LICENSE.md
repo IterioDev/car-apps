@@ -46,7 +46,8 @@ with the software already on it. The customer uses the software under the PolyFo
 
 ## Code from robertnisipeanu/mgu-store
 
-The app host code inside every app package (`oap-shared/online-host.js`) follows and contains code from
+The app host code in the packages of Car Data, Drag Timer, Fault Codes, Live Adjustments, Overlays and Tailscale
+(`oap-shared/online-host.js`) follows and contains code from
 robertnisipeanu/mgu-store's Store app. It is used here under these terms with RobertNisipeanu's permission.
 
 ## Not covered
