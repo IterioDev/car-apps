@@ -15,6 +15,7 @@ app platform and show up in *All apps* like BMW's apps.
 |---|---|---|
 | Car Data | `iteriodev_cardash` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep 1.1.10). Live engine data: engine speed, boost, power and torque with their peaks, oil, coolant and intake temperatures, battery voltage; fuel and air values with their last 5 minutes; a trip computer (distance, fuel, cost); gearbox data (ZF 8HP, read-only); the engine unit's values in groups. See below. |
 | Drag Timer | `iteriodev_draggy` | **iDrive 8 only** from 1.2.0 (iDrive 7 cars that have 1.1.8 keep it). Acceleration timer: stand still, launch, and it times the run with splits and a speed-over-time chart. Power run: floor it in one gear for power and torque over rpm, with a baseline to compare (from cauliflowermossgrape's idrive7-apps). Keeps your best times; km/h or mph. |
+| Drive Recorder | `oap-driverecorder-next` | **iDrive 8 only.** Keeps the car's cameras recording and saves a clip when you tap *Save clip* (by default the 20 s before and the 10 s after); watch, lock, delete and copy clips to a USB stick while the car stands still. Over 4 GB the oldest unlocked clips are replaced. The car must be coded for the Drive Recorder. Needs the Drive Recorder player below (the Store installs it with the app). |
 | eDrive | `iteriodev_edrive` | **iDrive 8 only.** For plug-in hybrids: the real electric range, learned from how the car is driven, the charge level and battery health, live power and cell voltages, and a log of the charges with their cost. Read-only. On a car without a high-voltage battery it says so and shows the 12 V battery; on a 48 V mild hybrid (from 1.1.0) also its 48 V battery (charge, health, power) and DC/DC converter, from jezikk82's patch to cauliflowermossgrape's idrive7-apps. Not tested on a car yet. |
 | Fault Codes | `iteriodev_dtcscan` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep 1.1.4). Reads the fault memory of every control unit in the car, shows each fault with its text and clears it when you ask. Also lists the car's Check Control messages. |
 | Live Adjustments | `iteriodev_liveadjust` | **iDrive 8 only** (from 1.1.0; iDrive 7 cars keep 1.0.7). For an MHD-tuned DME: engine map 1-4 and MHD Max Cooling, plus the exhaust flap (open, close, back to the DME). See below. |
@@ -170,6 +171,26 @@ cd /var/opt/iteriodev-screencast/current && XDG_RUNTIME_DIR=/run/wayland SCREENC
 then open port 5881. Size, frame rate and the encoder settings are the `SCREENCAST_*` environment variables at the
 top of `screencast.js`.
 
+## Drive Recorder (tool `iteriodev-drplay`, iDrive 8 only)
+
+> [!NOTE]
+> **Car-tested** (2.0.1, G82): recording, saving and watching clips, with all cameras and with front + rear.
+> Not car-tested yet: the 2.2.0 screens, Copy to USB and replacing the oldest clips at 4 GB.
+
+The app asks the car's camera unit for its Drive Recorder mode at every start (Settings can switch that off) and
+keeps the last 30 s; *Save clip* on the Record page writes the 20 s before and the 10 s after (Settings: *Clip
+length*). The cameras offered are the ones the car has: all cameras, front + rear, front or rear. A car not coded for the Drive Recorder (seen on a
+retrofitted rear camera) shows *No drive-recorder cameras found*. While a parking view is open, the cameras belong to
+it and nothing is recorded.
+
+The player (`iteriodev-drplay.service`, uid 3912, no internet) plays the clips through the GPU renderer, makes the
+thumbnails, locks, deletes and replaces the oldest clips, and copies to a USB stick: a whole clip as recorded, or one
+camera as an MP4 with the date, time and speed on it. Clips stay in the car's own Drive Recorder folder; *Lock* moves
+one into its `locked/` folder.
+
+**Install:** in the Store, **Drive Recorder** -> *Install* (it installs the player too), then restart the head unit
+once.
+
 ## What is in this repository
 
 - `apps/<id>/`: one folder per app with its package `<id>@<version>.tgz`, its `app.json` (version, title,
@@ -185,8 +206,8 @@ Each release is a tag `x.y.z`. The apps need the Store's deploy tool 0.7.5 or ne
 ## Disclaimer
 
 Use at your own risk. These apps are not made or endorsed by BMW. Fault Codes can clear fault memories (only
-when you ask); Live Adjustments switches MHD maps and drives the exhaust flap (not affiliated with MHD); the other
-apps only read from the car.
+when you ask); Live Adjustments switches MHD maps and drives the exhaust flap (not affiliated with MHD); Drive Recorder
+puts the cameras into their Drive Recorder mode; the other apps only read from the car.
 
 ## License
 

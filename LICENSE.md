@@ -53,6 +53,9 @@ robertnisipeanu/mgu-store's Store app. It is used here under these terms with Ro
 ## Not covered
 
 - `tools/iteriodev-tailscale/tailscaled` and `ts`: Tailscale, BSD 3-Clause License (`tools/iteriodev-tailscale/LICENSE`).
+- `tools/iteriodev-drplay/mgu-drplay` contains FFmpeg (GNU LGPL 2.1, `LICENSE.ffmpeg`), libjpeg-turbo
+  (`LICENSE.libjpeg-turbo`) and OpenH264 (`LICENSE.openh264`). For this one file, as the LGPL 2.1 requires, you may
+  change it for your own use and reverse engineer it to debug such changes.
 - Code ported from cauliflowermossgrape/idrive7-apps in Car Data (Trips, Transmission, the grouped Details): MIT License,
   with its copyright; the package's `renderer/kit/NOTICE` names the files.
 - The drawing runtime inside the app packages (`renderer/kit/`): based on cauliflowermossgrape/idrive7-apps, MIT

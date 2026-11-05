@@ -1,0 +1,23 @@
+{
+  "id": "iteriodev-drplay",
+  "kind": "tool",
+  "version": "1.1.0",
+  "title": "Drive Recorder player",
+  "description": "Plays and manages the Drive Recorder's clips for the Drive Recorder app: the picture through the GPU renderer, thumbnails, lock, delete, the oldest clips replaced at 4 GB, Copy to USB (the whole clip, or one camera as an MP4 with date, time and speed on it)",
+  "optional": true,
+  "uninstallable": true,
+  "requires": {},
+  "mguHmi": ["ID8"],
+  "files": [
+    { "path": "mgu-drplay", "from": "mgu-drplay", "mode": "0755" },
+    { "path": "setup.sh", "from": "setup.sh", "mode": "0755" },
+    { "path": "LICENSE.openh264", "from": "LICENSE.openh264", "mode": "0644" },
+    { "path": "LICENSE.ffmpeg", "from": "LICENSE.ffmpeg", "mode": "0644" },
+    { "path": "LICENSE.libjpeg-turbo", "from": "LICENSE.libjpeg-turbo", "mode": "0644" }
+  ],
+  "units": [{ "name": "iteriodev-drplay.service", "from": "iteriodev-drplay.service" }],
+  "enable": [{ "unit": "iteriodev-drplay.service", "target": "multi-user.target" }],
+  "recmgr": ["iteriodev-drplay"],
+  "crashNames": ["mgu-drplay"],
+  "restart": ["iteriodev-drplay.service"]
+}
