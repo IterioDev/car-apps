@@ -2,7 +2,7 @@
 
 Keeps the car's cameras recording and saves a clip when you ask; watch, lock, delete and copy clips to a USB stick while the car stands still. Over 4 GB the oldest unlocked clips are replaced. The Store installs the Drive Recorder player with it. The car must be coded for the Drive Recorder.
 
-Version 2.2.0 · iDrive 8 only · package `oap-driverecorder-next` · [all apps and how to install](../../README.md)
+Version 2.2.1 · iDrive 8 only · package `oap-driverecorder-next` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
 > Car-tested (2.0.1): recording, saving and watching clips. The 2.2.0 screens and Copy to USB are not tested on a car yet. The car must be coded for the Drive Recorder; the Store installs the Drive Recorder player with the app.
