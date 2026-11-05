@@ -1,9 +1,9 @@
 {
   "id": "iteriodev-overlays",
   "kind": "tool",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "title": "Overlays",
-  "description": "QuickSelect strip (iDrive 8.5 style) in the climate bar: four shortcuts (tap opens, hold 1 s saves the screen you are on), seat heating / ventilation in the HMI's own spots, steering wheel heating, M1 / M2 switch the M Mode; shift lights on the cluster for any car (with Cluster renderer 0.3.6 or newer). Set up in the Overlays app. Needs Renderer (mgu-render) 0.6.10 or newer.",
+  "description": "QuickSelect strip (iDrive 8.5 style) in the climate bar: four shortcuts (tap opens, hold 1 s saves the screen you are on), seat heating / ventilation in the HMI's own spots, steering wheel heating, M1 / M2 switch the M Mode; shift lights on the cluster for cars without their own (not M cars; with Cluster renderer 0.3.6 or newer). Set up in the Overlays app. Needs Renderer (mgu-render) 0.6.10 or newer.",
   "optional": true,
   "uninstallable": true,
   "mguHmi": [

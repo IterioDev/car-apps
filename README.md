@@ -19,7 +19,7 @@ app platform and show up in *All apps* like BMW's apps.
 | eDrive | `iteriodev_edrive` | **iDrive 8 only.** For plug-in hybrids: the real electric range, learned from how the car is driven, the charge level and battery health, live power and cell voltages, and a log of the charges with their cost. Read-only. On a car without a high-voltage battery it says so and shows the 12 V battery; on a 48 V mild hybrid (from 1.1.0) also its 48 V battery (charge, health, power) and DC/DC converter, from jezikk82's patch to cauliflowermossgrape's idrive7-apps. Not tested on a car yet. |
 | Fault Codes | `iteriodev_dtcscan` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep 1.1.4). Reads the fault memory of every control unit in the car, shows each fault with its text and clears it when you ask. Also lists the car's Check Control messages. |
 | Live Adjustments | `iteriodev_liveadjust` | **iDrive 8 only** (from 1.1.0; iDrive 7 cars keep 1.0.7). For an MHD-tuned DME: engine map 1-4 and MHD Max Cooling, plus the exhaust flap (open, close, back to the DME). See below. |
-| Overlays | `iteriodev_overlays` | **iDrive 8 only.** Sets up the Overlays strip in the climate bar: four shortcuts to BMW screens or apps, seat heating / ventilation and steering wheel heating buttons, shift lights on the cluster (any car), and on M cars the M Mode that M1 / M2 switch to. Needs the Overlays tool below (the Store installs it with the app). |
+| Overlays | `iteriodev_overlays` | **iDrive 8 only.** Sets up the Overlays strip in the climate bar: four shortcuts to BMW screens or apps, seat heating / ventilation and steering wheel heating buttons, shift lights on the cluster (cars without their own), and on M cars the M Mode that M1 / M2 switch to. Needs the Overlays tool below (the Store installs it with the app). |
 | Service | `iteriodev_service` | **iDrive 8 only.** The car's service requirements as the instrument cluster has them: engine oil, brakes, brake fluid, vehicle check, inspections, each with the distance and date left and whether it is due, and what it is when you tap it. Read-only: a service is reset in the cluster's own menu or at a workshop. Not car-tested yet. |
 | Tailscale | `iteriodev_tailscale` | **iDrive 8 only** (iDrive 7 cars keep 1.0.4). The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`) and Log out. Needs the Tailscale tool below (the Store installs it with the app). |
 
@@ -65,7 +65,9 @@ That link is gone: remove that source, then add `IterioDev/car-apps` as above. I
 > **Car-tested** (G82): the shortcuts (tap, hold to save), seat heating / ventilation and steering wheel heating in
 > the bar's own spots (0.3.1), M1 -> SPORT and back to ROAD as the car reports M setups (0.3.2, only M1 / M2 since
 > 0.3.3), the ambient light flash with its default colours (0.3.4). Not car-tested yet: the level segments, the shift
-> lights, TRACK, *Start in M SPORT* (0.3.3), other flash colours, and the app's picker and settings pages.
+> lights, TRACK, *Start in M SPORT* (0.3.3), other flash colours, the app's picker and settings pages, and 0.3.7's
+> fixes (seat heating in the AUTO program, ventilation shown only once seen, M setups ending with the car switched
+> off, no shift lights on M cars).
 
 An iDrive 8.5-style strip drawn over the climate bar, always there (also over the reversing camera):
 
@@ -74,7 +76,10 @@ An iDrive 8.5-style strip drawn over the climate bar, always there (also over th
 - **Seat heating / ventilation** in the HMI's own spots and with its own icons: ventilation left of each
   temperature, heating right of it. A tap steps the level (1 -> 2 -> 3 -> off, or 3 -> 2 -> 1 -> off); on, the icon
   turns red / blue and the line under it shows the level (three segments). What it shows is always the car's live
-  status, also when changed in the climate menu. Only what the car has is shown.
+  status, also when changed in the climate menu. Only what the car has is shown (on cars whose climate unit can't
+  say, ventilation shows once it has been on: switch it on once from the HMI's own button, or set it ON in the app).
+  While a side's climate runs the AUTO program the buttons follow its automatic seat heating / ventilation instead
+  (four levels, Low to Very high, set the way the HMI sets them).
 - **Steering wheel heating** at the bar's far left, one tap on / off.
 - **Ambient light flash** (on unless switched off in the app): when seat or steering wheel heating goes on, the
   ambient light turns red for 5 s, for ventilation blue, then back to your colour; from the strip, the climate menu
@@ -82,14 +87,14 @@ An iDrive 8.5-style strip drawn over the climate bar, always there (also over th
   (default 3 and 9: Coral and Azure). Cars with the 12-colour ambient light (G8x); nothing while it is off.
 - **M1 / M2** (M cars): switching an M setup on also switches the M Mode (cluster and head-up display, as the M Mode
   button), switching it off goes back; which mode for M1, M2 and off is set in the app. Only M1 / M2 switch it: a
-  mode picked with the M Mode button stays. The app's M Mode page shows once the car has reported an M setup.
+  mode picked with the M Mode button stays. Switching the car off ends an M setup (the next press enters it again).
 - **Start in M SPORT** (M cars, off unless set in the app): after a start, once the cluster is up (it reports its
   view; the head unit wakes before it), the M Mode goes to SPORT if the cluster shows its standard view.
-- **Shift lights** on the instrument cluster, for any car (iDrive 8): 8 bars a side at the top centre of the
-  cluster, over the map, lit from the outside in and flashing at the shift point; on cars without their own (not
-  M) also in the head-up display above the speed. Lit from the engine speed against a start and a flash rpm (set in
-  the app, or following the engine's current limit, lower while it is cold), or from an M car's own shift-light
-  signal. Needs **Cluster renderer (`cluster-render`) 0.3.6 or newer** from
+- **Shift lights** on the instrument cluster, for cars without their own (not M cars: those show theirs, so the
+  tool hides its own there; set *M car* to NO in the app to have them anyway): 8 bars a side at the top centre of
+  the cluster, over the map, lit from the outside in and flashing at the shift point, also in the head-up display
+  above the speed. Lit from the engine speed against a start and a flash rpm (set in the app, or following the
+  engine's current limit, lower while it is cold). Needs **Cluster renderer (`cluster-render`) 0.3.6 or newer** from
   [robertnisipeanu/idrive-apps](https://github.com/robertnisipeanu/idrive-apps); without it the rest works as before.
 
 The tool runs as the root service `iteriodev-overlays.service` and asks the HMI and the car over SOME/IP through its

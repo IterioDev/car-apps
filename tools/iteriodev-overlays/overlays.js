@@ -21,7 +21,7 @@
  * icon (application.json entryPoints[0].icon, a PNG in rhmiData) or its package icon.png; BMW's own gid:// tile
  * icons can't be drawn here, so those apps, and BMW screens the strip has no icon for, get a plain one.
  * Data: /var/opt/iteriodev-overlays/slots.json { slots: [4 x {state, applet} | {app, state, offset}], settings, mcar,
- * layout? }. VM ids (2026-11-01): Media 2 23, Nav 1 32, Phone 24 34, All apps 20 4, Home 20000 4, Climate 3 517.
+ * learned, vents (legacy cars: ventilation seen on, per seat), layout? }. VM ids (2026-11-01): Media 2 23, Nav 1 32, Phone 24 34, All apps 20 4, Home 20000 4, Climate 3 517.
  *   node overlays.js          the service (OVERLAYS_SEAT_DEMO=1: seats without a car, for the VM)
  *   node overlays.js --test   the self-check (no car needed)
  */
@@ -91,6 +91,13 @@ const MDRIVE = 0xb51f, MDRIVE_SUB = `sub 0xb51f 1 1 1 0x8018 0x8001 0x${shift.DM
 // Vehicle2 0xB519 statusDisplayKombi 0x807C (getter 124): the cluster's view, 1 standard, 2 M view, 3 M view plus,
 // 15 not filled in (mgu-m4 2026-11-03: 02 in SPORT, the getter answers)
 const VEHICLE2 = 0xb519, KOMBI_EV = 0x807c, KOMBI_SUB = 'sub 0xb519 1 1 1 0x807c';
+// the car switched off ends an M setup, and SP18's toggle with it (a client's M2, 2026-11-05: switched off in M1, the
+// next M press read as leaving): VehicleCondition 0x1531 vehicleConditionNoCrc 0x8002 (event group 2), byte 5
+// statusConditionVehicle 1 / 2 PARKEN, 3 STANDFUNKTIONEN, 5 WOHNEN (10 FAHREN, 8 / 12 drive-ready coming / going);
+// and the head unit asleep (STR: the process stood still WAKE_MS or longer)
+const VCOND = 0x1531, VCOND_EV = 0x8002, VCOND_SUB = 'sub 0x1531 1 1 2 0x8002', WAKE_MS = 60000;
+const carOff = (hex) => [1, 2, 3, 5].indexOf(parseInt((hex || '').slice(10, 12), 16)) >= 0;
+const mReset = (m) => { m.sp18 = 0; m.setup = 0; };
 // the ambient light flash when a seat or the wheel heating goes on: ComfortFunctionIuK 0xB512, the 12-colour ambient
 // light (G8x): status getter 3 / setter 26, 10 bytes {hue u16, colour 1-12, layer 1-3, brightness, mode (1 on),
 // dynamic x2}; 0fff / ff / 03 = no change. The colour byte is the 0-based place in the HMI's list (sqltext.db: Ivory,
@@ -204,7 +211,10 @@ function loadData(file) {
         SCREENS.forEach((s) => { const v = j.learned[s.title]; if (v && Number.isInteger(v.state) && Number.isInteger(v.applet)) lr[s.title] = { state: v.state, applet: v.applet }; });
     }
     learned = lr;
-    return { slots: good ? j.slots : defaults(), layout: j.layout, learned: lr, settings: migrate(mergeSettings(SETTINGS, j.settings), j.settings), mcar: j.mcar === true };
+    const vents = {};                                  // legacy cars: seats whose ventilation was seen on (seats.js)
+    seats.SEATS.forEach((s) => { if (j.vents && j.vents[s] === true) vents[s] = true; });
+    return { slots: good ? j.slots : defaults(), layout: j.layout, learned: lr, settings: migrate(mergeSettings(SETTINGS, j.settings), j.settings),
+        mcar: j.mcar === true, vents };
 }
 /* 0.3.5 and older had one switch for all seat buttons and one for the wheel; the per-button choice replaces them (the
  * app shows only that): a switch that was off turns its buttons 'off' */
@@ -361,6 +371,8 @@ function main() {
     const pics = {}, flash = [0, 0, 0, 0], looks = [], failAt = [0, 0, 0, 0];
     let notice = null;                                // the last tap that did nothing: { slot, title, at }
     const st = seats.state(!!process.env.OVERLAYS_SEAT_DEMO);
+    Object.assign(st.legacy.seen, conf.vents);
+    let ventsSaved = JSON.stringify(st.legacy.seen);
     const pending = {};                               // pending['driver.heat'] = { level, until }
     const gpu = new RenderClient('iteriodev-overlays', { info: log, warn: log, error: log });
     const PIX = { 'driver.wheel': 5, 'driver.cool': 6, 'driver.heat': 7, 'passenger.cool': 8, 'passenger.heat': 9 };
@@ -379,7 +391,7 @@ function main() {
         });
     }
     const save = () => {
-        try { saveData(DATA, Object.assign(conf.layout ? { layout: conf.layout } : {}, { slots, settings, mcar, learned })); } catch (e) { log('save: ' + e.message); }
+        try { saveData(DATA, Object.assign(conf.layout ? { layout: conf.layout } : {}, { slots, settings, mcar, learned, vents: st.legacy.seen })); } catch (e) { log('save: ' + e.message); }
     };
     function drawSlot(i) {
         const ic = iconOf(slots[i], apps);
@@ -470,6 +482,7 @@ function main() {
         for (const k of Object.keys(pending)) {      // the car took (or refused) the asked level
             if (pending[k].level === state(k).level || pending[k].until <= Date.now()) delete pending[k];
         }
+        if (JSON.stringify(st.legacy.seen) !== ventsSaved) { ventsSaved = JSON.stringify(st.legacy.seen); save(); }
         redrawAll();
         push();
     }
@@ -478,6 +491,7 @@ function main() {
         if (svc === MDRIVE && ev === shift.DME.ev) sl.dme(w[3]);
         else if (svc === MDRIVE) mSetup(ev, w[3]);
         else if (svc === VEHICLE2 && ev === KOMBI_EV) kombi(w[3]);
+        else if (svc === VCOND && ev === VCOND_EV) { if (carOff(w[3]) && (m.sp18 || m.setup)) { log(`car off (${w[3]}): no M setup`); mReset(m); } }
         else if (svc === shift.RPM.svc && ev === shift.RPM.ev) sl.rpm(w[3]);
         else if (svc === shift.LIMIT.svc && ev === shift.LIMIT.ev) sl.limit(w[3]);
         else {
@@ -506,11 +520,14 @@ function main() {
         }, FLASH_MS);
     }
 
-    /* shift lights in cluster-render's `guide` target, and in `hud` on cars without their own (no M setup, no DME shift
-     * lights seen) (shiftlights.js); off: no rpm polling, no layer shown */
+    /* shift lights in cluster-render's `guide` target and in `hud` (shiftlights.js), only on cars without their own: an
+     * M car (an M setup seen, the DME's shift-light signal seen, or the user's choice) has its own in the cluster and the
+     * HUD (a client's M2, 2026-11-05: ours over the map). Off or an M car: no rpm polling, no layer shown */
     const sl = (() => {
         const v = { rpm: 0, limit: null, dme: null, dmeAt: 0, seg: -1, flash: null, shown: {}, vis: { shown: false, lowSince: 0 },
-            renderer: 'missing', layer: '' };
+            renderer: 'missing', layer: '', own: null };
+        const own = () => mcarOf(mcar || v.dmeAt > 0, settings);
+        const poll = () => hmi(settings.shift.on && !v.own ? shift.RPM.poll : shift.RPM.poll.replace(/ 50 /, ' 0 '));
         let cr = null;
         const layers = {};                            // target -> layer ref
         if (fs.existsSync(CLUSTER)) {
@@ -536,9 +553,10 @@ function main() {
         } else log('shift lights: cluster-render is not installed');
         function update() {
             const s = settings.shift, now = Date.now(), th = shift.thresholds(s, v.limit);
+            if (own() !== v.own) { v.own = own(); poll(); push(); }
             const l = v.dme && now - v.dmeAt < shift.DME_FRESH_MS ? v.dme : shift.lights(v.rpm, th);
-            const near = s.on && shift.visible(v.vis, v.rpm, th, l.seg, now);
-            const shown = { guide: near, hud: near && s.hud && !mEff() && !v.dmeAt };   // an M car's HUD has its own
+            const near = s.on && !v.own && shift.visible(v.vis, v.rpm, th, l.seg, now);
+            const shown = { guide: near, hud: near && s.hud };
             if (!cr) return;
             const all = (name, val) => Object.keys(layers).forEach((t) => cr.uniform(layers[t], name, [val]));
             if (l.seg !== v.seg) { v.seg = l.seg; all('u_seg', l.seg); }
@@ -551,8 +569,8 @@ function main() {
             rpm(hex) { const r = shift.rpmOf(hex); if (r !== null) { v.rpm = r; update(); } },
             limit(hex) { const l = shift.limitOf(hex); if (l !== v.limit) { v.limit = l; update(); push(); } },
             dme(hex) { const d = shift.dmeOf(hex); if (d) { v.dme = d; v.dmeAt = Date.now(); update(); } },
-            settings() { hmi(settings.shift.on ? shift.RPM.poll : shift.RPM.poll.replace(/ 50 /, ' 0 ')); update(); },
-            status: () => ({ renderer: v.renderer, layer: v.layer, limit: v.limit, dme: v.dmeAt > 0, th: shift.thresholds(settings.shift, v.limit) }),
+            settings() { v.own = own(); poll(); update(); },
+            status: () => ({ renderer: v.renderer, layer: v.layer, limit: v.limit, dme: v.dmeAt > 0, own: own(), th: shift.thresholds(settings.shift, v.limit) }),
             tick: update,                             // the hysteresis' timeout
             close() { if (cr) cr.close(); },
         };
@@ -578,6 +596,7 @@ function main() {
         if (st.backend !== 'demo') seats.SUBS.forEach((l) => hmi(l));
         hmi(MDRIVE_SUB);
         hmi(KOMBI_SUB);
+        hmi(VCOND_SUB);
         hmi(shift.LIMIT.sub);
         sl.settings();                                // the rpm poll (hmictl's own thread), when the shift lights are on
     }
@@ -740,6 +759,12 @@ function main() {
     }, 30000);
     setInterval(reread, REREAD_MS);
     setInterval(sl.tick, 500);
+    let tickAt = Date.now();
+    setInterval(() => {                              // the head unit slept (the car off): no M setup now
+        const now = Date.now();
+        if (now - tickAt >= WAKE_MS && (m.sp18 || m.setup)) { log(`woke up after ${Math.round((now - tickAt) / 1000)} s: no M setup`); mReset(m); }
+        tickAt = now;
+    }, 5000);
     process.on('SIGTERM', () => { gpu.close(); sl.close(); if (child) child.kill(); process.exit(0); });
     gpu.connect();
     log(`overlays: ${JSON.stringify(slots)} ${JSON.stringify(settings)}${st.backend === 'demo' ? ', seats: demo' : ''}`);
@@ -817,6 +842,10 @@ function test() {
         mSetupOf(ms, 0x8001, IDLE, 15010), mSetupOf(ms, 0x8001, ENTER, 15500), mSetupOf(ms, 0x8001, CAR2, 20000), mSetupOf(ms, 0x8001, CAR, 22000),
         mSetupOf(ms, 0x8001, LEAVE, 27000), mSetupOf(ms, 0x8001, IDLE, 27010), mSetupOf(ms, 0x8001, '02', 30000), mSetupOf(ms, 0x8001, '01', 31000)],
         [null, null, 1, null, null, null, null, 0, null, null, null]);
+    // the car switched off in M1: the next press enters again (not leaving); VehicleCondition byte 5
+    const mo = { sp21: false };
+    assert.deepStrictEqual([mSetupOf(mo, 0x8001, ENTER, 1000), (mReset(mo), mSetupOf(mo, 0x8001, ENTER, 9000)), mSetupOf(mo, 0x8001, LEAVE, 12000)], [1, 1, 0]);
+    assert.deepStrictEqual(['00000000000502', '00000000000a02', '00000000000202', '00000000000c02', ''].map(carOff), [true, false, true, false, false]);
     // ambient flash: off -> on only; heat / wheel 'heat', ventilation 'cool', heat wins; the colour only while it is on;
     // the menu's 3rd colour = byte 02
     const K = ['driver.wheel', 'driver.cool', 'driver.heat', 'passenger.cool', 'passenger.heat'];
