@@ -189,7 +189,9 @@ camera as an MP4 with the date, time and speed on it. Clips stay in the car's ow
 one into its `locked/` folder.
 
 **Install:** in the Store, **Drive Recorder** -> *Install* (it installs the player too), then restart the head unit
-once.
+once. Most cars then need one more restart: the head unit's camera service turns its recording buffer on only with a
+second provisioning line (`oap_drive_recorder`, next to the app's own), which the player (1.1.1) adds at its first
+start. Until then Diagnostics says *Flag on, but icam2proxy offers no video buffer*.
 
 ## What is in this repository
 
