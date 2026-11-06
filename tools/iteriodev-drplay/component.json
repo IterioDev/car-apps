@@ -7,7 +7,7 @@
   "optional": true,
   "uninstallable": true,
   "requires": {},
-  "mguHmi": ["ID8"],
+  "mguHmi": ["ID7", "ID8"],
   "files": [
     { "path": "mgu-drplay", "from": "mgu-drplay", "mode": "0755" },
     { "path": "setup.sh", "from": "setup.sh", "mode": "0755" },
