@@ -1,7 +1,7 @@
 {
   "id": "iteriodev-drplay",
   "kind": "tool",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "title": "Drive Recorder player",
   "description": "Plays and manages the Drive Recorder's clips for the Drive Recorder app: the picture through the GPU renderer, thumbnails, lock, delete, the oldest clips replaced at 4 GB, Copy to USB (the whole clip, or one camera as an MP4 with date, time and speed on it)",
   "optional": true,
