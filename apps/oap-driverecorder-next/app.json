@@ -1,6 +1,6 @@
 {
  "id": "oap-driverecorder-next",
- "version": "2.3.0",
+ "version": "2.3.1",
  "title": "Drive Recorder",
  "description": "Keeps the car's cameras recording and saves a clip when you ask; watch, lock, delete and copy clips to a USB stick while the car stands still. Over 4 GB the oldest unlocked clips are replaced. The Store installs the Drive Recorder player with it. The car must be coded for the Drive Recorder.",
  "mguHmi": [

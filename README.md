@@ -183,8 +183,8 @@ top of `screencast.js`.
 
 > [!NOTE]
 > **Car-tested** (2.0.1, G82): recording, saving and watching clips, with all cameras and with front + rear.
-> Not car-tested yet: the 2.2.0 screens, Copy to USB, replacing the oldest clips at 4 GB, and 2.3.0's new app host
-> (the Store's lifecycle, on iDrive 8 too).
+> Not car-tested yet: the 2.2.0 screens, Copy to USB, replacing the oldest clips at 4 GB, and the new app host
+> (the Store's lifecycle, on iDrive 8 too; 2.3.0 did not start on the car, 2.3.1 fixes that).
 
 > [!WARNING]
 > **iDrive 7 (2.3.0) is untested:** no iDrive 7 car or emulator has run the app or the player. The package builds
