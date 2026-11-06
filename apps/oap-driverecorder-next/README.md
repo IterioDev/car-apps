@@ -2,13 +2,13 @@
 
 Keeps the car's cameras recording and saves a clip when you ask; watch, lock, delete and copy clips to a USB stick while the car stands still. Over 4 GB the oldest unlocked clips are replaced. The Store installs the Drive Recorder player with it. The car must be coded for the Drive Recorder.
 
-Version 2.3.11 · iDrive 7 and iDrive 8 · package `oap-driverecorder-next` · [all apps and how to install](../../README.md)
+Version 2.3.12 · iDrive 7 and iDrive 8 · package `oap-driverecorder-next` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
 > Car-tested (2.0.1, iDrive 8): recording, saving and watching clips. 2.3.0 did not start on the car (its manifest lacked what the new app host needs); 2.3.1 fixes that. Not tested on a car yet: the 2.2.0 screens, Copy to USB, and 2.3.1's new app host (the Store's, on iDrive 8 too). The car must be coded for the Drive Recorder; the Store installs the Drive Recorder player with the app.
 
 > [!NOTE]
-> **iDrive 7, car-tested** (2.3.5 to 2.3.11 with the players 1.1.2 to 1.1.4, a G20 without BMW's online services): it installs, starts, opens all its pages, finds and records all four cameras, saved full 91 s clips and copied them to a USB stick (as recorded and as one camera's MP4). The player raises BMW's 1 GB storage budget for the clips to 4.5 GB and makes the stick writable while *Copy to USB* needs it ([details](../../README.md#drive-recorder-tool-iteriodev-drplay)). Not tested on iDrive 7 yet: a save after the budget was raised, watching clips, a car with BMW's online services.
+> **iDrive 7, car-tested** (2.3.5 to 2.3.12 with the players 1.1.2 to 1.1.4, a G20 without BMW's online services): it installs, starts, opens all its pages, finds and records all four cameras, saved full 91 s clips and copied them to a USB stick (as recorded and as one camera's MP4). The player raises BMW's 1 GB storage budget for the clips to 4.5 GB and makes the stick writable while *Copy to USB* needs it ([details](../../README.md#drive-recorder-tool-iteriodev-drplay)). Not tested on iDrive 7 yet: a save after the budget was raised, watching clips, a car with BMW's online services.
 
 ## Screens
 

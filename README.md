@@ -2,7 +2,7 @@
 
 > [!WARNING]
 > **Not tested on iDrive 7.** These apps and tools have been tested only on iDrive 8, in the emulator and on a real
-> car. Drive Recorder (from 2.3.0, with its player) is the only app here that installs on iDrive 7 too; from 2.3.11
+> car. Drive Recorder (from 2.3.0, with its player) is the only app here that installs on iDrive 7 too; from 2.3.12
 > with the player 1.1.4 it records, saves and copies clips there, tested on one G20 (see its section). Every other app is iDrive 8 only; iDrive 7 cars keep the versions they have: Car Data
 > 1.1.10, Drag Timer 1.1.8, Fault Codes 1.1.4, Live Adjustments 1.0.7 and Tailscale 1.0.4 (checked there only as far
 > as building against iDrive 7's app SDK).
@@ -187,7 +187,7 @@ top of `screencast.js`.
 > (the Store's lifecycle, on iDrive 8 too; 2.3.0 did not start on the car, 2.3.1 fixes that).
 
 > [!NOTE]
-> **iDrive 7, car-tested** (a 2021 G20 M340i, MGU18, 360° cameras, no BMW online services; 2.3.5 to 2.3.11, players
+> **iDrive 7, car-tested** (a 2021 G20 M340i, MGU18, 360° cameras, no BMW online services; 2.3.5 to 2.3.12, players
 > 1.1.2 to 1.1.4): it installs, starts, opens all its pages, finds all four cameras and records them; it saved full 91 s
 > clips (all cameras, 60 s + 30 s, 476 MB each) and copied them to a USB stick, as recorded and as one camera's MP4.
 > Not tested on iDrive 7 yet: a save after the player raised the clips' storage budget (below; the 91 s saves came
