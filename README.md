@@ -191,8 +191,8 @@ top of `screencast.js`.
 > 1.1.2 to 1.1.4): it installs, starts, opens all its pages, finds all four cameras and records them; it saved full 91 s
 > clips (all cameras, 60 s + 30 s, 476 MB each) and copied them to a USB stick, as recorded and as one camera's MP4.
 > Not tested on iDrive 7 yet: a save after the player raised the clips' storage budget (below; the 91 s saves came
-> before the old 1 GB filled), watching clips, a car with BMW's online services (its provisioning then comes from
-> BMW, not only from the das files).
+> before the old 1 GB filled), watching clips, a car with BMW's online services (see *BMW's online provisioning*
+> below).
 
 The app asks the car's camera unit for its Drive Recorder mode at every start (Settings can switch that off) and
 keeps the last 30 s; *Save clip* on the Record page writes the 20 s before and the 10 s after (Settings: *Clip
@@ -214,6 +214,12 @@ start. Until then Diagnostics says *Flag on, but icam2proxy offers no video buff
 writes no das lines, so the player (from 1.1.2) adds both there, the app's and `oap_drive_recorder` (it keeps each das
 file's first copy in `/var/opt/iteriodev-drplay/das-orig/`); until the restart after that, Diagnostics says
 *Provisioning flag not set*.
+
+**BMW's online provisioning:** the das lines work only on a car whose provisioning comes from its das files
+(Diagnostics: *Provisioning data state: DAS*). A car provisioned online by BMW (data state *OTA*) takes that whole
+part from BMW's signed provisioning file, and the head unit reads no app lines from the das files there. Its camera
+service turns the recording buffer on only if BMW's provisioning for that car enables the Drive Recorder; there is
+no way around that from the app. Diagnostics (2.3.13) then says *Provisioning flag not set by BMW*.
 
 **Storage budget (player 1.1.4):** BMW's `/usr/bin/quotaset.sh` gives the camera service (user `ent_icam2proxy`) and
 its group (`mgu_driverec`, which writes the clip folder) 1 GB of `/var/opt` each on an MGU18 (100 MB on some
