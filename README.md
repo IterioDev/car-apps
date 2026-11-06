@@ -2,8 +2,8 @@
 
 > [!WARNING]
 > **Not tested on iDrive 7.** These apps and tools have been tested only on iDrive 8, in the emulator and on a real
-> car. Drive Recorder (from 2.3.0, with its player) is the only app here that installs on iDrive 7 too, untested
-> there (see its section). Every other app is iDrive 8 only; iDrive 7 cars keep the versions they have: Car Data
+> car. Drive Recorder (from 2.3.0, with its player) is the only app here that installs on iDrive 7 too; it runs there
+> from 2.3.6, tested on one G20 (see its section). Every other app is iDrive 8 only; iDrive 7 cars keep the versions they have: Car Data
 > 1.1.10, Drag Timer 1.1.8, Fault Codes 1.1.4, Live Adjustments 1.0.7 and Tailscale 1.0.4 (checked there only as far
 > as building against iDrive 7's app SDK).
 
@@ -16,7 +16,7 @@ app platform and show up in *All apps* like BMW's apps.
 |---|---|---|
 | Car Data | `iteriodev_cardash` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep 1.1.10). Live engine data: engine speed, boost, power and torque with their peaks, oil, coolant and intake temperatures, battery voltage; fuel and air values with their last 5 minutes; a trip computer (distance, fuel, cost); gearbox data (ZF 8HP, read-only); the engine unit's values in groups; on diesel cars the particulate filter (DPF). See below. |
 | Drag Timer | `iteriodev_draggy` | **iDrive 8 only** from 1.2.0 (iDrive 7 cars that have 1.1.8 keep it). Acceleration timer: stand still, launch, and it times the run with splits and a speed-over-time chart. Power run: floor it in one gear for power and torque over rpm, with a baseline to compare (from cauliflowermossgrape's idrive7-apps). Keeps your best times; km/h or mph. |
-| Drive Recorder | `oap-driverecorder-next` | **iDrive 7 and iDrive 8** (from 2.3.0; iDrive 7 untested, see below). Keeps the car's cameras recording and saves a clip when you tap *Save clip* (by default the 20 s before and the 10 s after); watch, lock, delete and copy clips to a USB stick while the car stands still. Over 4 GB the oldest unlocked clips are replaced. The car must be coded for the Drive Recorder. Needs the Drive Recorder player below (the Store installs it with the app). |
+| Drive Recorder | `oap-driverecorder-next` | **iDrive 7 and iDrive 8** (from 2.3.0; on iDrive 7 tested on one car from 2.3.6, see below). Keeps the car's cameras recording and saves a clip when you tap *Save clip* (by default the 20 s before and the 10 s after); watch, lock, delete and copy clips to a USB stick while the car stands still. Over 4 GB the oldest unlocked clips are replaced. The car must be coded for the Drive Recorder. Needs the Drive Recorder player below (the Store installs it with the app). |
 | eDrive | `iteriodev_edrive` | **iDrive 8 only.** For plug-in hybrids: the real electric range, learned from how the car is driven, the charge level and battery health, live power and cell voltages, and a log of the charges with their cost. Read-only. On a car without a high-voltage battery it says so and shows the 12 V battery; on a 48 V mild hybrid (from 1.1.0) also its 48 V battery (charge, health, power) and DC/DC converter, from jezikk82's patch to cauliflowermossgrape's idrive7-apps. Not tested on a car yet. |
 | Fault Codes | `iteriodev_dtcscan` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep 1.1.4). Reads the fault memory of every control unit in the car, shows each fault with its text and clears it when you ask. Also lists the car's Check Control messages. |
 | Live Adjustments | `iteriodev_liveadjust` | **iDrive 8 only** (from 1.1.0; iDrive 7 cars keep 1.0.7). For an MHD-tuned DME: engine map 1-4 and MHD Max Cooling, plus the exhaust flap (open, close, back to the DME). See below. |
@@ -186,10 +186,11 @@ top of `screencast.js`.
 > Not car-tested yet: the 2.2.0 screens, Copy to USB, replacing the oldest clips at 4 GB, and the new app host
 > (the Store's lifecycle, on iDrive 8 too; 2.3.0 did not start on the car, 2.3.1 fixes that).
 
-> [!WARNING]
-> **iDrive 7 (2.3.0) is untested:** no iDrive 7 car or emulator has run the app or the player. The package builds
-> against iDrive 7's app SDK and has its own iDrive 7 screens; whether an iDrive 7 head unit's camera service
-> (`icam2proxy`, its Drive Recorder video buffer) and the player's provisioning line work as on iDrive 8 is not known.
+> [!NOTE]
+> **iDrive 7, car-tested** (2.3.6 with the player 1.1.2, a 2021 G20 M340i, MGU18, 360° cameras, no BMW online
+> services): it installs, starts, opens all its pages, and after the player's provisioning lines and one restart of
+> the head unit the Drive Recorder runs. Not tested on iDrive 7 yet: saving and watching clips, Copy to USB, a car
+> with BMW's online services (its provisioning then comes from BMW, not only from the das files).
 
 The app asks the car's camera unit for its Drive Recorder mode at every start (Settings can switch that off) and
 keeps the last 30 s; *Save clip* on the Record page writes the 20 s before and the 10 s after (Settings: *Clip
@@ -205,7 +206,10 @@ one into its `locked/` folder.
 **Install:** in the Store, **Drive Recorder** -> *Install* (it installs the player too), then restart the head unit
 once. Most cars then need one more restart: the head unit's camera service turns its recording buffer on only with a
 second provisioning line (`oap_drive_recorder`, next to the app's own), which the player (1.1.1) adds at its first
-start. Until then Diagnostics says *Flag on, but icam2proxy offers no video buffer*.
+start. Until then Diagnostics says *Flag on, but icam2proxy offers no video buffer*. On iDrive 7 the deploy tool
+writes no das lines, so the player (from 1.1.2) adds both there, the app's and `oap_drive_recorder` (it keeps each das
+file's first copy in `/var/opt/iteriodev-drplay/das-orig/`); until the restart after that, Diagnostics says
+*Provisioning flag not set*.
 
 ## What is in this repository
 

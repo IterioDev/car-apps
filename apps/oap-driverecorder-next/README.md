@@ -2,13 +2,13 @@
 
 Keeps the car's cameras recording and saves a clip when you ask; watch, lock, delete and copy clips to a USB stick while the car stands still. Over 4 GB the oldest unlocked clips are replaced. The Store installs the Drive Recorder player with it. The car must be coded for the Drive Recorder.
 
-Version 2.3.1 · iDrive 7 and iDrive 8 · package `oap-driverecorder-next` · [all apps and how to install](../../README.md)
+Version 2.3.6 · iDrive 7 and iDrive 8 · package `oap-driverecorder-next` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
 > Car-tested (2.0.1, iDrive 8): recording, saving and watching clips. 2.3.0 did not start on the car (its manifest lacked what the new app host needs); 2.3.1 fixes that. Not tested on a car yet: the 2.2.0 screens, Copy to USB, and 2.3.1's new app host (the Store's, on iDrive 8 too). The car must be coded for the Drive Recorder; the Store installs the Drive Recorder player with the app.
 
-> [!WARNING]
-> **iDrive 7 is untested** (2.3.0): no iDrive 7 car or emulator has run it. The package builds against iDrive 7's app SDK and has its own iDrive 7 screens, but whether an iDrive 7 head unit's camera service (`icam2proxy` and its Drive Recorder video buffer) works the way it does on iDrive 8 is not known.
+> [!NOTE]
+> **iDrive 7, car-tested** (2.3.6 with the player 1.1.2, a G20 without BMW's online services): it installs, starts, opens all its pages, and after the player's provisioning lines and one restart of the head unit the Drive Recorder runs. Not tested on iDrive 7 yet: saving and watching clips, Copy to USB, a car with BMW's online services.
 
 ## Screens
 

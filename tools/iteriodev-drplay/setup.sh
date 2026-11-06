@@ -28,33 +28,68 @@ done
 # start: the head unit's next start takes it. Under the deploy tool's own lock (its format: "<pid> <boot id>", linked
 # into place; held by a run: skipped, tried at the next start), in a rootfs window like the deploy tool's (a / found
 # read-write stays so). Never fails the service: a failed ExecStartPre would stop it.
+# 1.1.2, iDrive 7 (MainApp in /usr/lib/oap-mainapp, none in oap-mainapp21): a car without BMW's backend has its
+# provisioning from the das files alone (data state DAS, G20 2026-11-06), and the deploy tool writes no das lines there,
+# so both lines go in here - the app's (appStartType manually, as the deploy tool registers the app) and
+# oap_drive_recorder - after x_call's line (where the deploy tool puts an app's on iDrive 8), else before </data>. Each
+# file's first copy is kept in /var/opt/iteriodev-drplay/das-orig/ before it is changed.
+P=/usr/share/tm/prov
+L='<oap_drive_recorder enabled="true" allowed="true" appStartType="autostart" userLoginRequired="false"/>'
+A='<oap-driverecorder-next enabled="true" allowed="true" appStartType="manually" userLoginRequired="false"/>'
+ID7=
+[ -d /usr/lib/oap-mainapp ] && [ ! -d /usr/lib/oap-mainapp21 ] && ID7=1
+
+# das_edit <das file> <result file>: 0 when the result is to be written (the file lacked lines), else 1
+das_edit() {
+    f=$1; out=$2; add=; n=0
+    if [ -n "$ID7" ]; then
+        grep -q '<oap-driverecorder-next ' "$f" || { add="$A"; n=1; }
+        grep -q '<oap_drive_recorder ' "$f" || { add="${add:+$add#}$L"; n=$((n + 1)); }
+        [ "$n" -gt 0 ] || return 1
+        if [ "$(grep -c '<x_call ' "$f")" = 1 ]; then
+            awk -v l="$add" '{ print } /<x_call / { i = $0; sub(/<.*/, "", i); c = split(l, a, "#"); for (k = 1; k <= c; k++) print i a[k] }' "$f" > "$out"
+        elif [ "$(grep -c '^[[:space:]]*</data>[[:space:]]*$' "$f")" = 1 ]; then
+            awk -v l="$add" '/^[[:space:]]*<\/data>[[:space:]]*$/ { i = $0; sub(/<.*/, "", i); c = split(l, a, "#"); for (k = 1; k <= c; k++) print i "\t" a[k] } { print }' "$f" > "$out"
+        else
+            echo "das: $f has neither one x_call line nor one </data> line: left as it is"
+            return 1
+        fi
+        [ "$(grep -c '<oap-driverecorder-next ' "$out")" = 1 ] || return 1
+    else
+        grep -q '<oap-driverecorder-next ' "$f" && ! grep -q '<oap_drive_recorder ' "$f" || return 1
+        n=1
+        # the app's line, then ours with its indentation
+        awk -v l="$L" '{ print } /<oap-driverecorder-next / { i = $0; sub(/<.*/, "", i); print i l }' "$f" > "$out"
+    fi
+    # only a result n lines longer, with oap_drive_recorder once
+    [ "$(grep -c '<oap_drive_recorder ' "$out")" = 1 ] && [ "$(($(grep -c '' "$f") + n))" = "$(grep -c '' "$out")" ]
+}
+
 das_fix() {
-    P=/usr/share/tm/prov
-    L='<oap_drive_recorder enabled="true" allowed="true" appStartType="autostart" userLoginRequired="false"/>'
     need=
     for f in "$P"/das_00*.xml; do
         [ -f "$f" ] && [ ! -L "$f" ] || continue
-        grep -q '<oap-driverecorder-next ' "$f" && ! grep -q '<oap_drive_recorder ' "$f" && need="$need $f"
+        das_edit "$f" "/tmp/das.drplay-$$.$(basename "$f")" && need="$need $f" || rm -f "/tmp/das.drplay-$$.$(basename "$f")"
     done
     [ -n "$need" ] || return 0
     D=/var/opt/mgu-deploy
     mkdir -p "$D" && echo "$$ $(cat /proc/sys/kernel/random/boot_id)" > "$D/lock.$$" || return 0
-    ln "$D/lock.$$" "$D/lock" 2>/dev/null || { rm -f "$D/lock.$$"; echo "das: the deploy tool is busy, next start"; return 0; }
+    ln "$D/lock.$$" "$D/lock" 2>/dev/null || { rm -f "$D/lock.$$" /tmp/das.drplay-$$.*; echo "das: the deploy tool is busy, next start"; return 0; }
     rm -f "$D/lock.$$"
+    O=/var/opt/iteriodev-drplay/das-orig
+    mkdir -p "$O"
     ro=
     case ",$(awk '$2 == "/" { o = $4 } END { print o }' /proc/mounts)," in *,ro,*) ro=1 ;; esac
     if [ -z "$ro" ] || mount -o remount,rw /; then
         for f in $need; do
-            # the app's line, then ours with its indentation; only a result one line longer with ours once is written
-            awk -v l="$L" '{ print } /<oap-driverecorder-next / { i = $0; sub(/<.*/, "", i); print i l }' "$f" > "/tmp/das.drplay-$$" &&
-                [ "$(grep -c '<oap_drive_recorder ' "/tmp/das.drplay-$$")" = 1 ] &&
-                [ "$(($(grep -c '' "$f") + 1))" = "$(grep -c '' "/tmp/das.drplay-$$")" ] &&
-                cat "/tmp/das.drplay-$$" > "$f" && echo "das: oap_drive_recorder added to $f"
-            rm -f "/tmp/das.drplay-$$"
+            r="/tmp/das.drplay-$$.$(basename "$f")"
+            [ -e "$O/$(basename "$f")" ] || cp -p "$f" "$O/$(basename "$f")" || { rm -f "$r"; continue; }
+            cat "$r" > "$f" && echo "das: drive recorder lines added to $f"
+            rm -f "$r"
         done
         sync
         [ -z "$ro" ] || mount -o remount,ro / || echo "das: / stays read-write: mount -o remount,ro /"
     fi
-    rm -f "$D/lock"
+    rm -f "$D/lock" /tmp/das.drplay-$$.*
 }
-[ -d /usr/share/tm/prov ] && (set +e; das_fix) || :
+[ -d "$P" ] && (set +e; das_fix) || :
