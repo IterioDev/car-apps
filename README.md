@@ -37,7 +37,8 @@ only, any other shows "not supported yet"); DPF (marked Experimental, read-only,
 works (1.0.1, MHD). BMW's regulated flap job opens and closes the flap on a G80 S58 MHD, but the DME drops it once
 the car moves (issue #3). Max Cooling and MHD's own flap control (1.0.7) are not car-tested yet.
 
-- **Engine map 1-4** (MHD): only with the car standing still. The DME has to echo the request back, or the screen
+- **Engine map 1-4** (MHD): at any time, also while driving (from 1.1.1), as MHD itself switches maps on the fly from
+  the cruise control buttons. The DME has to echo the request back, or the screen
   says why it wasn't switched. MHD reports no active map, so the screen shows the map the DME accepted, not one it
   read back. The engine light may flash while the map changes; MHD does that.
 - **Max Cooling** (MHD): at any speed, accepted the same way. *On* only with the engine running (over 500 rpm);
