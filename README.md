@@ -13,7 +13,7 @@ app platform and show up in *All apps* like BMW's apps.
 
 | App | Package id | What it does |
 |---|---|---|
-| Car Data | `iteriodev_cardash` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep 1.1.10). Live engine data: engine speed, boost, power and torque with their peaks, oil, coolant and intake temperatures, battery voltage; fuel and air values with their last 5 minutes; a trip computer (distance, fuel, cost); gearbox data (ZF 8HP, read-only); the engine unit's values in groups. See below. |
+| Car Data | `iteriodev_cardash` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep 1.1.10). Live engine data: engine speed, boost, power and torque with their peaks, oil, coolant and intake temperatures, battery voltage; fuel and air values with their last 5 minutes; a trip computer (distance, fuel, cost); gearbox data (ZF 8HP, read-only); the engine unit's values in groups; on diesel cars the particulate filter (DPF). See below. |
 | Drag Timer | `iteriodev_draggy` | **iDrive 8 only** from 1.2.0 (iDrive 7 cars that have 1.1.8 keep it). Acceleration timer: stand still, launch, and it times the run with splits and a speed-over-time chart. Power run: floor it in one gear for power and torque over rpm, with a baseline to compare (from cauliflowermossgrape's idrive7-apps). Keeps your best times; km/h or mph. |
 | Drive Recorder | `oap-driverecorder-next` | **iDrive 8 only.** Keeps the car's cameras recording and saves a clip when you tap *Save clip* (by default the 20 s before and the 10 s after); watch, lock, delete and copy clips to a USB stick while the car stands still. Over 4 GB the oldest unlocked clips are replaced. The car must be coded for the Drive Recorder. Needs the Drive Recorder player below (the Store installs it with the app). |
 | eDrive | `iteriodev_edrive` | **iDrive 8 only.** For plug-in hybrids: the real electric range, learned from how the car is driven, the charge level and battery health, live power and cell voltages, and a log of the charges with their cost. Read-only. On a car without a high-voltage battery it says so and shows the 12 V battery; on a 48 V mild hybrid (from 1.1.0) also its 48 V battery (charge, health, power) and DC/DC converter, from jezikk82's patch to cauliflowermossgrape's idrive7-apps. Not tested on a car yet. |
@@ -25,11 +25,12 @@ app platform and show up in *All apps* like BMW's apps.
 
 All of them draw their screens through the GPU renderer `mgu-render`.
 
-**Car Data** (six pages). Fuel & air, Trips, Transmission and the grouped Details come from cauliflowermossgrape's
-idrive7-apps (MIT; the package's `renderer/kit/NOTICE`). Not car-tested yet: Trips' fuel figure (the car's fuel signal
+**Car Data** (seven pages; DPF is left out on petrol cars). Fuel & air, Trips, Transmission and the grouped Details come
+from cauliflowermossgrape's idrive7-apps (MIT; the package's `renderer/kit/NOTICE`); the DPF page's idea and values from
+2bhacker9's DPF Monitor (idrive7-apps issue #88). Not car-tested yet: Trips' fuel figure (the car's fuel signal
 is scaled against the engine unit's own figure, learned per car while Car Data is open) and whether trips are counted
 while the app's screen is closed; Transmission (marked Experimental, read-only: the ZF 8HP variants 0F25D0 and 0F21E0
-only, any other shows "not supported yet").
+only, any other shows "not supported yet"); DPF (marked Experimental, read-only, never run on a diesel).
 
 **Live Adjustments** (one screen, sends a command only when you tap a choice). Car-tested: the engine map switch
 works (1.0.1, MHD). BMW's regulated flap job opens and closes the flap on a G80 S58 MHD, but the DME drops it once
