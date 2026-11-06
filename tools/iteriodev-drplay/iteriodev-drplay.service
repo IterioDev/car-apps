@@ -9,6 +9,9 @@ ExecStartPre=/bin/sh /var/opt/iteriodev-drplay/current/setup.sh
 # the user that asked for it), then drops itself to uid 3912, gid 929 mgu_driverec, groups 929 + 903 mgu_persist.
 # No internet.
 ExecStart=/var/opt/iteriodev-drplay/current/mgu-drplay
+# 1.1.3, root beside it in this unit's cgroup (stopped with it): a USB stick the car mounted read-only is made writable
+# while the Drive Recorder app's Copy to USB wants it, and read-only again after (usb-rw.sh)
+ExecStartPost=/bin/sh -c '/bin/sh /var/opt/iteriodev-drplay/current/usb-rw.sh &'
 Restart=always
 RestartSec=10
 

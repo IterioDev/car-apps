@@ -11,8 +11,16 @@ T=/var/opt/iteriodev-drplay/thumbs
 X=/var/opt/iteriodev-drplay/export
 R=/run/iteriodev-drplay
 mkdir -p "$T" "$X" "$R"
-chown "$U:$G" "$T" "$X" "$R"
-chmod 755 "$T" "$X" "$R"
+# 1.1.4: the thumbnails and the export folder in group mgu_persist (903: the player's second group, no quota), setgid, so
+# what the player writes there takes nothing from the clips' budget - in mgu_driverec (929) it counted against the clip
+# folder's quota, and an MP4 export failed with "Disk quota exceeded" once the clips had filled it (G20 2026-11-06)
+P2=903
+chown "$U:$P2" "$T" "$X"
+chmod 2755 "$T" "$X"
+chown "$U:$G" "$R"
+chmod 755 "$R"
+# (only regular files the player owns: -h never follows a link, -type f leaves links out)
+find "$T" "$X" -xdev -type f -user "$U" ! -group "$P2" -exec chgrp -h "$P2" {} \; 2>/dev/null || :
 # the clip folders (02775 ent_mono:mgu_driverec: group 929 writes there; the HDD one only on cars with a disk): root
 # only makes locked/ where nothing is - mkdir never follows a link at that name, the setgid folder gives it group 929
 # and setgid. No chown / chmod by path in a folder others write to.
@@ -20,6 +28,24 @@ for C in /var/opt/public/ent/driverecorder /mnt/share/ent/driverecorder; do
     [ -d "$C" ] && [ ! -L "$C" ] || continue
     [ -e "$C/locked" ] || [ -L "$C/locked" ] || (umask 002; mkdir "$C/locked") || :   # (made meanwhile: fine)
 done
+
+# 1.1.4, the clips' budget: BMW's /usr/bin/quotaset.sh gives the camera service (user ent_icam2proxy) and its group
+# (mgu_driverec, which writes the clip folder) 1 GB hard each on /var/opt (MGU18 highf; 100 MB on ncap), while the player
+# keeps up to 4 GB of clips: with the budget full the camera service's stores ended part way (118 MB left: a 23 s clip)
+# or at once (no file, an empty one), and nothing was replaced, as that starts over 4 GB (G20 2026-11-06). Both hard
+# limits go to 4.5 GB, the 4 GB kept + one clip being written, only when lower and not 0 (no limit); quotas stay on.
+# BMW's again: setquota -g mgu_driverec 0 1048576 0 0 /var/opt; setquota -u ent_icam2proxy 0 1048576 0 0 /var/opt
+CLIP_BUDGET_KB=4718592
+quota_fix() {
+    grep -q ' /var/opt ext4 .*quota' /proc/mounts || return 0
+    for q in "-g mgu_driverec" "-u ent_icam2proxy"; do
+        set -- $q
+        hard=$(quota -w -v "$1" "$2" 2>/dev/null | awk '$1 ~ "^/dev/" && $4 ~ /^[0-9]+$/ { print $4; exit }')
+        [ -n "$hard" ] && [ "$hard" -gt 0 ] && [ "$hard" -lt "$CLIP_BUDGET_KB" ] || continue
+        setquota "$1" "$2" 0 "$CLIP_BUDGET_KB" 0 0 /var/opt && echo "quota: $2 $hard KB -> $CLIP_BUDGET_KB KB"
+    done
+}
+(set +e; quota_fix) || :
 
 # 1.1.1, provisioning: icam2proxy offers its video buffer only when the das files enable the Drive Recorder. On a car
 # coded COMMUNICATION_PARKMASTER gen2 it reads the section oap_drive_recorder, not the app's own line
