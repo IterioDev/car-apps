@@ -106,6 +106,20 @@ const mReset = (m) => { m.sp18 = 0; m.setup = 0; };
 const AMBIENT = { get: 'call 0xb512 1 3 1', set: (c) => `call 0xb512 1 26 1 0fff${c}ffffffff030303`,
     byte: (n) => (n - 1).toString(16).padStart(2, '0') };
 const FLASH_MS = 5000, FLASH_AFTER_MS = 10000;      // ponytail: no flash for the start's first statuses (grace window)
+// boot: the strip shows with the HMI, not over the black screen of a start nor the M start animation (a client
+// 2026-11-07: "overlaps with the M boot animation"; mgu-m4: the animation is a video cameraplayer plays on surface 0x198,
+// 1280x480, ~50 s from boot). User 2026-11-07: show it 1 minute after the start (the head unit's boot, or a wake from
+// sleep), and only once the HMI answers its graphical context (HMIContext2); it stays over the cameras after that. No
+// HMI answer by MAX_MS: shown all the same. A restart of the tool later (an update) shows it at once.
+const BOOT = { AFTER_MS: 60000, MAX_MS: 120000 };
+function bootGate(now, b) {                          // b: { since (the start), hmiAt (0: not yet) } -> why up, or null
+    if (b.hmiAt && now - b.since >= BOOT.AFTER_MS) return '1 min after the start, HMI up';
+    return now - b.since >= BOOT.MAX_MS ? 'timeout' : null;
+}
+/** when the head unit started: now less its uptime (/proc/uptime counts sleep too: a wake is told by the tick gap) */
+function bootedAt() {
+    try { return Date.now() - parseFloat(fs.readFileSync('/proc/uptime', 'utf8')) * 1000; } catch (e) { return Date.now(); }
+}
 
 const log = (m) => console.log(m);
 
@@ -370,6 +384,7 @@ function main() {
     const SW = L.slotW, H = L.h, BW = L.buttonW, ICON_MAX = 76, HMI_PX = 84;
     const pics = {}, flash = [0, 0, 0, 0], looks = [], failAt = [0, 0, 0, 0];
     let notice = null;                                // the last tap that did nothing: { slot, title, at }
+    const boot = { since: 0, hmiAt: 0, up: false };    // BOOT: shown once up
     const st = seats.state(!!process.env.OVERLAYS_SEAT_DEMO);
     Object.assign(st.legacy.seen, conf.vents);
     let ventsSaved = JSON.stringify(st.legacy.seen);
@@ -433,7 +448,8 @@ function main() {
         ops.reduce((at, o) => { all.set(o, at); return at + o.length; }, 0);
         gpu.frameWords(all);
     }
-    function claims() {                               // the shortcuts and the buttons shown
+    function claims() {                               // the shortcuts and the buttons shown (none while booting)
+        if (!boot.up) return gpu.claim([]);
         gpu.claim(shownSlots().map((x) => ({ x, y: 0, w: SW, h: H })).concat(shownButtons().map((b) => ({ x: b.x, y: 0, w: BW, h: H }))));
     }
     function targetAt(x) {
@@ -740,15 +756,30 @@ function main() {
     gpu.place({ x: L.x, y: L.y, w: L.w, h: L.h, scale: 1, ox: 0, oy: 0 });
     L.slots.forEach((x, i) => gpu.pixmap(i + 1, SW, H, 'rgba', 'linear'));
     Object.keys(PIX).forEach((k) => gpu.pixmap(PIX[k], BW, H, 'rgba', 'linear'));
-    claims();
-    gpu.show(true);
+    /* boot (BOOT): hidden, claiming nothing, until 1 min after the start with the HMI up; armed again after a sleep */
+    function arm(why, since) {
+        Object.assign(boot, { since, hmiAt: 0, up: false });
+        gpu.show(false);
+        claims();
+        log(`boot: strip hidden (${why}) until ${Math.round(BOOT.AFTER_MS / 1000)} s after the start with the HMI up`);
+    }
+    function bootTick() {
+        if (boot.up) return;
+        if (!boot.hmiAt) hmi('ctx').then((r) => { if (!boot.hmiAt && /^ok -?\d+ -?\d+/.test(r)) { boot.hmiAt = Date.now(); log(`boot: HMI up (${r})`); } });
+        const why = bootGate(Date.now(), boot);
+        if (!why) return;
+        boot.up = true;
+        log(`boot: strip shown ${Math.round((Date.now() - boot.since) / 1000)} s after the start (${why})`);
+        gpu.show(true);
+        redrawAll();
+    }
     gpu.on('ready', () => { log('renderer ready'); frame(); });
     gpu.on('touch', (phase, x) => {
         const before = gestures.pressed();
         gestures.touch(phase, x);
         if (gestures.pressed() !== before) [before, gestures.pressed()].forEach(draw);
     });
-    gpu.on('closed', () => gpu.show(true));         // a renderer without overlay_apps for us closes it on HMI touches
+    gpu.on('closed', () => { if (boot.up) gpu.show(true); });   // a renderer without overlay_apps for us closes it on HMI touches
     redrawAll();
     subscribe();
     serve();
@@ -763,9 +794,12 @@ function main() {
     setInterval(() => {                              // the head unit slept (the car off): no M setup now
         const now = Date.now();
         if (now - tickAt >= WAKE_MS && (m.sp18 || m.setup)) { log(`woke up after ${Math.round((now - tickAt) / 1000)} s: no M setup`); mReset(m); }
+        if (now - tickAt >= WAKE_MS) arm('woke up', now);   // a start after a sleep: its animation too
         tickAt = now;
     }, 5000);
     process.on('SIGTERM', () => { gpu.close(); sl.close(); if (child) child.kill(); process.exit(0); });
+    arm('start', bootedAt());
+    setInterval(bootTick, 1000);
     gpu.connect();
     log(`overlays: ${JSON.stringify(slots)} ${JSON.stringify(settings)}${st.backend === 'demo' ? ', seats: demo' : ''}`);
 }
@@ -773,6 +807,10 @@ function main() {
 /* ---- self-check: node overlays.js --test ---- */
 function test() {
     const assert = require('assert');
+    // boot: black screen (no HMI), the animation (HMI up), 1 min after the start with the HMI up; no HMI: the timeout
+    const b0 = { since: 0, hmiAt: 0 }, hmiUp = { since: 0, hmiAt: 20000 };
+    assert.deepStrictEqual([bootGate(5000, b0), bootGate(30000, hmiUp), bootGate(59999, hmiUp), bootGate(60000, hmiUp), bootGate(90000, b0),
+        bootGate(120000, b0)], [null, null, null, '1 min after the start, HMI up', null, 'timeout']);
     const apps = [{ id: 'iteriodev_cardash', appletId: 20097 }, { id: 'robertn_store', appletId: 20650 }];
     assert.deepStrictEqual(classify(3000, 23097, apps), { app: 'iteriodev_cardash', state: 3000, offset: 3000 });
     assert.deepStrictEqual(classify(5, 20650, apps), { app: 'robertn_store', state: 5, offset: 0 });

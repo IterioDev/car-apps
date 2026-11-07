@@ -70,12 +70,14 @@ That link is gone: remove that source, then add `IterioDev/car-apps` as above. I
 > 0.3.3), the ambient light flash with its default colours (0.3.4). Not car-tested yet: the level segments, the shift
 > lights, TRACK, *Start in M SPORT* (0.3.3), other flash colours, the app's picker and settings pages, and 0.3.7's
 > fixes (seat heating in the AUTO program, ventilation shown only once seen, M setups ending with the car switched
-> off, no shift lights on M cars).
+> off, no shift lights on M cars), and 0.3.8 (the strip 1 minute after a start, the HMI's own shortcut icons).
 
-An iDrive 8.5-style strip drawn over the climate bar, always there (also over the reversing camera):
+An iDrive 8.5-style strip drawn over the climate bar, there from 1 minute after the head unit starts (or wakes), so
+not over the black start screen or the M start animation, and from then on always (also over the reversing camera):
 
-- **Shortcuts:** two left and two right of *CLIMATE MENU*. A tap opens the slot's screen; holding one for 1 s saves
-  the screen you are on into it (any BMW screen or app). The app picks them from a list too.
+- **Shortcuts:** two left and two right of *CLIMATE MENU*, with the HMI's own icons (Media, Navigation, Phone, All
+  apps). A tap opens the slot's screen; holding one for 1 s saves the screen you are on into it (any BMW screen or
+  app). The app picks them from a list too.
 - **Seat heating / ventilation** in the HMI's own spots and with its own icons: ventilation left of each
   temperature, heating right of it. A tap steps the level (1 -> 2 -> 3 -> off, or 3 -> 2 -> 1 -> off); on, the icon
   turns red / blue and the line under it shows the level (three segments). What it shows is always the car's live
