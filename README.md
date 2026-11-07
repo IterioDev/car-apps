@@ -70,9 +70,10 @@ That link is gone: remove that source, then add `IterioDev/car-apps` as above. I
 > 0.3.3), the ambient light flash with its default colours (0.3.4). Not car-tested yet: the level segments, the shift
 > lights, TRACK, *Start in M SPORT* (0.3.3), other flash colours, the app's picker and settings pages, and 0.3.7's
 > fixes (seat heating in the AUTO program, ventilation shown only once seen, M setups ending with the car switched
-> off, no shift lights on M cars), and 0.3.8 (the strip 1 minute after a start, the HMI's own shortcut icons).
+> off, no shift lights on M cars), 0.3.8 (the HMI's own shortcut icons) and 0.3.9 (the strip 15 s after a start, a
+> solid phone icon).
 
-An iDrive 8.5-style strip drawn over the climate bar, there from 1 minute after the head unit starts (or wakes), so
+An iDrive 8.5-style strip drawn over the climate bar, there from 15 s after the head unit starts (or wakes) with the HMI up, so
 not over the black start screen or the M start animation, and from then on always (also over the reversing camera):
 
 - **Shortcuts:** two left and two right of *CLIMATE MENU*, with the HMI's own icons (Media, Navigation, Phone, All

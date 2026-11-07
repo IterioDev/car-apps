@@ -108,12 +108,13 @@ const AMBIENT = { get: 'call 0xb512 1 3 1', set: (c) => `call 0xb512 1 26 1 0fff
 const FLASH_MS = 5000, FLASH_AFTER_MS = 10000;      // ponytail: no flash for the start's first statuses (grace window)
 // boot: the strip shows with the HMI, not over the black screen of a start nor the M start animation (a client
 // 2026-11-07: "overlaps with the M boot animation"; mgu-m4: the animation is a video cameraplayer plays on surface 0x198,
-// 1280x480, ~50 s from boot). User 2026-11-07: show it 1 minute after the start (the head unit's boot, or a wake from
-// sleep), and only once the HMI answers its graphical context (HMIContext2); it stays over the cameras after that. No
-// HMI answer by MAX_MS: shown all the same. A restart of the tool later (an update) shows it at once.
-const BOOT = { AFTER_MS: 60000, MAX_MS: 120000 };
+// 1280x480 surface ~50 s from boot, the animation itself a few seconds). Shown AFTER_MS after the start (the head unit's
+// boot, or a wake from sleep; a tester 2026-11-07: 1 min too long, 10-15 s enough) and only once the HMI answers its
+// graphical context (HMIContext2); it stays over the cameras after that. No HMI answer by MAX_MS: shown all the same.
+// A restart of the tool later (an update) shows it at once.
+const BOOT = { AFTER_MS: 15000, MAX_MS: 60000 };
 function bootGate(now, b) {                          // b: { since (the start), hmiAt (0: not yet) } -> why up, or null
-    if (b.hmiAt && now - b.since >= BOOT.AFTER_MS) return '1 min after the start, HMI up';
+    if (b.hmiAt && now - b.since >= BOOT.AFTER_MS) return 'HMI up';
     return now - b.since >= BOOT.MAX_MS ? 'timeout' : null;
 }
 /** when the head unit started: now less its uptime (/proc/uptime counts sleep too: a wake is told by the tick gap) */
@@ -756,7 +757,7 @@ function main() {
     gpu.place({ x: L.x, y: L.y, w: L.w, h: L.h, scale: 1, ox: 0, oy: 0 });
     L.slots.forEach((x, i) => gpu.pixmap(i + 1, SW, H, 'rgba', 'linear'));
     Object.keys(PIX).forEach((k) => gpu.pixmap(PIX[k], BW, H, 'rgba', 'linear'));
-    /* boot (BOOT): hidden, claiming nothing, until 1 min after the start with the HMI up; armed again after a sleep */
+    /* boot (BOOT): hidden, claiming nothing, until AFTER_MS after the start with the HMI up; armed again after a sleep */
     function arm(why, since) {
         Object.assign(boot, { since, hmiAt: 0, up: false });
         gpu.show(false);
@@ -807,10 +808,10 @@ function main() {
 /* ---- self-check: node overlays.js --test ---- */
 function test() {
     const assert = require('assert');
-    // boot: black screen (no HMI), the animation (HMI up), 1 min after the start with the HMI up; no HMI: the timeout
-    const b0 = { since: 0, hmiAt: 0 }, hmiUp = { since: 0, hmiAt: 20000 };
-    assert.deepStrictEqual([bootGate(5000, b0), bootGate(30000, hmiUp), bootGate(59999, hmiUp), bootGate(60000, hmiUp), bootGate(90000, b0),
-        bootGate(120000, b0)], [null, null, null, '1 min after the start, HMI up', null, 'timeout']);
+    // boot: black screen (no HMI), the animation (HMI up), 15 s after the start with the HMI up; no HMI: the timeout
+    const b0 = { since: 0, hmiAt: 0 }, hmiUp = { since: 0, hmiAt: 4000 };
+    assert.deepStrictEqual([bootGate(5000, b0), bootGate(10000, hmiUp), bootGate(14999, hmiUp), bootGate(15000, hmiUp), bootGate(30000, b0),
+        bootGate(60000, b0)], [null, null, null, 'HMI up', null, 'timeout']);
     const apps = [{ id: 'iteriodev_cardash', appletId: 20097 }, { id: 'robertn_store', appletId: 20650 }];
     assert.deepStrictEqual(classify(3000, 23097, apps), { app: 'iteriodev_cardash', state: 3000, offset: 3000 });
     assert.deepStrictEqual(classify(5, 20650, apps), { app: 'robertn_store', state: 5, offset: 0 });
