@@ -9,11 +9,12 @@
  *             below), hold-to-move and memories also while driving (user 2026-11-08)
  *   easy exit (0.3.0, user 2026-11-08) the driver's own Exit position (the seat + the electric steering column when the
  *             car has one, seat.js 'wheel'; the driver's memories keep the column too): the driver door opening while
- *             the car stands keeps where the driver sat and moves to Exit; the driver's belt buckled (door open or
- *             closed) moves back there. Stands = under 2 km/h; no fresh speed: the engine under 1000 rpm; neither: the
- *             car off. Both moves only while it stands. Door: DoorsWindowsRoofMirrors 0x5530 ev 0x8001 / 0x8006 byte
- *             2 (1 open), events only; belt: CDS2 0xB514 getter 5 / ev 0x8005 byte 0 (1 buckled); rpm: CDS 0xB513
- *             getter 25 (x 0.25). NOT car-tested.
+ *             the car stands keeps where the driver sat and moves to Exit; the driver door closed with the ignition or
+ *             the engine on (whichever comes last; 0.3.1, user: not everyone wears the belt) moves back there.
+ *             Stands = under 2 km/h; no fresh speed: the engine under 1000 rpm; neither: the car off. Both moves only
+ *             while it stands. Door: DoorsWindowsRoofMirrors 0x5530 ev 0x8001 / 0x8006 byte 2 (1 open), events only;
+ *             ignition: VehicleCondition test / ready to drive / driving; engine: CDS 0xB513 getter 25 (x 0.25) at
+ *             400 rpm or more. NOT car-tested.
  * All UDS goes through the head unit's diagnostic gateway on one `hmictl serve` (uds.js).
  * Control socket /run/iteriodev-comfort/ctl.sock, JSON lines in and out; every change is pushed to every client:
  *   {op:'get'}  {op:'ambient', settings:{on, rgb:[r,g,b], bright 5-100, follow, zones:{dash:{rgb}|{off:true}|null}}}
@@ -38,9 +39,9 @@ const CTL = process.env.COMFORT_CTL || '/run/iteriodev-comfort/ctl.sock';
 const HMICTL = process.env.COMFORT_HMICTL || path.join(__dirname, 'hmictl');   // tests: a .js stand-in, run with this Node
 const SPEED_SUB = 'sub 0xb519 1 1 1 0x8008', SPEED_GET = 'call 0xb519 1 8 1', SPEED_FRESH_MS = 3000;
 const AMB_SUB = 'sub 0xb512 1 1 1 0x8003', AMB_GET = 'call 0xb512 1 3 1';
-const RPM_GET = 'call 0xb513 1 25 1', BELT_SUB = 'sub 0xb514 1 1 1 0x8005', BELT_GET = 'call 0xb514 1 5 1';
+const RPM_GET = 'call 0xb513 1 25 1';
 const DOOR_SUB = 'sub 0x5530 1 1 1 0x8001 0x8006';
-const STOP_SPEED = 2 * 64, STOP_RPM = 1000 * 4;              // raw: speed 1/64 km/h (V_VEH_COG), rpm x 0.25
+const STOP_SPEED = 2 * 64, STOP_RPM = 1000 * 4, RUN_RPM = 400 * 4;   // raw: speed 1/64 km/h (V_VEH_COG), rpm x 0.25
 // VehicleCondition: shown to the apps (the car switched on or not)
 const VCOND_SUB = 'sub 0x1531 1 1 2 0x8002';                 // no getter: its notifications only
 const carOn = (hex) => [7, 8, 10].indexOf(parseInt((hex || '').slice(10, 12), 16)) >= 0;   // test / ready to drive / driving
@@ -96,22 +97,30 @@ function main() {
     function done(line) { clearTimeout(busyTimer); const b = busy; busy = null; if (b) b.res(line); pump(); }
 
     const diag = new uds.Uds(hmi, log);
-    const car = { speed: null, speedAt: 0, rpm: null, rpmAt: 0, ambientOn: null, on: false, door: null, belt: null };
-    const cond = (hex) => { const on = carOn(hex); if (on !== car.on) { car.on = on; log(`car ${on ? 'on' : 'off'} (${hex})`); push(); } };
+    const car = { speed: null, speedAt: 0, rpm: null, rpmAt: 0, ambientOn: null, on: false, door: null };
+    const cond = (hex) => { const on = carOn(hex); if (on !== car.on) { car.on = on; log(`car ${on ? 'on' : 'off'} (${hex})`); push(); back(); } };
     // stands: under 2 km/h; no fresh speed: the engine under 1000 rpm (idle or off); neither: the car switched off
     const fresh = (t) => Date.now() - t < SPEED_FRESH_MS;
     const parked = () => (fresh(car.speedAt) ? car.speed < STOP_SPEED : fresh(car.rpmAt) ? car.rpm < STOP_RPM : !car.on);
     const u16 = (k) => (hex) => { const v = parseInt((hex || '').slice(0, 4), 16); if (v >= 0 && v !== 0xffff) { car[k] = v; car[k + 'At'] = Date.now(); } };
     const speed = u16('speed'), rpm = u16('rpm');
-    // the driver door / belt: edges only (a state seen first - a restart with the door open - moves nothing)
-    function edge(k, v, what, fn) {
+    // the driver door: its changes only (a state seen first - a restart with the door open - moves nothing)
+    function door(hex) {
+        const v = parseInt((hex || '').slice(4, 6), 16), was = car.door;
         if (v !== 0 && v !== 1) return;
-        const was = car[k];
-        car[k] = v === 1;
-        if (car[k] && was === false) { log(what); fn(); }
+        car.door = v === 1;
+        if (was === null || was === car.door) return;
+        log(`driver door ${car.door ? 'open' : 'closed'}`);
+        if (car.door) easyExit(false);
+        back();
     }
-    const door = (hex) => edge('door', parseInt((hex || '').slice(4, 6), 16), 'driver door open', () => easyExit(false));
-    const belt = (hex) => edge('belt', parseInt((hex || '').slice(0, 2), 16), 'driver belt buckled', () => easyBack());
+    // back to the driving position: the driver door closed with the ignition or the engine on, whichever comes last
+    let ready = false;
+    function back() {
+        const r = car.door === false && (car.on || (fresh(car.rpmAt) && car.rpm >= RUN_RPM));
+        if (r && !ready) { log('driver door closed, car on'); easyBack(); }
+        ready = r;
+    }
     function ambientStatus(hex) {
         const on = (hex || '').length >= 16 ? parseInt(hex.slice(14, 16), 16) === 1 : null;
         if (on !== car.ambientOn) { car.ambientOn = on; log(`car ambient light: ${on ? 'on' : 'off'} (${hex})`); light(true); push(); }
@@ -122,11 +131,10 @@ function main() {
         else if (svc === 0xb519 && ev === 0x8008) speed(w[3]);
         else if (svc === 0xb512 && ev === 0x8003) ambientStatus(w[3]);
         else if (svc === 0x1531 && ev === 0x8002) cond(w[3]);
-        else if (svc === 0xb514 && ev === 0x8005) belt(w[3]);
         else if (svc === 0x5530 && (ev === 0x8001 || ev === 0x8006)) door(w[3]);
     }
     function subscribe() {
-        [uds.SUB, SPEED_SUB, AMB_SUB, VCOND_SUB, BELT_SUB, DOOR_SUB].forEach((l) => hmi(l));
+        [uds.SUB, SPEED_SUB, AMB_SUB, VCOND_SUB, DOOR_SUB].forEach((l) => hmi(l));
         hmi(AMB_GET).then((r) => { if (r.startsWith('ok ')) ambientStatus(r.slice(3)); });
     }
 
@@ -190,7 +198,7 @@ function main() {
         try { log(`${name}: ${JSON.stringify(await fn())}`); } catch (e) { log(`${name}: ${e.message}`); }
         busyJob = null; push();
     }
-    const AUTO = ['exit', 'back'];                    // the door's and the belt's: they stop whatever runs first
+    const AUTO = ['exit', 'back'];                    // the door's: they stop whatever runs first
     async function auto(name, fn) {
         if (busyJob) { mover.halt(); while (busyJob) await new Promise((r) => setTimeout(r, 50)); }
         return job(name, fn);
@@ -211,7 +219,7 @@ function main() {
         for (const s of steps) { const r = await s(); if (r !== 'done') return r; }
         return 'done';
     }
-    // out of the way (the door, or the app's Exit): the driving position kept until the belt brings it back - a
+    // out of the way (the door, or the app's Exit): the driving position kept until the way back - a
     // second door opening before that keeps the first one
     function easyExit(manual) {
         if (!data.exit || (!manual && !data.settings.easyExit)) return;
@@ -285,7 +293,7 @@ function main() {
             }
         });
         c.on('error', () => {});
-        // the app gone: nothing it started keeps moving (the door's and the belt's moves run without it)
+        // the app gone: nothing it started keeps moving (the door's moves run without it)
         c.on('close', () => { clients.delete(c); if (!clients.size && AUTO.indexOf(busyJob) < 0) mover.halt(); });
         c.write(JSON.stringify(status()) + '\n');
     });
@@ -294,7 +302,7 @@ function main() {
 
     subscribe();
     const poll = (l, fn) => hmi(l).then((r) => { if (r.startsWith('ok ')) fn(r.slice(3)); });
-    setInterval(() => { poll(SPEED_GET, speed); poll(RPM_GET, rpm); poll(BELT_GET, belt); }, 2000);
+    setInterval(() => { poll(SPEED_GET, speed); poll(RPM_GET, (h) => { rpm(h); back(); }); }, 2000);
     setInterval(() => { if (lit && Date.now() - litAt > amb.RENEW_MS) light(true); }, 10000);
     setTimeout(() => {
         ['driver', 'passenger'].forEach((s) => mover.read(s).catch((e) => log(`${s} seat: ${e.message}`)));
