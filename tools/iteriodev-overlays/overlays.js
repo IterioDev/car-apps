@@ -11,6 +11,8 @@
  *     tap         the level steps 1 -> 2 -> 3 -> off (or 3 -> 2 -> 1 -> off); what is shown is always the car's live
  *                 status (the climate menu or the seat buttons may change it), the asked level only until it answers
  *   the steering wheel heating at the bar's far left, the same kind of button (one tap: on / off)
+ *   a right-hand drive car (the setting side 'right', set in the app; default 'left', user 2026-11-08): the driver's
+ *     seat buttons in the right-hand spots, the passenger's in the left-hand ones, the wheel at the far right
  *   M1 / M2 on the steering wheel (M cars): an M setup switched on also switches the M Mode (cluster, HUD, as the M
  *     Mode panel's button: `hmictl mmode sport`), switched off back; which mode for each: the settings
  * The Overlays app (iteriodev_overlays) is its control panel: a JSON-lines socket (CTL) with the settings, the slots,
@@ -82,7 +84,8 @@ const mcarOf = (found, set) => (set.mmode.car === 'yes' ? true : set.mmode.car =
 const RED = [255, 48, 49], BLUE = [29, 120, 223], WHITE = [255, 255, 255];   // the HMI's accent colours
 const OFF_ALPHA = 0.6;
 const MODES = ['road', 'sport', 'track'];
-const SETTINGS = { shortcuts: true, seats: true, wheel: true, ambient: true, ambientHeat: 3, ambientCool: 9, order: 'up',
+const SIDES = ['left', 'right'];                     // where the steering wheel is (LAYOUT is a left-hand drive car's)
+const SETTINGS = { shortcuts: true, seats: true, wheel: true, ambient: true, ambientHeat: 3, ambientCool: 9, order: 'up', side: 'left',
     show: BUTTON_KEYS.reduce((o, k) => { o[k] = 'auto'; return o; }, {}),
     mmode: { on: true, m1: 'sport', m2: 'sport', off: 'road', boot: false, car: 'auto' }, shift: shift.DEFAULTS };
 // MDrive 0xB51F, the active M setup: statusMConfigurationMDrive 0x8018 byte 0 (Hmi8's ...SP21: 0 none, 1 M1, 2 M2,
@@ -205,6 +208,7 @@ function mergeSettings(cur, p) {
     ['shortcuts', 'seats', 'wheel', 'ambient'].forEach((k) => { if (typeof p[k] === 'boolean') out[k] = p[k]; });
     ['ambientHeat', 'ambientCool'].forEach((k) => { if (Number.isInteger(p[k]) && p[k] >= 1 && p[k] <= 12) out[k] = p[k]; });
     if (p.order === 'up' || p.order === 'down') out.order = p.order;
+    if (SIDES.indexOf(p.side) >= 0) out.side = p.side;
     if (p.show && typeof p.show === 'object') BUTTON_KEYS.forEach((k) => { if (SHOW.indexOf(p.show[k]) >= 0) out.show[k] = p.show[k]; });
     if (p.mmode && typeof p.mmode === 'object') {
         ['on', 'boot'].forEach((k) => { if (typeof p.mmode[k] === 'boolean') out.mmode[k] = p.mmode[k]; });
@@ -285,17 +289,26 @@ function clusterUp(k, hex) {
 }
 /* the next level of a tap: 1 -> 2 -> 3 -> off ('up'), or 3 -> 2 -> 1 -> off ('down') */
 const nextLevel = (level, max, order) => (order === 'down' ? (level > 0 ? level - 1 : max) : seats.next(level, max));
+/* the seat whose spots a seat's buttons take: its own on a left-hand drive car, the other one's on a right-hand drive
+ * one (the driver sits on the right: a client's report 2026-11-08, the left icons switched the right seat) */
+const spotSeat = (seat, side) => (side !== 'right' ? seat : seat === 'driver' ? 'passenger' : 'driver');
+/* where a seat / wheel button sits (L.buttons: a left-hand drive car's); the wheel at the other end on a right-hand one */
+function spot(L, key, side) {
+    const [seat, kind] = key.split('.');
+    if (kind === 'wheel') return side === 'right' ? L.w - L.buttons[key] - L.buttonW : L.buttons[key];
+    return L.buttons[`${spotSeat(seat, side)}.${kind}`];
+}
 /* the seat / wheel buttons to show, [{ key, x }]: per button the user's choice ('on' / 'off'), on 'auto' what the car has;
  * the old master switches (seats, wheel) still hide theirs */
 function buttons(L, st, set) {
     const want = (key, have) => (set.show[key] === 'on' || (set.show[key] !== 'off' && have));
     const out = [];
-    if (set.wheel && want('driver.wheel', st.wheel.have)) out.push({ key: 'driver.wheel', x: L.buttons['driver.wheel'] });
+    if (set.wheel && want('driver.wheel', st.wheel.have)) out.push({ key: 'driver.wheel', x: spot(L, 'driver.wheel', set.side) });
     if (set.seats) {
         for (const seat of seats.SEATS) {
             for (const kind of ['cool', 'heat']) {
                 const key = `${seat}.${kind}`;
-                if (want(key, st.seats[seat][kind].have)) out.push({ key, x: L.buttons[key] });
+                if (want(key, st.seats[seat][kind].have)) out.push({ key, x: spot(L, key, set.side) });
             }
         }
     }
@@ -432,7 +445,8 @@ function main() {
     };
     function drawButtonKey(key) {
         const [seat, kind] = key.split('.');
-        picture({ builtin: kind === 'wheel' ? 'hmi-wheel' : `hmi-${kind}-${seat}` }, (img) => {
+        // the HMI's icon for the spot it is drawn in (a right-hand drive car: the driver's buttons in the right-hand spots)
+        picture({ builtin: kind === 'wheel' ? 'hmi-wheel' : `hmi-${kind}-${spotSeat(seat, settings.side)}` }, (img) => {
             const px = Buffer.alloc(BW * H * 4);
             drawButton(px, L, kind, img, shown(key), gestures.pressed() === key, state(key).max);
             gpu.pixels(PIX[key], [{ x: 0, y: 0, w: BW, h: H }], px);
@@ -836,10 +850,15 @@ function test() {
     assert.strictEqual(keys(heatOnly, SETTINGS), 'driver.heat@864 passenger.heat@2486');
     assert.strictEqual(keys(all, mergeSettings(SETTINGS, { seats: false })), 'driver.wheel@20');
     assert.strictEqual(keys(all, mergeSettings(SETTINGS, { wheel: false, seats: 'no' })), 'driver.cool@222 driver.heat@864 passenger.cool@1844 passenger.heat@2486');
+    // a right-hand drive car: the driver's buttons in the right-hand spots, the passenger's left, the wheel at the far right
+    const rhd = mergeSettings(SETTINGS, { side: 'right' });
+    assert.strictEqual(keys(all, rhd), 'driver.wheel@2740 driver.cool@1844 driver.heat@2486 passenger.cool@222 passenger.heat@864');
+    assert.deepStrictEqual([spotSeat('driver', 'right'), spotSeat('passenger', 'right'), spotSeat('driver', 'left')], ['passenger', 'driver', 'driver']);
+    assert.strictEqual(mergeSettings(rhd, { side: 'middle' }).side, 'right', 'a bad side: kept');
     // settings: known keys of the right kind only
     const s2 = mergeSettings(SETTINGS, { order: 'down', mmode: { m2: 'track', off: 'warp', on: false, boot: 1 }, extra: 1, shortcuts: 0,
         ambientHeat: 4, ambientCool: 13 });
-    assert.deepStrictEqual(s2, { shortcuts: true, seats: true, wheel: true, ambient: true, ambientHeat: 4, ambientCool: 9, order: 'down',
+    assert.deepStrictEqual(s2, { shortcuts: true, seats: true, wheel: true, ambient: true, ambientHeat: 4, ambientCool: 9, order: 'down', side: 'left',
         show: SETTINGS.show, mmode: { on: false, m1: 'sport', m2: 'track', off: 'road', boot: false, car: 'auto' },
         shift: shift.DEFAULTS });
     // per-button choice: 'on' shows what the car doesn't report, 'off' hides what it does (an M2 without ventilation that

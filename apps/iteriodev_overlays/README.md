@@ -2,7 +2,7 @@
 
 Set up the Overlays strip in the climate bar: what each of the four shortcuts opens (BMW screens or apps), the seat heating / ventilation and steering wheel buttons, the tap order, shift lights on the instrument cluster for cars without their own, not M cars (needs Cluster renderer from robertnisipeanu/idrive-apps), and on M cars which M Mode M1 / M2 switch to. Needs the Overlays tool from the same source.
 
-Version 1.2.2 · iDrive 8 only · package `iteriodev_overlays` · [all apps and how to install](../../README.md)
+Version 1.3.0 · iDrive 8 only · package `iteriodev_overlays` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
 > The strip in the climate bar is car-tested (G82); the app's pages are not yet. Needs the Overlays tool (the Store installs it with the app).
@@ -27,7 +27,7 @@ BMW screens or the apps on this car.
 
 ![Climate](screenshots/climate.png)
 
-Tap order, the ambient light flash and its colours, and which seat and steering wheel buttons the strip shows.
+Tap order, the ambient light flash and its colours, the steering wheel's side (*Right* for a right-hand drive car: the driver's buttons on the right), and which seat and steering wheel buttons the strip shows.
 
 ### Shift lights
 

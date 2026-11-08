@@ -70,8 +70,8 @@ That link is gone: remove that source, then add `IterioDev/car-apps` as above. I
 > 0.3.3), the ambient light flash with its default colours (0.3.4). Not car-tested yet: the level segments, the shift
 > lights, TRACK, *Start in M SPORT* (0.3.3), other flash colours, the app's picker and settings pages, and 0.3.7's
 > fixes (seat heating in the AUTO program, ventilation shown only once seen, M setups ending with the car switched
-> off, no shift lights on M cars), 0.3.8 (the HMI's own shortcut icons) and 0.3.9 (the strip 15 s after a start, a
-> solid phone icon).
+> off, no shift lights on M cars), 0.3.8 (the HMI's own shortcut icons), 0.3.9 (the strip 15 s after a start, a
+> solid phone icon) and 0.4.0 (the right-hand drive setting).
 
 An iDrive 8.5-style strip drawn over the climate bar, there from 15 s after the head unit starts (or wakes) with the HMI up, so
 not over the black start screen or the M start animation, and from then on always (also over the reversing camera):
@@ -87,6 +87,8 @@ not over the black start screen or the M start animation, and from then on alway
   While a side's climate runs the AUTO program the buttons follow its automatic seat heating / ventilation instead
   (four levels, Low to Very high, set the way the HMI sets them).
 - **Steering wheel heating** at the bar's far left, one tap on / off.
+- **Right-hand drive:** set *Steering wheel* to *Right* on the app's Climate page (default *Left*): the driver's
+  seat buttons move to the right-hand spots, the passenger's to the left, and the wheel button to the bar's far right.
 - **Ambient light flash** (on unless switched off in the app): when seat or steering wheel heating goes on, the
   ambient light turns red for 5 s, for ventilation blue, then back to your colour; from the strip, the climate menu
   or the seat buttons alike. The colours are picked in the app by their number in the car's ambient light menu
