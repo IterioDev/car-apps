@@ -13,8 +13,10 @@
  *             the engine on (whichever comes last; 0.3.1, user: not everyone wears the belt) moves back there.
  *             Stands = under 2 km/h; no fresh speed: the engine under 1000 rpm; neither: the car off. Both moves only
  *             while it stands. Door: DoorsWindowsRoofMirrors 0x5530 ev 0x8001 / 0x8006 byte 2 (1 open), events only;
- *             ignition: VehicleCondition test / ready to drive / driving; engine: CDS 0xB513 getter 25 (x 0.25) at
- *             400 rpm or more. NOT car-tested.
+ *             ignition / engine: VehicleCondition test / ready to drive / driving (events); rpm: CDS 0xB513 getter 25
+ *             (x 0.25, 400 rpm or more = running), asked only while the speed getter gives nothing. No polling for
+ *             the door or the ignition, nothing polled on the BDC (0.3.2, user: no poll spam, as the old SET
+ *             button poll): the column is read once at the start and while it moves. NOT car-tested.
  * All UDS goes through the head unit's diagnostic gateway on one `hmictl serve` (uds.js).
  * Control socket /run/iteriodev-comfort/ctl.sock, JSON lines in and out; every change is pushed to every client:
  *   {op:'get'}  {op:'ambient', settings:{on, rgb:[r,g,b], bright 5-100, follow, zones:{dash:{rgb}|{off:true}|null}}}
@@ -302,7 +304,10 @@ function main() {
 
     subscribe();
     const poll = (l, fn) => hmi(l).then((r) => { if (r.startsWith('ok ')) fn(r.slice(3)); });
-    setInterval(() => { poll(SPEED_GET, speed); poll(RPM_GET, (h) => { rpm(h); back(); }); }, 2000);
+    setInterval(() => {                               // HU getters, not the BDC; rpm only while no speed comes
+        poll(SPEED_GET, speed);
+        if (!fresh(car.speedAt)) poll(RPM_GET, (h) => { rpm(h); back(); });
+    }, 2000);
     setInterval(() => { if (lit && Date.now() - litAt > amb.RENEW_MS) light(true); }, 10000);
     setTimeout(() => {
         ['driver', 'passenger'].forEach((s) => mover.read(s).catch((e) => log(`${s} seat: ${e.message}`)));
