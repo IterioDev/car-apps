@@ -139,7 +139,25 @@ Consider turning off key expiry for this device in the Tailscale admin console.
 - Reachable only while the head unit runs and the uplink is online: while the car sleeps, Linux is suspended.
 - No log upload to Tailscale (`--no-logs-no-support`); MagicDNS is not set on the head unit itself.
 - `tools/iteriodev-tailscale/build.sh` rebuilds the binary from Tailscale's source (static, the CLI linked in, only
-  the features the head unit needs); `runas/` drops the service from root to uid 3910.
+  the features the head unit needs); `runas/` drops the service from root to uid 3910. `test.sh` checks the
+  daemon's command line with and without the SOCKS5 setting below (offline, not installed on the head unit).
+
+**SOCKS5 proxy for apps on the head unit (off by default, from 1.104.6):** apps on the head unit can reach your
+tailnet through a local SOCKS5 proxy, e.g. a game-streaming app reaching your PC. Turn it on over SSH as root:
+
+```sh
+echo 1055 > /var/opt/iteriodev-tailscale/socks5-port
+systemctl restart iteriodev-tailscale
+```
+
+The proxy then listens on `127.0.0.1:1055` (the port in the file). Remove the file and restart to turn it off. The
+setting is kept across tool updates. A value that is not a port (1-65535) is ignored; the proxy never listens on
+anything but `127.0.0.1`.
+
+- Nothing outside the head unit can use it, but it has **no authentication**: every app and tool on the head unit
+  (any uid) can reach your tailnet through it, so your tailnet's access controls decide what the car can reach.
+- It also connects to internet addresses outside the tailnet, as the service's uid 3910, which the uplink routes:
+  an app the uplink does not route can still reach the internet through it.
 
 ## Screen share (tool `iteriodev-screencast`)
 

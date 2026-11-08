@@ -1,7 +1,7 @@
 {
   "id": "iteriodev-tailscale",
   "kind": "tool",
-  "version": "1.104.5",
+  "version": "1.104.6",
   "title": "Tailscale",
   "description": "Remote access to the head unit over your tailnet (Tailscale in userspace networking, through the internet uplink)",
   "optional": true,
