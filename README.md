@@ -23,7 +23,7 @@ app platform and show up in *All apps* like BMW's apps.
 | Fault Codes | `iteriodev_dtcscan` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep 1.1.4). Reads the fault memory of every control unit in the car, shows each fault with its text and clears it when you ask. Also lists the car's Check Control messages. |
 | Live Adjustments | `iteriodev_liveadjust` | **iDrive 8 only** (from 1.1.0; iDrive 7 cars keep 1.0.7). For an MHD-tuned DME: engine map 1-4 and MHD Max Cooling, plus the exhaust flap (open, close, back to the DME). See below. |
 | Overlays | `iteriodev_overlays` | **iDrive 8 only.** Sets up the Overlays strip in the climate bar: four shortcuts to BMW screens or apps, seat heating / ventilation and steering wheel heating buttons, shift lights on the cluster (cars without their own), and on M cars the M Mode that M1 / M2 switch to. Needs the Overlays tool below (the Store installs it with the app). |
-| Seats | `iteriodev_seats` | **iDrive 7 and iDrive 8.** Move the front seats from the screen, also while driving, both on one page (hold the controls round each seat), three memories per seat, and the Make room button (parked only) for the passenger seat; a right-hand drive setting. Needs the Comfort tool below (the Store installs it with the app). |
+| Seats | `iteriodev_seats` | **iDrive 7 and iDrive 8.** Move the front seats from the screen, also while driving, both on one page (hold the controls round each seat), three memories per seat, the Make room button (parked only) for the passenger seat, Easy exit (the driver seat and an electric steering column out of the way when the door opens, back when you buckle up); a right-hand drive setting. Needs the Comfort tool below (the Store installs it with the app). |
 | Service | `iteriodev_service` | **iDrive 8 only.** The car's service requirements as the instrument cluster has them: engine oil, brakes, brake fluid, vehicle check, inspections, each with the distance and date left and whether it is due, and what it is when you tap it. Read-only: a service is reset in the cluster's own menu or at a workshop. Not car-tested yet. |
 | Tailscale | `iteriodev_tailscale` | **iDrive 8 only** (iDrive 7 cars keep 1.0.4). The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`) and Log out. Needs the Tailscale tool below (the Store installs it with the app). |
 
@@ -121,14 +121,16 @@ slots are kept in `/var/opt/iteriodev-overlays/slots.json`.
 > [!NOTE]
 > **Car-tested** (an M4, BDC_G05, seat modules FAS_G11 / BFS_G11): custom colours on all eight ambient light modules,
 > seat hold-to-move and memory recall, parked. Not car-tested yet: Ambient Light 1.1.1's screen and later, Make room,
-> moving the seats while driving, iDrive 7.
+> moving the seats while driving, iDrive 7, Easy exit and the electric steering column (0.3.0).
 
 The root service behind Ambient Light and Seats (`iteriodev-comfort.service`). It talks to the body controller and
 the seat modules through the head unit's own diagnostic gateway, with the car's workshop jobs: the ambient light's RGB
 per module (each write lasts 254 s and is renewed; switched off, the car's own colour returns at once; a zone with two
 kinds of light, such as a line and decor, is split into parts with a colour each), the seat motors and their position
-counters. Seats move at any speed (as with their own switches) except Make room, which needs the car parked; every
-move ends with a stop, and the seat's own switches always win. The apps talk to it over
+counters, and an electric steering column (through the body controller). Seats move at any speed (as with their own
+switches) except Make room and Easy exit, which need the car standing; the steering column moves only while the car
+stands, only when calibrated, and stops at its own soft end stops. Easy exit follows the driver door and the driver's
+belt. Every move ends with a stop, and the seat's own switches always win. The apps talk to it over
 `/run/iteriodev-comfort/ctl.sock`; the zones' colours and the seat memories are kept in
 `/var/opt/iteriodev-comfort/data.json`.
 
@@ -299,7 +301,7 @@ Each release is a tag `x.y.z`. The apps need the Store's deploy tool 0.7.5 or ne
 Use at your own risk. These apps are not made or endorsed by BMW. Fault Codes can clear fault memories (only
 when you ask); Live Adjustments switches MHD maps and drives the exhaust flap (not affiliated with MHD); Drive Recorder
 puts the cameras into their Drive Recorder mode; Ambient Light sets the interior light's colours and Seats moves the
-front seats (through the Comfort tool); the other apps only read from the car.
+front seats and an electric steering column (through the Comfort tool); the other apps only read from the car.
 
 ## License
 
