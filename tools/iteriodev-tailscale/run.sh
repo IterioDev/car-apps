@@ -5,8 +5,10 @@
 # While it runs, /run/iteriodev-tailscale/resolv.conf follows the uplink lease's DNS servers every 5 s, written in
 # place (the unit binds that file over /etc/resolv.conf; Go re-reads it when it changes). Offline: kept as it was,
 # tailscaled then falls back to its built-in DERP bootstrap DNS.
-D=/var/opt/iteriodev-tailscale
-R=/run/iteriodev-tailscale
+# Opt-in: a port in $D/socks5-port (written by root, kept over updates) adds a SOCKS5 server on 127.0.0.2:<port>
+# for the head unit's apps to reach the tailnet. Loopback only, whatever the file says; no file, no proxy.
+D=${D:-/var/opt/iteriodev-tailscale}   # overridable for test.sh
+R=${R:-/run/iteriodev-tailscale}
 LEASE=/run/mgu-uplink/lease.json
 
 dns() {
@@ -17,9 +19,27 @@ dns() {
     [ "$new" = "$(cat "$R/resolv.conf" 2>/dev/null)" ] || echo "$new" > "$R/resolv.conf"
 }
 
+# a listener on the port: tailscaled would exit at start (log.Fatalf) and Restart=always would loop, cutting remote access
+busy() { grep -qiE "^ *[0-9]+: [0-9A-F]+:$(printf %04X "$1") [0-9A-F]+:[0-9A-F]+ 0A " /proc/net/tcp /proc/net/tcp6 2>/dev/null; }
+
 dns
+set --
+if [ -r "$D/socks5-port" ]; then
+    port=$(tr -d ' \t\r\n' < "$D/socks5-port")
+    case "$port" in
+        # leading 0: printf would read it as octal
+        ''|0*|*[!0-9]*) echo "socks5-port: '$port' is not a port, no SOCKS5 server" >&2 ;;
+        *) if ! [ "$port" -le 65535 ] 2>/dev/null; then echo "socks5-port: $port is out of range, no SOCKS5 server" >&2
+           elif busy "$port"; then echo "socks5-port: port $port is in use, no SOCKS5 server" >&2
+           # 127.0.0.2, not .1: netstack forwards inbound tailnet TCP to 127.0.0.1:<port> (that is how ssh is
+           # reached), so a proxy on 127.0.0.1 would be open to the tailnet
+           else set -- --socks5-server="127.0.0.2:$port"; fi ;;
+    esac
+elif [ -e "$D/socks5-port" ]; then
+    echo "socks5-port: not readable by uid $(id -u), no SOCKS5 server" >&2
+fi
 "$D/current/tailscaled" --tun=userspace-networking --statedir="$D/state" --socket="$R/tailscaled.sock" \
-    --port=41641 --no-logs-no-support &
+    --port=41641 --no-logs-no-support "$@" &
 pid=$!
 trap 'kill "$pid" 2>/dev/null; wait "$pid"; exit 0' TERM INT
 while kill -0 "$pid" 2>/dev/null; do

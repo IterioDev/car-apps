@@ -1,6 +1,6 @@
 #!/bin/sh
 # ExecStartPre (root): the daemon's state folder, its runtime folder (socket) and the resolv.conf ExecStart binds
-# over /etc/resolv.conf, all for uid 3910.
+# over /etc/resolv.conf, all for uid 3910. The opt-in socks5-port (root's) is made readable for run.sh.
 set -e
 U=3910
 D=/var/opt/iteriodev-tailscale
@@ -12,3 +12,4 @@ chmod 755 "$R"
 [ -f "$R/resolv.conf" ] || : > "$R/resolv.conf"
 chown "$U:$U" "$R/resolv.conf"
 chmod 644 "$R/resolv.conf"
+[ ! -f "$D/socks5-port" ] || chmod 644 "$D/socks5-port"
