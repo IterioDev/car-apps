@@ -1,0 +1,17 @@
+{
+ "id": "iteriodev_ambient",
+ "version": "1.2.0",
+ "title": "Ambient Light",
+ "description": "Any colour on the interior ambient light, on one screen. Your car's zones in a list (dash, doors, footwell, console, seats, roof: the ones your car has): give each the main colour, its own or the car's, or pick All zones to colour every one. Colour bars for any shade, brightness (or follow the car's), the car's nine colours, and six presets that keep the whole look with every zone's colour. Works while the car's own ambient light is on. Needs the Comfort tool from the same source. iDrive 7 and 8.",
+ "mguHmi": [
+  "ID7",
+  "ID8"
+ ],
+ "needs": [
+  "renderer"
+ ],
+ "requires": {
+  "iteriodev-comfort": "0.2.0",
+  "mgu-deploy": "0.7.5"
+ }
+}

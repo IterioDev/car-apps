@@ -1,0 +1,64 @@
+{
+  "id": "iteriodev-comfort",
+  "kind": "tool",
+  "version": "0.2.0",
+  "title": "Comfort",
+  "description": "The service behind the Ambient Light and Seats apps: any colour on the ambient light (per zone), front seat moves, three memories per seat and the Gentleman function (passenger seat out of the way and back). Through the car's own body and seat modules; seats move at any speed, Make room only parked.",
+  "optional": true,
+  "uninstallable": true,
+  "mguHmi": [
+    "ID7",
+    "ID8"
+  ],
+  "requires": {
+    "mgu-deploy": "0.7.11"
+  },
+  "files": [
+    {
+      "path": "comfort.js",
+      "from": "comfort.js",
+      "mode": "0644"
+    },
+    {
+      "path": "uds.js",
+      "from": "uds.js",
+      "mode": "0644"
+    },
+    {
+      "path": "ambient.js",
+      "from": "ambient.js",
+      "mode": "0644"
+    },
+    {
+      "path": "seat.js",
+      "from": "seat.js",
+      "mode": "0644"
+    },
+    {
+      "path": "hmictl",
+      "from": "hmictl",
+      "mode": "0755"
+    }
+  ],
+  "units": [
+    {
+      "name": "iteriodev-comfort.service",
+      "from": "iteriodev-comfort.service"
+    }
+  ],
+  "enable": [
+    {
+      "unit": "iteriodev-comfort.service",
+      "target": "multi-user.target"
+    }
+  ],
+  "recmgr": [
+    "iteriodev-comfort"
+  ],
+  "crashNames": [
+    "hmictl"
+  ],
+  "restart": [
+    "iteriodev-comfort.service"
+  ]
+}

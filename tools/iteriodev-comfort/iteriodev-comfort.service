@@ -1,0 +1,18 @@
+[Unit]
+Description=Comfort: ambient light colours, seat moves and memories (Ambient Light / Seats apps), over the car's diagnostic gateway
+After=vsomeipd.service
+
+[Service]
+# root: the vsomeip policy lets uid 0 use the diagnostic gateway (TASU 0xF8A6) and read Vehicle2 / ComfortFunctionIuK.
+# Data /var/opt/iteriodev-comfort/data.json (kept over updates); the apps' control socket
+# /run/iteriodev-comfort/ctl.sock (0666: the apps run as their own uids)
+RuntimeDirectory=iteriodev-comfort
+RuntimeDirectoryMode=0755
+ExecStart=/usr/bin/node /var/opt/iteriodev-comfort/current/comfort.js
+# the car's system.conf has DefaultStandardOutput=null: the log would never reach the journal
+StandardOutput=journal
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
