@@ -28,6 +28,8 @@ if [ -r "$D/socks5-port" ]; then
         *) if [ "$port" -ge 1 ] && [ "$port" -le 65535 ]; then set -- --socks5-server="127.0.0.1:$port"
            else echo "socks5-port: $port is out of range, no SOCKS5 server" >&2; fi ;;
     esac
+elif [ -e "$D/socks5-port" ]; then
+    echo "socks5-port: not readable by uid $(id -u), no SOCKS5 server" >&2
 fi
 "$D/current/tailscaled" --tun=userspace-networking --statedir="$D/state" --socket="$R/tailscaled.sock" \
     --port=41641 --no-logs-no-support "$@" &

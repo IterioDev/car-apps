@@ -28,4 +28,12 @@ check "0.0.0.0:1055" ""
 check "1055 --foo" ""
 check "70000" ""
 check "0" ""
+# a file the service cannot read: no flag (as root every file is readable, so only checked as another user)
+if [ "$(id -u)" != 0 ]; then
+    printf 1055 > "$T/socks5-port"; chmod 000 "$T/socks5-port"
+    D=$T R=$T/run sh "$S/run.sh" 2>/dev/null
+    if [ "$(cat "$T/args")" = "$BASE" ]; then echo "ok   socks5-port unreadable"
+    else echo "FAIL socks5-port unreadable: got '$(cat "$T/args")'"; fail=1; fi
+    chmod 600 "$T/socks5-port"
+fi
 exit $fail

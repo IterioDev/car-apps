@@ -151,8 +151,10 @@ systemctl restart iteriodev-tailscale
 ```
 
 The proxy then listens on `127.0.0.1:1055` (the port in the file). Remove the file and restart to turn it off. The
-setting is kept across tool updates. A value that is not a port (1-65535) is ignored; the proxy never listens on
-anything but `127.0.0.1`.
+file sits beside the tool's versioned folder, like the login state, so updates keep it. A value that is not a port
+(1-65535) is ignored; the proxy never listens on anything but `127.0.0.1`. Pick a free port: if another program
+already listens on it, tailscaled stops at start (and the service keeps restarting) until you change or remove the
+file.
 
 - Nothing outside the head unit can use it, but it has **no authentication**: every app and tool on the head unit
   (any uid) can reach your tailnet through it, so your tailnet's access controls decide what the car can reach.
