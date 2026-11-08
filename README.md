@@ -150,16 +150,19 @@ echo 1055 > /var/opt/iteriodev-tailscale/socks5-port
 systemctl restart iteriodev-tailscale
 ```
 
-The proxy then listens on `127.0.0.1:1055` (the port in the file). Remove the file and restart to turn it off. The
-file sits beside the tool's versioned folder, like the login state, so updates keep it. A value that is not a port
-(1-65535) is ignored; the proxy never listens on anything but `127.0.0.1`. Pick a free port: if another program
-already listens on it, tailscaled stops at start (and the service keeps restarting) until you change or remove the
-file.
+Turning this on gives every app on the head unit the internet through your uplink, not only your tailnet: the
+proxy also dials non-tailnet addresses as uid 3910, which mgu-uplink routes.
 
-- Nothing outside the head unit can use it, but it has **no authentication**: every app and tool on the head unit
-  (any uid) can reach your tailnet through it, so your tailnet's access controls decide what the car can reach.
-- It also connects to internet addresses outside the tailnet, as the service's uid 3910, which the uplink routes:
-  an app the uplink does not route can still reach the internet through it.
+Apps then use the proxy at `127.0.0.2:1055` (the port in the file). Remove the file and restart to turn it off. The
+file sits beside the tool's versioned folder, like the login state, so updates keep it. A value that is not a port
+(1-65535, no leading zero) is ignored; the proxy never listens on anything but `127.0.0.2`. If another program
+already listens on the port, tailscaled starts without the proxy and the journal says so.
+
+- Not reachable from the tailnet: it listens on `127.0.0.2`, while incoming tailnet connections go to `127.0.0.1`
+  (like ssh).
+- **No authentication**, so every app and tool on the head unit (any uid) can use it: the same trust model as the
+  daemon's control socket, which is open to all of them (0666). Your tailnet's access controls decide what the car
+  can reach through it.
 
 ## Screen share (tool `iteriodev-screencast`)
 
