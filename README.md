@@ -4,8 +4,9 @@
 > **Not tested on iDrive 7.** These apps and tools have been tested only on iDrive 8, in the emulator and on a real
 > car. Drive Recorder (from 2.3.0, with its player) installs on iDrive 7 too; from 2.3.12
 > with the player 1.1.4 it records, saves and copies clips there, tested on one G20 (see its section). Ambient Light
-> and Seats (with the Comfort tool) install on iDrive 7 too, not run on an iDrive 7 car yet. Every other app is iDrive 8 only; iDrive 7 cars keep the versions they have: Car Data
-> 1.1.10, Drag Timer 1.1.8, Fault Codes 1.1.4, Live Adjustments 1.0.7 and Tailscale 1.0.4 (checked there only as far
+> and Seats (with the Comfort tool), and Tailscale from 1.1.1 (with its tool), install on iDrive 7 too, not run on an
+> iDrive 7 car yet. Every other app is iDrive 8 only; iDrive 7 cars keep the versions they have: Car Data
+> 1.1.10, Drag Timer 1.1.8, Fault Codes 1.1.4 and Live Adjustments 1.0.7 (checked there only as far
 > as building against iDrive 7's app SDK).
 
 Apps and tools by IterioDev for BMW head units with iDrive 7 and iDrive 8 (MGU). The apps run in the head unit's own
@@ -25,7 +26,7 @@ app platform and show up in *All apps* like BMW's apps.
 | Overlays | `iteriodev_overlays` | **iDrive 8 only.** Sets up the Overlays strip in the climate bar: four shortcuts to BMW screens or apps, seat heating / ventilation and steering wheel heating buttons, shift lights on the cluster (cars without their own), and on M cars the M Mode that M1 / M2 switch to. Needs the Overlays tool below (the Store installs it with the app). |
 | Seats | `iteriodev_seats` | **iDrive 7 and iDrive 8.** Move the front seats from the screen, also while driving, both on one page (hold the controls round each seat), three memories per seat, the Make room button (parked only) for the passenger seat, Easy exit for both front seats (the seat, and on the driver's side an electric steering column, out of the way when its door opens, back once the door is shut: the driver's with the car on, the passenger's with someone seated); a right-hand drive setting. Needs the Comfort tool below (the Store installs it with the app). |
 | Service | `iteriodev_service` | **iDrive 8 only.** The car's service requirements as the instrument cluster has them: engine oil, brakes, brake fluid, vehicle check, inspections, each with the distance and date left and whether it is due, and what it is when you tap it. Read-only: a service is reset in the cluster's own menu or at a workshop. Not car-tested yet. |
-| Tailscale | `iteriodev_tailscale` | **iDrive 8 only** (iDrive 7 cars keep 1.0.4). The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`) and Log out. Needs the Tailscale tool below (the Store installs it with the app). |
+| Tailscale | `iteriodev_tailscale` | **iDrive 7 and iDrive 8** (from 1.1.1; on iDrive 7 not run on a car yet). The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`) and Log out. Needs the Tailscale tool below (the Store installs it with the app). |
 
 All of them draw their screens through the GPU renderer `mgu-render`.
 
