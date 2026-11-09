@@ -45,9 +45,10 @@ class Uds {
     pump() {
         if (this.cur || !this.q.length) return;
         const c = this.cur = this.q.shift();
-        this.arm(TIMEOUT_MS);
+        // the answer's time counts from the request's going out, not from its waiting behind hmictl's line before it
         this.hmi(line(c.target, c.sid, c.data)).then((r) => {
-            if (this.cur === c && !/^ok/.test(r)) this.finish(null, new Error('gateway: ' + r));
+            if (this.cur !== c) return;
+            if (/^ok/.test(r)) this.arm(TIMEOUT_MS); else this.finish(null, new Error('gateway: ' + r));
         });
     }
 

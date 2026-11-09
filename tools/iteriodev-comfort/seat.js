@@ -7,6 +7,11 @@
  *   2E D7 08 <motor> <action> <pwm %>   MOTOR: motor = TAB_SV_MOTOREN_FCT (00 SLV fore/aft, 01 SHV height,
  *                             02 LNV backrest, 03 SNV tilt, 04 KHV headrest), action 00 stop / 01 plus / 02 minus
  *   22 D7 02                  HALLZAEHLER: u16 per axis SLV SHV LNV SNV KHV STV LBV LKV (+3 spare), 8192..57344
+ *   22 D7 00                  CONFIG_HW: per motor 0 none, 1 motor only, 2 motor + hall sensor (read once, probe()):
+ *                             a motor-only axis moves while held, without readings (0.4.0, user 2026-11-09)
+ * End stop = no progress since the newest reading at least STALL_MS old (0.4.0: a slow gateway took longer than that
+ * between two readings and stopped every recall half way); a recall takes a standstill short of its target twice for
+ * a pause (the seat module holding its motors, e.g. while the engine starts) before it takes it for the end stop.
  * The seat's own switches still work and win over a diagnostic stop (car-tested), so nothing here can lock a seat.
  * Every move ends with STOP: at its target, at the end stop (the counter stands still), on a stop request, when its
  * holder stops asking (jog: the app repeats every 300 ms), after its time limit, and - the Gentleman moves only (user
@@ -31,7 +36,7 @@ const WHEEL = ['HGT', 'LEN'];                                             // the
 const TOL = 40, STALL_MS = 700, STALL_COUNTS = 15, TICK_MS = 250, RESEND_MS = 500, JOG_MS = 900, IDLE_MS = 3000;
 // ponytail: the column's digits per mm are unknown (not car-tested): its tolerance and standstill counts are guesses, tune on the car
 const WHEEL_TOL = 8, WHEEL_STALL = 3;
-const LIMIT_MS = 25000, ROOM_REST_MS = 2500;
+const LIMIT_MS = 25000, ROOM_REST_MS = 2500, PAUSE_MS = 1000;
 const EXT_NRC = [0x7f, 0x7e, 0x31];        // a write refused in the default session: tried once more in the extended one
 
 /** 22 D702 reply -> { SLV: count, ... } for the axes this seat has (an axis it lacks reads 0x8000 or 0) */
@@ -41,6 +46,14 @@ function parseHall(uds) {
         const v = (uds[3 + 2 * i] << 8) | uds[4 + 2 * i];
         if (v >= 8192 && v <= 57344 && v !== 0x8000) out[a] = v;
     });
+    return out;
+}
+/** 22 D700 CONFIG_HW reply -> { SLV: 0 none | 1 motor only | 2 motor + hall sensor, ... } (TAB_CONFIG_HW_MOTOR). A seat
+ * with motors only (electric seats with memory on the driver's side only, user 2026-11-09) moves, but has no position */
+function parseConfig(uds) {
+    if (uds.length < 3 + AXES.length) throw new Error('short CONFIG_HW');
+    const out = {};
+    AXES.forEach((a, i) => { out[a] = uds[3 + i] <= 2 ? uds[3 + i] : 0; });
     return out;
 }
 /** 22 D089 reply -> { pos: { HGT, LEN }, moving, soft: { axis: { 1: at the plus softstop, -1: at the minus one } }, norm } */
@@ -64,6 +77,7 @@ class Mover {
         this.pos = { driver: {}, passenger: {}, wheel: {} };
         this.inv = { driver: {}, passenger: {}, wheel: {} };    // an axis whose counter runs against plus (found while recalling)
         this.ext = { driver: true, passenger: true, wheel: false };   // extended session: the seats always, the BDC once it asks
+        this.cfg = { driver: null, passenger: null };  // parseConfig() of each seat, null = not known (then: the axes read)
         this.sess = {};
         this.wheel = null;                           // the column's last status (parseWheel)
         this.hasWheel = null;                        // the car has an electric column: null = not known yet
@@ -79,6 +93,18 @@ class Mover {
         this.changed();
         return this.pos[seat];
     }
+
+    /** once at the start: which motors the seat has and which of them report a position, then where it is */
+    async probe(seat) {
+        try { this.cfg[seat] = parseConfig(await this.uds.send(UNITS[seat], 0x22, [0xd7, 0x00])); this.log(`${seat} seat motors: ${JSON.stringify(this.cfg[seat])}`); }
+        catch (e) { this.log(`${seat} seat motors: ${e.message}`); }
+        if (this.axes(seat).some((a) => this.hall(seat, a)) || !this.cfg[seat]) await this.read(seat).catch((e) => this.log(`${seat} seat: ${e.message}`));
+        this.changed();
+    }
+    /** the axes this seat moves (its motors; not known: the ones it reported a position for) */
+    axes(seat) { const c = this.cfg[seat]; return AXES.filter((a) => (c ? c[a] > 0 : this.pos[seat][a] !== undefined)); }
+    /** does this axis report its position (a hall sensor)? Without: hold-to-move only, no memory */
+    hall(seat, axis) { const c = this.cfg[seat]; return c ? c[axis] === 2 : this.pos[seat][axis] !== undefined; }
 
     /** does the car have an electric steering column? (null again when the BDC did not answer: ask later) */
     async probeWheel() {
@@ -126,6 +152,7 @@ class Mover {
         while (this.busy) await sleep(20);        // the previous move sends its stop first
         if (me.why) return me.why;
         const wheel = seat === 'wheel', still = wheel ? WHEEL_STALL : STALL_COUNTS;
+        const blind = !wheel && !this.hall(seat, axis);   // no position: moves while its holder asks, no end stop seen
         const parked = () => (!parkedOnly && !wheel) || this.parked();
         if (!parked()) return 'not parked';
         this.busy = true;
@@ -149,12 +176,21 @@ class Mover {
                     sent = now;
                     if (this.sess[seat]) this.sess[seat] = now;
                 }
+                if (blind) {
+                    const u = until(null, Date.now() - t0);
+                    if (u) { me.why = u; break; }
+                    await sleep(TICK_MS);
+                    continue;
+                }
                 const p = await this.read(seat), v = p[axis];
                 if (v === undefined) { me.why = 'no such axis'; break; }
-                hist.push([Date.now(), v, wheel && this.wheel.moving]);
-                while (hist.length > 1 && hist[0][0] < Date.now() - STALL_MS) hist.shift();
+                // an end stop: no progress since the newest reading at least STALL_MS old (a slow gateway takes longer
+                // than that between two readings: compared with the one just taken, it stopped half way before 0.3.3)
+                const t = Date.now();
+                hist.push([t, v, wheel && this.wheel.moving]);
+                while (hist.length > 1 && hist[1][0] <= t - STALL_MS) hist.shift();
                 if (wheel && this.wheel.soft[axis][dir]) { me.why = 'end stop'; break; }   // the BDC's own limit
-                if (Date.now() - t0 > STALL_MS + 300 && Math.abs(v - hist[0][1]) < still && hist.every((h) => !h[2])) { me.why = 'end stop'; break; }
+                if (t - t0 > STALL_MS + 300 && t - hist[0][0] >= STALL_MS && Math.abs(v - hist[0][1]) < still && hist.every((h) => !h[2])) { me.why = 'end stop'; break; }
                 const u = until(p, Date.now() - t0);
                 if (u) { me.why = u; break; }
                 await sleep(TICK_MS);
@@ -166,7 +202,7 @@ class Mover {
             if (this.motion === me) this.motion = null;
             this.busy = false;
             this.log(`${seat} ${axis} ${dir > 0 ? '+' : '-'}: ${me.why}`);
-            this.read(seat).catch(() => {});
+            if (!blind) this.read(seat).catch(() => {});
         }
         return me.why;
     }
@@ -179,16 +215,18 @@ class Mover {
         this.drive(seat, axis, dir, () => (Date.now() > holder.deadline ? 'released' : null), undefined, holder).catch(() => {});
     }
 
-    halt() { if (this.motion) this.motion.why = 'stopped'; }
+    /** stops the move, and a recall between two of its moves (a pause, a reading) */
+    halt() { this.haltAt = Date.now(); if (this.motion) this.motion.why = 'stopped'; }
 
     /** drive each axis of a saved position (from read()) back to its counts (parkedOnly: the Gentleman's way back) */
     async recall(seat, target, parkedOnly) {
-        const wheel = seat === 'wheel', tol = wheel ? WHEEL_TOL : TOL, still = wheel ? WHEEL_STALL : STALL_COUNTS;
+        const wheel = seat === 'wheel', tol = wheel ? WHEEL_TOL : TOL, still = wheel ? WHEEL_STALL : STALL_COUNTS, t0 = Date.now();
         for (const axis of wheel ? WHEEL : ORDER) {
+            if (this.haltAt >= t0) return 'stopped';
             if (target[axis] === undefined) continue;
             const v0 = (await this.read(seat))[axis];
             if (v0 === undefined || Math.abs(target[axis] - v0) <= tol) continue;
-            for (let turn = 0; turn < 2; turn++) {
+            for (let turn = 0, pause = 0; turn < 2; turn++) {
                 const want = target[axis], start = this.pos[seat][axis];
                 const dir = Math.sign(want - start) * (this.inv[seat][axis] ? -1 : 1);
                 let worse = false;
@@ -199,6 +237,13 @@ class Mover {
                     return null;
                 }, undefined, undefined, parkedOnly);
                 if (worse) { this.inv[seat][axis] = !this.inv[seat][axis]; continue; }   // its counter runs the other way
+                // ponytail: a standstill short of a saved (so reachable) place is taken for a pause twice (the seat module
+                // holds its motors while the engine starts, user 2026-11-09: half the way back), then for the end stop
+                if (why === 'end stop' && pause < 2 && Math.abs(want - (await this.read(seat))[axis]) > tol) {
+                    pause++; turn--; await sleep(PAUSE_MS);
+                    if (this.haltAt >= t0) return 'stopped';
+                    continue;
+                }
                 if (why !== 'there' && why !== 'end stop') return why;
                 break;
             }
@@ -209,6 +254,7 @@ class Mover {
     /** Gentleman (parked only): the passenger seat all the way forward, the backrest a little forward; back: recall()
      * of where room() saved it was, parked only too */
     async room() {
+        if (!this.hall('passenger', 'SLV')) return { why: 'no positions', was: null };   // its end stop and way back need them
         const was = await this.read('passenger');
         const why = await this.drive('passenger', 'SLV', 1, () => null, undefined, undefined, true);
         if (why !== 'end stop' && why !== 'time limit') return { why, was };
@@ -217,7 +263,7 @@ class Mover {
     }
 }
 
-module.exports = { UNITS, AXES, ORDER, WHEEL, TOL, parseHall, parseWheel, move, stop, wheelMove, WHEEL_STOP, Mover };
+module.exports = { UNITS, AXES, ORDER, WHEEL, TOL, parseHall, parseConfig, parseWheel, move, stop, wheelMove, WHEEL_STOP, Mover };
 
 if (require.main === module && process.argv.includes('--test')) {
     const assert = require('assert');
@@ -297,7 +343,33 @@ if (require.main === module && process.argv.includes('--test')) {
         assert.strictEqual(await mv.recall('passenger', { SLV: 0x8000 }, true), 'not parked', 'Move back: parked only');
         assert.strictEqual(await mv.recall('wheel', { HGT: 0x4100 }), 'not parked', 'the column: parked only, always');
         assert.ok(sent.includes('6e 10 3') && sent.filter((s) => s === '6e 2e d7 8 0 0 0').length >= 2);
-        clearInterval(mv.idle);
+        // a slow gateway (400 ms a request: more than STALL_MS between two readings) while the seat moves: no end stop
+        // half way (it stopped after ~1 s before 0.3.3, user 2026-11-09: "did only half the movement back")
+        const logs = [], slow = new Mover({ send: (u, s, d) => sleep(400).then(() => fake.send(u, s, d)) }, () => true, (l) => logs.push(l));
+        st.SLV = 0x8028;
+        assert.strictEqual(await slow.recall('passenger', { SLV: 0x81f0 }), 'done');
+        assert.ok(Math.abs(st.SLV - 0x81f0) <= 160 && !logs.some((l) => /end stop/.test(l)), `${st.SLV.toString(16)} ${logs.join(' | ')}`);
+        // a pause on the way (the seat module holds the motors while the engine starts): moved on, not taken for the end
+        st.SLV = 0x8028;
+        let held = true;
+        setTimeout(() => { held = false; }, 2500);
+        const pausing = new Mover({ send: (u, s, d) => (held && s === 0x2e && d[3] ? Promise.resolve([0x6e]) : fake.send(u, s, d)) }, () => true);
+        assert.strictEqual(await pausing.recall('passenger', { SLV: 0x8100 }), 'done');
+        assert.ok(Math.abs(st.SLV - 0x8100) <= TOL + 40, `after the pause: ${st.SLV.toString(16)}`);
+        // a passenger seat with motors only (D700 01 each, no D702: electric seats, memory on the driver's side only):
+        // hold-to-move works and reads nothing while it moves; no Make room (no end stop, no way back)
+        const bare = [], only = new Mover({ send: (u, s, d) => {
+            bare.push([s].concat(d).map((x) => x.toString(16)).join(' '));
+            if (s === 0x22 && d[1] === 0x00) return Promise.resolve([0x62, 0xd7, 0x00, 1, 1, 1, 0, 0, 0, 0, 0]);
+            return s === 0x22 ? nrc(0x31) : Promise.resolve([s + 0x40]);
+        } }, () => true);
+        await only.probe('passenger');
+        assert.deepStrictEqual([only.axes('passenger'), only.hall('passenger', 'SLV')], [['SLV', 'SHV', 'LNV'], false]);
+        const until = Date.now() + 700;
+        assert.strictEqual(await only.drive('passenger', 'SLV', 1, () => (Date.now() > until ? 'released' : null)), 'released');
+        assert.ok(bare.filter((s) => s === '2e d7 8 0 1 64').length >= 2 && !bare.some((s) => s === '22 d7 2'), bare.join(' | '));
+        assert.strictEqual((await only.room()).why, 'no positions');
+        [mv, slow, pausing, only].forEach((m) => clearInterval(m.idle));
         console.log('seat ok');
         process.exit(0);
     })().catch((e) => { console.error(e); process.exit(1); });
