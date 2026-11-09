@@ -1,6 +1,6 @@
 {
  "id": "iteriodev_seats",
- "version": "1.4.1",
+ "version": "1.4.2",
  "title": "Seats",
  "description": "Move the driver and passenger seats from the central display, also while driving, both on one page: each seat seen from the side with its controls round it (fore / aft, height, backrest, tilt and headrest, while you hold them), three memories per seat under it, the Gentleman button (parked only) that moves the passenger seat out of the way and back, and easy exit: save your own getting-out position and the driver seat (and an electric steering wheel) moves there when the driver door opens with the car standing, and back once the door is shut with the car on. Needs the Comfort tool from the sam",
  "mguHmi": [
