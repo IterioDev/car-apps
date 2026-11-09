@@ -7,8 +7,8 @@
  *   2E D7 08 <motor> <action> <pwm %>   MOTOR: motor = TAB_SV_MOTOREN_FCT (00 SLV fore/aft, 01 SHV height,
  *                             02 LNV backrest, 03 SNV tilt, 04 KHV headrest), action 00 stop / 01 plus / 02 minus
  *   22 D7 02                  HALLZAEHLER: u16 per axis SLV SHV LNV SNV KHV STV LBV LKV (+3 spare), 8192..57344
- *   22 D7 00                  CONFIG_HW: per motor 0 none, 1 motor only, 2 motor + hall sensor (read once, probe()):
- *                             a motor-only axis moves while held, without readings (0.4.0, user 2026-11-09)
+ *   22 D7 00                  CONFIG_HW: per motor 0 none, 1 motor only, 2 motor + hall sensor (probe(), only for a seat
+ *                             whose D702 gives no position): a motor-only axis moves while held, without readings (0.4.0)
  * End stop = no progress since the newest reading at least STALL_MS old (0.4.0: a slow gateway took longer than that
  * between two readings and stopped every recall half way); a recall takes a standstill short of its target twice for
  * a pause (the seat module holding its motors, e.g. while the engine starts) before it takes it for the end stop.
@@ -94,17 +94,25 @@ class Mover {
         return this.pos[seat];
     }
 
-    /** once at the start: which motors the seat has and which of them report a position, then where it is */
+    /** at the start (and the car switched on while a seat is still unknown): where it is (D702, as up to 1.4.x); only a
+     * seat reporting no position at all is asked which motors it has (D700: motors without hall sensors). 1.5.0 asked
+     * D700 first and believed it, and a car's passenger seat (positions fine) vanished (user 2026-11-09) */
     async probe(seat) {
-        try { this.cfg[seat] = parseConfig(await this.uds.send(UNITS[seat], 0x22, [0xd7, 0x00])); this.log(`${seat} seat motors: ${JSON.stringify(this.cfg[seat])}`); }
-        catch (e) { this.log(`${seat} seat motors: ${e.message}`); }
-        if (this.axes(seat).some((a) => this.hall(seat, a)) || !this.cfg[seat]) await this.read(seat).catch((e) => this.log(`${seat} seat: ${e.message}`));
+        await this.read(seat).catch((e) => this.log(`${seat} seat: ${e.message}`));
+        if (!Object.keys(this.pos[seat]).length) {
+            try { this.cfg[seat] = parseConfig(await this.uds.send(UNITS[seat], 0x22, [0xd7, 0x00])); this.log(`${seat} seat motors: ${JSON.stringify(this.cfg[seat])}`); }
+            catch (e) { this.log(`${seat} seat motors: ${e.message}`); }
+        }
         this.changed();
     }
-    /** the axes this seat moves (its motors; not known: the ones it reported a position for) */
-    axes(seat) { const c = this.cfg[seat]; return AXES.filter((a) => (c ? c[a] > 0 : this.pos[seat][a] !== undefined)); }
+    // ponytail: a seat with positions shows only those axes; a motor-only axis on such a seat (none seen) stays hidden
+    /** the axes this seat moves: the ones reporting a position; none: its motors (D700) */
+    axes(seat) {
+        const p = this.pos[seat], c = this.cfg[seat];
+        return Object.keys(p).length ? AXES.filter((a) => p[a] !== undefined) : c ? AXES.filter((a) => c[a] > 0) : [];
+    }
     /** does this axis report its position (a hall sensor)? Without: hold-to-move only, no memory */
-    hall(seat, axis) { const c = this.cfg[seat]; return c ? c[axis] === 2 : this.pos[seat][axis] !== undefined; }
+    hall(seat, axis) { return this.pos[seat][axis] !== undefined; }
 
     /** does the car have an electric steering column? (null again when the BDC did not answer: ask later) */
     async probeWheel() {
@@ -365,11 +373,20 @@ if (require.main === module && process.argv.includes('--test')) {
         } }, () => true);
         await only.probe('passenger');
         assert.deepStrictEqual([only.axes('passenger'), only.hall('passenger', 'SLV')], [['SLV', 'SHV', 'LNV'], false]);
-        const until = Date.now() + 700;
+        const until = Date.now() + 700, b0 = bare.length;
         assert.strictEqual(await only.drive('passenger', 'SLV', 1, () => (Date.now() > until ? 'released' : null)), 'released');
-        assert.ok(bare.filter((s) => s === '2e d7 8 0 1 64').length >= 2 && !bare.some((s) => s === '22 d7 2'), bare.join(' | '));
+        assert.ok(bare.filter((s) => s === '2e d7 8 0 1 64').length >= 2 && !bare.slice(b0).some((s) => s === '22 d7 2'), bare.join(' | '));
         assert.strictEqual((await only.room()).why, 'no positions');
-        [mv, slow, pausing, only].forEach((m) => clearInterval(m.idle));
+        // a seat whose D700 says nothing usable but whose D702 reports positions (a car's passenger seat lost in 1.5.0,
+        // user 2026-11-09): the positions win, D700 is not even asked
+        const odd = [], both = new Mover({ send: (u, s, d) => {
+            odd.push([s].concat(d).map((x) => x.toString(16)).join(' '));
+            if (s === 0x22 && d[1] === 0x00) return Promise.resolve([0x62, 0xd7, 0x00, 0, 0, 0, 0, 0, 0, 0, 0]);
+            return fake.send(u, s, d);
+        } }, () => true);
+        await both.probe('passenger');
+        assert.deepStrictEqual([both.axes('passenger'), both.hall('passenger', 'SLV'), odd.includes('22 d7 0')], [['SLV', 'LNV'], true, false]);
+        [mv, slow, pausing, only, both].forEach((m) => clearInterval(m.idle));
         console.log('seat ok');
         process.exit(0);
     })().catch((e) => { console.error(e); process.exit(1); });

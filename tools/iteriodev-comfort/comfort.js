@@ -134,7 +134,12 @@ function main() {
     const diag = new uds.Uds(hmi, log);
     const car = { speed: null, speedAt: 0, rpm: null, rpmAt: 0, ambientOn: null, on: false,
         door: { driver: null, passenger: null }, occ: { driver: null, passenger: null } };
-    const cond = (hex) => { const on = carOn(hex); if (on !== car.on) { car.on = on; log(`car ${on ? 'on' : 'off'} (${hex})`); push(); SEATS.forEach(back); } };
+    const cond = (hex) => {
+        const on = carOn(hex);
+        if (on === car.on) return;
+        car.on = on; log(`car ${on ? 'on' : 'off'} (${hex})`); push(); SEATS.forEach(back);
+        if (on) SEATS.filter((s) => !mover.axes(s).length).forEach((s) => mover.probe(s));   // a seat asleep at the start
+    };
     // stands: under 2 km/h; no fresh speed: the engine under 1000 rpm (idle or off); neither: the car switched off
     const fresh = (t) => Date.now() - t < SPEED_FRESH_MS;
     const parked = () => (fresh(car.speedAt) ? car.speed < STOP_SPEED : fresh(car.rpmAt) ? car.rpm < STOP_RPM : !car.on);
@@ -382,7 +387,7 @@ function main() {
     }, 2000);
     setInterval(() => { if (lit && Date.now() - litAt > amb.RENEW_MS) light(true); }, 10000);
     setTimeout(() => {
-        SEATS.forEach((s) => mover.probe(s));         // its motors (D700) and where it is: once
+        SEATS.forEach((s) => mover.probe(s));         // where it is (no position at all: its motors, D700)
         mover.probeWheel();
         light(true);
     }, 3000);
