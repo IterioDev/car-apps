@@ -2,8 +2,9 @@
 /*
  * comfort.js - iteriodev-comfort: the root service behind the Ambient Light and Seats apps on iDrive 8 (Node 8).
  *   ambient   any colour on the interior ambient light, per zone, through the body controller (ambient.js); only
- *             while the car's own ambient light is on (ComfortFunctionIuK 0xB512 status, mode byte); written again
- *             every 2 minutes (each write lasts 254 s), handed back to the car's colour when switched off
+ *             while the car's own ambient light is on (ComfortFunctionIuK 0xB512 status, mode byte) and someone is in
+ *             the car (VehicleCondition: not parked / standby - 0.5.1, issue #17: lights on after locking); written
+ *             again every 2 minutes (each write lasts 254 s), handed back to the car's colour when switched off
  *   seats     hold-to-move, three memories per front seat and the Gentleman function (passenger seat out of the way
  *             and back), through the seat modules (seat.js); the Gentleman parked only (standing, as easy exit
  *             below), hold-to-move and memories also while driving (user 2026-11-08)
@@ -71,6 +72,11 @@ const STOP_SPEED = 2 * 64, STOP_RPM = 1000 * 4, RUN_RPM = 400 * 4;   // raw: spe
 // VehicleCondition: shown to the apps (the car switched on or not)
 const VCOND_SUB = 'sub 0x1531 1 1 2 0x8002';                 // no getter: its notifications only
 const carOn = (hex) => [7, 8, 10].indexOf(parseInt((hex || '').slice(10, 12), 16)) >= 0;   // test / ready to drive / driving
+// statusConditionVehicle: someone in the car (WOHNEN, test, ready to drive, driving, ending it) or not (PARKEN, STANDFUNKTIONEN:
+// locked and left). Our ambient colour only while someone is in it (issue #17: it stayed on after locking, each renewal
+// holding the lights 254 s while the head unit stayed awake); not told yet: as before
+const COND = { 1: 'parked', 2: 'parked', 3: 'standby, nobody in the car', 5: 'residing', 7: 'test', 8: 'ready to drive', 10: 'driving', 12: 'ending ready to drive' };
+const IN_CAR = [5, 7, 8, 10, 12];
 const log = (m) => console.log(m);
 
 function load() {
@@ -139,9 +145,16 @@ function main() {
     }
 
     const diag = new uds.Uds(hmi, log);
-    const car = { speed: null, speedAt: 0, rpm: null, rpmAt: 0, ambientOn: null, on: false, mode: null,
+    const car = { speed: null, speedAt: 0, rpm: null, rpmAt: 0, ambientOn: null, on: false, mode: null, cond: null,
         door: { driver: null, passenger: null }, occ: { driver: null, passenger: null } };
+    const inCar = () => car.cond === null || IN_CAR.indexOf(car.cond) >= 0;
     const cond = (hex) => {
+        const v = parseInt((hex || '').slice(10, 12), 16);
+        if (COND[v] && v !== car.cond) {
+            const was = inCar();
+            car.cond = v; log(`car ${COND[v]} (${hex})`);
+            if (inCar() !== was) { light(true); push(); }
+        }
         const on = carOn(hex);
         if (on === car.on) return;
         car.on = on; log(`car ${on ? 'on' : 'off'} (${hex})`); push(); SEATS.forEach(back);
@@ -248,7 +261,7 @@ function main() {
                 if (wait > 0) await new Promise((r) => setTimeout(r, wait));
                 roundAt = Date.now();
                 if (!mods) await discover();
-                const set = amb.effective(data.ambient, car.mode), want = set.on && car.ambientOn === true, all = force;
+                const set = amb.effective(data.ambient, car.mode), want = set.on && car.ambientOn === true && inCar(), all = force;
                 force = false;
                 if (!want && !lit) break;
                 for (const x of amb.plan(mods, want ? set : amb.settings(set, { on: false }), oem)) {
