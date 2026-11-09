@@ -15,7 +15,7 @@ app platform and show up in *All apps* like BMW's apps.
 
 | App | Package id | What it does |
 |---|---|---|
-| Ambient Light | `iteriodev_ambient` | **iDrive 7 and iDrive 8.** Any colour on the interior ambient light (a colour bar, brightness, the car's colours), per zone from a list of the car's zones, and presets that keep every zone's colour. Needs the Comfort tool below (the Store installs it with the app). |
+| Ambient Light | `iteriodev_ambient` | **iDrive 7 and iDrive 8.** Any colour on the interior ambient light (a colour bar, brightness, the car's colours), per zone from a list of the car's zones, presets that keep every zone's colour, and a colour per drive mode that the light switches to with the mode. Needs the Comfort tool below (the Store installs it with the app). |
 | Car Data | `iteriodev_cardash` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep 1.1.10). Live engine data: engine speed, boost, power and torque with their peaks, oil, coolant and intake temperatures, battery voltage; fuel and air values with their last 5 minutes; a trip computer (distance, fuel, cost); gearbox data (ZF 8HP, read-only); the engine unit's values in groups; on diesel cars the particulate filter (DPF). See below. |
 | Drag Timer | `iteriodev_draggy` | **iDrive 8 only** from 1.2.0 (iDrive 7 cars that have 1.1.8 keep it). Acceleration timer: stand still, launch, and it times the run with splits and a speed-over-time chart. Power run: floor it in one gear for power and torque over rpm, with a baseline to compare (from cauliflowermossgrape's idrive7-apps). Keeps your best times; km/h or mph. |
 | Drive Recorder | `oap-driverecorder-next` | **iDrive 7 and iDrive 8** (from 2.3.0; on iDrive 7 tested on one car, see below). Keeps the car's cameras recording and saves a clip when you tap *Save clip* (by default the 20 s before and the 10 s after); watch, lock, delete and copy clips to a USB stick while the car stands still. Over 4 GB the oldest unlocked clips are replaced. The car must be coded for the Drive Recorder. Needs the Drive Recorder player below (the Store installs it with the app). |
@@ -122,12 +122,13 @@ slots are kept in `/var/opt/iteriodev-overlays/slots.json`.
 > **Car-tested** (an M4, BDC_G05, seat modules FAS_G11 / BFS_G11): custom colours on all eight ambient light modules,
 > seat hold-to-move and memory recall, parked. Not car-tested yet: Ambient Light 1.1.1's screen and later, Make room,
 > moving the seats while driving, iDrive 7, Easy exit and the electric steering column (0.3.0), the passenger's Easy
-> exit with the seat sensor and motor-only seats (0.4.0).
+> exit with the seat sensor and motor-only seats (0.4.0), the colour per drive mode (0.5.0).
 
 The root service behind Ambient Light and Seats (`iteriodev-comfort.service`). It talks to the body controller and
 the seat modules through the head unit's own diagnostic gateway, with the car's workshop jobs: the ambient light's RGB
 per module (each write lasts 254 s and is renewed; switched off, the car's own colour returns at once; a zone with two
-kinds of light, such as a line and decor, is split into parts with a colour each), the seat motors and their position
+kinds of light, such as a line and decor, is split into parts with a colour each; with the drive modes on, the drive
+mode the head unit reports picks the colour), the seat motors and their position
 counters, and an electric steering column (through the body controller). Seats move at any speed (as with their own
 switches) except Make room and Easy exit, which need the car standing; the steering column moves only while the car
 stands, only when calibrated, and stops at its own soft end stops. Easy exit follows each front door, the ignition or

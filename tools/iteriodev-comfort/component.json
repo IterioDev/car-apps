@@ -1,7 +1,7 @@
 {
   "id": "iteriodev-comfort",
   "kind": "tool",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "title": "Comfort",
   "description": "The service behind the Ambient Light and Seats apps: any colour on the ambient light (per zone), front seat moves, three memories per seat, the Gentleman function (passenger seat out of the way and back) and easy exit for both front seats (to your own getting-out position when its door opens with someone in the seat, back once the door is shut: the driver with the car on, the passenger seated; the driver's electric steering column too). Through the car's own body and seat modules; seats move at any speed, Make room, easy exit and the steering column only standing.",
   "optional": true,

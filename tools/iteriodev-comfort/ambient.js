@@ -133,11 +133,40 @@ function hsv(h, s, v) {
     return [f(5), f(3), f(1)];
 }
 
-const DEFAULTS = { on: false, rgb: [254, 0, 0], bright: 100, follow: true, zones: {} };
+/* The drive mode (user 2026-11-09: a colour per drive mode, switched with it): FES 0xB50D statusFESVehicleDynamicSwitchHMI
+ * (getter 37, notifier 0x8025) byte 0 actualValueModeDrivingExperience (byte 5 displayModeDrivingExperience when that
+ * one says nothing). The Driving Experience Control's modes get a colour each (null: none, the settings as they are);
+ * the hybrid / off-road ones are not in the list (their own colour: none). NOT car-tested: 2 = Sport Plus is a guess
+ * (enum SPORT_EXPERT) */
+const MODES = { 1: 'Sport', 2: 'Sport Plus', 3: 'Sport Individual', 4: 'Comfort', 5: 'Comfort Plus', 6: 'Comfort Individual',
+    7: 'Eco Pro', 8: 'Eco Pro Plus', 9: 'Eco Pro Individual', 10: 'Adaptive' };
+const MODE_RGB = { 1: [254, 30, 0], 2: [254, 0, 70], 3: [254, 110, 0], 4: [40, 120, 254], 5: [180, 200, 254], 6: [0, 210, 200],
+    7: [20, 210, 90], 8: [120, 254, 60], 9: [0, 254, 160], 10: [150, 80, 254] };
+function driveMode(hex) {
+    for (const i of [0, 5]) { const v = parseInt((hex || '').substr(2 * i, 2), 16); if (v >= 1 && v <= 28 && v !== 25 && v !== 26) return v; }
+    return null;
+}
+/** what the light shows: in a drive mode with a colour of its own (the drive modes on) that colour in every zone, else
+ *  the settings */
+function effective(set, mode) {
+    const c = set.modes && set.modes.on && set.modes.rgb[mode];
+    return c ? Object.assign({}, set, { on: true, rgb: c, zones: {} }) : set;
+}
+
+const DEFAULTS = { on: false, rgb: [254, 0, 0], bright: 100, follow: true, zones: {}, modes: { on: false, rgb: MODE_RGB } };
 function settings(cur, p) {
     const out = Object.assign({}, DEFAULTS, cur || {});
+    const m = out.modes || {};
+    out.modes = { on: m.on === true, rgb: Object.assign({}, MODE_RGB, m.rgb) };
     if (!p || typeof p !== 'object') return out;
     const rgb = (v) => Array.isArray(v) && v.length === 3 && v.every((x) => Number.isInteger(x) && x >= 0 && x <= 255);
+    if (p.modes && typeof p.modes === 'object') {
+        if (typeof p.modes.on === 'boolean') out.modes.on = p.modes.on;
+        Object.keys(p.modes.rgb || {}).filter((k) => MODES[k]).forEach((k) => {
+            const v = p.modes.rgb[k];
+            if (v === null || rgb(v)) out.modes.rgb[k] = v && v.slice();
+        });
+    }
     if (typeof p.on === 'boolean') out.on = p.on;
     if (typeof p.follow === 'boolean') out.follow = p.follow;
     if (rgb(p.rgb)) out.rgb = p.rgb.slice();
@@ -153,7 +182,8 @@ function settings(cur, p) {
     return out;
 }
 
-module.exports = { BDC, BUSES, HOLD_S, RENEW_MS, ZONES, KINDS, PART, parse, split, frame, release, plan, key, hsv, settings, zoneOf, nameOf, kindOf };
+module.exports = { BDC, BUSES, HOLD_S, RENEW_MS, ZONES, KINDS, PART, MODES, parse, split, frame, release, plan, key, hsv, settings,
+    driveMode, effective, zoneOf, nameOf, kindOf };
 
 if (require.main === module && process.argv.includes('--test')) {
     const assert = require('assert');
@@ -185,5 +215,16 @@ if (require.main === module && process.argv.includes('--test')) {
     assert.deepStrictEqual(Object.keys(two.zones), ['dash.line', 'dash.decor'], 'only zones and zone parts');
     assert.deepStrictEqual(plan(x6, two).map((x) => x.rgb), [[254, 0, 0], [254, 254, 254], [254, 0, 0], [254, 254, 254], [0, 0, 254]]);
     assert.deepStrictEqual(plan(x6, settings(null, { on: true, rgb: [0, 0, 254], zones: { dash: { rgb: [1, 2, 3] } } })).map((x) => x.rgb)[1], [1, 2, 3], 'a whole-zone setting reaches its parts');
+    // drive modes: off by default with a colour each; one set to none; Sport's colour in every zone (ours on), a mode
+    // without one / the drive modes off / a mode not in the list: the settings as they are
+    const d0 = settings({ on: false, rgb: [1, 2, 3] });
+    assert.deepStrictEqual([d0.modes.on, d0.modes.rgb[4], DEFAULTS.modes.rgb === MODE_RGB, MODE_RGB[4]], [false, [40, 120, 254], true, [40, 120, 254]]);
+    const dm = settings(d0, { modes: { on: true, rgb: { 1: [254, 0, 0], 4: null, 99: [1, 1, 1], 7: [300, 0, 0] } }, zones: { doors: { off: true } } });
+    assert.deepStrictEqual([dm.modes.rgb[1], dm.modes.rgb[4], dm.modes.rgb[99], dm.modes.rgb[7], MODE_RGB[1]], [[254, 0, 0], null, undefined, [20, 210, 90], [254, 30, 0]]);
+    assert.deepStrictEqual(settings(JSON.parse(JSON.stringify(dm))).modes.rgb[4], null, 'none survives the data file');
+    assert.deepStrictEqual(plan(mods, effective(dm, 1)).map((x) => x.rgb), mods.map(() => [254, 0, 0]), 'Sport: its colour everywhere');
+    assert.ok([4, 12, null].every((v) => effective(dm, v) === dm) && effective(settings(dm, { modes: { on: false } }), 1).on === false);
+    // FES statusFESVehicleDynamicSwitchHMI: byte 0 the mode; INITIALISIERUNG (0): byte 5; nothing usable: null
+    assert.deepStrictEqual([driveMode('01000000003f3f'), driveMode('00000000000505'), driveMode('3f000000003f3f'), driveMode('')], [1, 5, null, null]);
     console.log('ambient ok');
 }

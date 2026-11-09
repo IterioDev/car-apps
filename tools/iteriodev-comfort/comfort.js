@@ -27,9 +27,15 @@
  *             minute. A slow gateway read as an end stop half way (seat.js), and a seat module pausing its motors
  *             (engine start) ended the axis: two more tries. Seats with motors but no position (D700: electric seats,
  *             memory on the driver's side only) move while held, no memory / Easy exit / Make room.
+ *   drive modes 0.5.0 (user 2026-11-09): a colour per drive mode (ambient.js MODES), switched with it while the drive
+ *             modes are on: the mode's colour in every zone (our colour on), a mode without one: the settings as they
+ *             are. The mode: FES 0xB50D notifier 0x8025, and its getter 37 read every second by hmictl's own poll thread
+ *             (a head-unit getter on the MGU's signal gateway, nothing asked on the bus; FES notifiers did not run for
+ *             Car Data). NOT car-tested.
  * All UDS goes through the head unit's diagnostic gateway on one `hmictl serve` (uds.js).
  * Control socket /run/iteriodev-comfort/ctl.sock, JSON lines in and out; every change is pushed to every client:
- *   {op:'get'}  {op:'ambient', settings:{on, rgb:[r,g,b], bright 5-100, follow, zones:{dash:{rgb}|{off:true}|null}}}
+ *   {op:'get'}  {op:'ambient', settings:{on, rgb:[r,g,b], bright 5-100, follow, zones:{dash:{rgb}|{off:true}|null},
+ *               modes:{on, rgb:{<mode 1-10>:[r,g,b]|null}}}}
  *   {op:'jog', seat:'driver'|'passenger', axis:'SLV'|'SHV'|'LNV'|'SNV'|'KHV', dir:1|-1}   (again every 300 ms while held)
  *   {op:'stop'}  {op:'memory', seat, slot:0-2, save:true|false}  {op:'gentleman'}  (out of the way, again: back)
  *   {op:'exit', seat, save:true|false}  (save: the seat (+ the driver's column) as it is = its Exit; else: there now;
@@ -54,6 +60,7 @@ const HMICTL = process.env.COMFORT_HMICTL || path.join(__dirname, 'hmictl');   /
 const SPEED_SUB = 'sub 0xb519 1 1 1 0x8008', SPEED_GET = 'call 0xb519 1 8 1', SPEED_FRESH_MS = 3000;
 const AMB_SUB = 'sub 0xb512 1 1 1 0x8003', AMB_GET = 'call 0xb512 1 3 1';
 const RPM_GET = 'call 0xb513 1 25 1';
+const FES_SUB = 'sub 0xb50d 1 1 1 0x8025', FES_POLL = 'poll 0xb50d 1 37 1 1000 0x8025';   // the drive mode
 const DOOR_SUB = 'sub 0x5530 1 1 1 0x8001 0x8006', DOOR_BYTE = { driver: 2, passenger: 3 };   // statusDoorSwitchDRD / PSD, 1 open
 // SeatInformation seatOccupancyStatusForEachSeat (events only): relativeSeatLocation 1 the driver's, 3 the passenger's
 const OCC_SUB = 'sub 0x1030 1 1 1 0x8001', REL_SEAT = { 1: 'driver', 3: 'passenger' };
@@ -132,7 +139,7 @@ function main() {
     }
 
     const diag = new uds.Uds(hmi, log);
-    const car = { speed: null, speedAt: 0, rpm: null, rpmAt: 0, ambientOn: null, on: false,
+    const car = { speed: null, speedAt: 0, rpm: null, rpmAt: 0, ambientOn: null, on: false, mode: null,
         door: { driver: null, passenger: null }, occ: { driver: null, passenger: null } };
     const cond = (hex) => {
         const on = carOn(hex);
@@ -184,6 +191,11 @@ function main() {
         const on = (hex || '').length >= 16 ? parseInt(hex.slice(14, 16), 16) === 1 : null;
         if (on !== car.ambientOn) { car.ambientOn = on; log(`car ambient light: ${on ? 'on' : 'off'} (${hex})`); light(true); push(); }
     }
+    function driveMode(hex) {
+        const v = amb.driveMode(hex);
+        if (v === null || v === car.mode) return;
+        car.mode = v; log(`drive mode ${amb.MODES[v] || v} (${hex})`); lightSoon(); push();
+    }
     function onEvent(line) {
         const w = line.split(' '), svc = parseInt(w[1], 16), ev = parseInt(w[2], 16);
         if (svc === uds.SVC) diag.onEvent(svc, ev, w[3]);
@@ -192,9 +204,10 @@ function main() {
         else if (svc === 0x1531 && ev === 0x8002) cond(w[3]);
         else if (svc === 0x5530 && (ev === 0x8001 || ev === 0x8006)) door(w[3]);
         else if (svc === 0x1030 && ev === 0x8001) occupancy(w[3]);
+        else if (svc === 0xb50d && ev === 0x8025) driveMode(w[3]);
     }
     function subscribe() {
-        [uds.SUB, SPEED_SUB, AMB_SUB, VCOND_SUB, DOOR_SUB, OCC_SUB].forEach((l) => hmi(l));
+        [uds.SUB, SPEED_SUB, AMB_SUB, VCOND_SUB, DOOR_SUB, OCC_SUB, FES_SUB, FES_POLL].forEach((l) => hmi(l));
         poll(AMB_GET, ambientStatus);
     }
 
@@ -235,10 +248,10 @@ function main() {
                 if (wait > 0) await new Promise((r) => setTimeout(r, wait));
                 roundAt = Date.now();
                 if (!mods) await discover();
-                const want = data.ambient.on && car.ambientOn === true, all = force;
+                const set = amb.effective(data.ambient, car.mode), want = set.on && car.ambientOn === true, all = force;
                 force = false;
                 if (!want && !lit) break;
-                for (const x of amb.plan(mods, want ? data.ambient : amb.settings(data.ambient, { on: false }), oem)) {
+                for (const x of amb.plan(mods, want ? set : amb.settings(set, { on: false }), oem)) {
                     const b = x.off ? amb.release(x.m) : amb.frame(x.m, x.rgb, x.bright), k = amb.key(x.m), h = b.join(',');
                     if (!all && sent[k] === h) continue;
                     try { await diag.send(amb.BDC, 0x2e, b); sent[k] = h; } catch (e) { log(`ambient ${k}: ${e.message}`); }
@@ -327,7 +340,7 @@ function main() {
     /* ---- the apps ---- */
     const clients = new Set();
     const status = () => ({ state: {
-        parked: parked(), carOn: car.on, ambient: { settings: data.ambient, carOn: car.ambientOn, lit,
+        parked: parked(), carOn: car.on, ambient: { settings: data.ambient, carOn: car.ambientOn, lit, mode: car.mode,
             modules: (mods || []).map((m) => ({ id: amb.key(m), name: m.name, zone: m.zone, fault: m.fault })) },
         seats: { pos: mover.pos, moving: mover.motion ? { seat: mover.motion.seat, axis: mover.motion.axis } : null, job: busyJob,
             jobSeat, memories: data.memories, roomOut: !!data.room, wheel: mover.hasWheel === true,
