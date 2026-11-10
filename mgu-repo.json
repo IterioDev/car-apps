@@ -14,10 +14,6 @@
    "path": "tools/iteriodev-comfort"
   },
   {
-   "id": "iteriodev-drplay",
-   "path": "tools/iteriodev-drplay"
-  },
-  {
    "id": "iteriodev-overlays",
    "path": "tools/iteriodev-overlays"
   },
