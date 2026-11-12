@@ -13,8 +13,8 @@
  *       <- { state: { settings, status } }   (pushed on every change, at most 4 a second)
  *   The app asks the camera ECU for the front view (its CameraProxy / ICAM2Proxy grants); the tool starts it in the
  *   background (`hmictl start iteriodev_turnview`) when the camera is wanted and the app is not connected.
- * Data: /var/opt/iteriodev-turnview/settings.json { enabled, cal { h, pitch, fov, yaw, x } }, nofront (0.2.0: the car
- * has no front camera, the widget says only that until the front view works), turnview.log (1 MB, one
+ * Data: /var/opt/iteriodev-turnview/settings.json { enabled, cal { h, pitch, fov, yaw, x } }, rear-only (0.2.1: the
+ * car has the rear camera alone, the widget says "No front camera" only until the front view works), turnview.log (1 MB, one
  * old file kept). Never stops a system service; the native parts are children, restarted with a growing delay when
  * they die young. Times are monotonic (the MGU sets its clock after boot).
  * Env (tests): TURNVIEW_DATA, TURNVIEW_CTL, TURNVIEW_HMICTL, TURNVIEW_CAMCLUSTER, TURNVIEW_CR_SOCKET, TURNVIEW_TICK_MS,
@@ -106,9 +106,13 @@ function main() {
     const save = () => {
         try { fs.writeFileSync(`${SETTINGS}.new`, JSON.stringify(settings, null, 2)); fs.renameSync(`${SETTINGS}.new`, SETTINGS); } catch (e) { log(`settings: ${e.message}`); }
     };
-    // 0.2.0: no front camera on this car (the app's camreq 'nofront': rear camera only, or no cameras) - kept in a file so
-    // the widget says so at once after every start, with or without a route; gone as soon as the front view works
-    const NOFRONT = path.join(DATA, 'nofront');
+    // no front camera on this car (the app's camreq 'rearonly': the ECU gave the rear camera alone, never the front) -
+    // kept in a file so the widget says so at once after every start, with or without a route; gone as soon as the
+    // front view works or camcluster decodes (its frames hold the front camera). 0.2.1: 0.2.0's file `nofront` was
+    // guessed from a front view that did not come (wrong on a BMW XM with cameras): dropped, and app 1.1.0's
+    // 'nofront' counts as 'refused'
+    const NOFRONT = path.join(DATA, 'rear-only');
+    try { fs.unlinkSync(path.join(DATA, 'nofront')); } catch (e) { /* none */ }
     let noFront = fs.existsSync(NOFRONT);
     log(`start: enabled ${settings.enabled}, cal ${JSON.stringify(settings.cal)}${noFront ? ', no front camera (saved)' : ''}`);
 
@@ -117,7 +121,7 @@ function main() {
     function setNoFront(on) {
         if (on === noFront) return;
         noFront = on; status.noFront = on; scene.noFront(on);
-        try { if (on) fs.writeFileSync(NOFRONT, 'no front camera\n'); else fs.unlinkSync(NOFRONT); } catch (e) { log(`nofront: ${e.message}`); }
+        try { if (on) fs.writeFileSync(NOFRONT, 'rear camera only\n'); else fs.unlinkSync(NOFRONT); } catch (e) { log(`rear-only: ${e.message}`); }
         log(on ? 'camera: this car has no front camera' : 'camera: the front camera works');
     }
     const nav = createNav({ log, now: mono }), track = createTrack({ passedMs: +process.env.TURNVIEW_PASSED_MS || 0 });
@@ -233,7 +237,12 @@ function main() {
     // ---- mgu-camcluster: the video, as its status lines say ----
     let cam = null, camOut = '', videoOn = false, yielded = false;
     const camSt = { startedAt: 0, delay: 0 };
-    function camState(s) { if (status.camera !== s) { log(`camera: ${s}`); status.camera = s; scene.camera(s); push(); } }
+    function camState(s) {
+        if (status.camera === s) return;
+        log(`camera: ${s}`); status.camera = s; scene.camera(s);
+        if (s === 'decoding') setNoFront(false);
+        push();
+    }
     function camStart() {
         if (yielded || cam) return;                         // (a restart timer while YouTube has the cluster, or one running)
         camSt.startedAt = mono();
@@ -351,8 +360,8 @@ function main() {
             settings = mergeSettings(settings, { cal: DEFAULT_CAL });
             save(); applyCal(settings.cal); push();
         } else if (q.op === 'camreq' && typeof q.state === 'string') {
-            status.camreq = q.state.slice(0, 20); scene.camreq(status.camreq);
-            if (status.camreq === 'nofront') setNoFront(true);
+            status.camreq = q.state === 'nofront' ? 'refused' : q.state.slice(0, 20); scene.camreq(status.camreq);
+            if (status.camreq === 'rearonly' && status.camera !== 'decoding') setNoFront(true);
             else if (status.camreq === 'on') setNoFront(false);
             push();
         } else send(c, stateMsg());                       // 'get' and anything else

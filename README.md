@@ -245,8 +245,10 @@ Auto), runs the front camera through its own decoder (`mgu-camcluster`) and draw
 Cluster renderer (`cluster-render`, robertnisipeanu/idrive-apps, 0.3.6 or newer). The app shows the status and
 calibrates the chevrons.
 
-**Needs a front camera:** the 360 cameras (Surround View) or front + rear cameras. A car with a rear camera only, or
-no cameras, gets *No front camera* in the widget and nothing else.
+**Needs a front camera:** the 360 cameras (Surround View) or front + rear cameras. When the camera unit does not give
+the front camera alone, Turn View asks for front + rear, then all cameras. A car whose camera unit gives the rear
+camera and never the front gets *No front camera* in the widget and nothing else; no camera view at all shows
+*No camera*. (1.1.1 / tool 0.2.1: 1.1.0 showed *No front camera* on some cars that have the cameras.)
 
 **Install:** in the Store, **Turn View** -> *Install* (it installs the tool too). A first install starts at the next
 start of the head unit; then pick **Cluster renderer** in the cluster's widget menu. After each tool update the
