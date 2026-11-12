@@ -1,0 +1,21 @@
+mgu-camcluster - license note
+
+mgu-camcluster as a whole is GPL-3.0-or-later, because it contains GPL-3.0-or-later code:
+
+- src/avb_source.*, src/rtp_h264.*, src/nal_reader.*, src/decoder_msdk.*: copied from Robert Nisipeanu's
+  waze-on-cluster (dist/idrive-apps-id8/native/waze-on-cluster, GPL-3.0-or-later, Copyright (C) 2026 Robert
+  Nisipeanu), headers kept; avb_source.cpp and decoder_msdk.* are modified (each says how, in its header).
+  waze-on-cluster's LICENSE holds the GPL-3.0 text.
+- Compiled in from cluster-render's iDrive 8 port (dist/idrive-apps-id8/native/cluster-render, branch
+  cluster-render-idrive8): src/log.*, kit/yuv_atlas.* (GPL-3.0-or-later, Robert Nisipeanu) and src/generation.*
+  (GPL-3.0-or-later, IterioDev); the client library (client/, include/cluster_render/: MPL-2.0, Robert Nisipeanu,
+  text in its LICENSES/MPL-2.0.txt), linked unchanged from that tree.
+- src/mfx/: Intel Media SDK API headers (MIT, Copyright (c) 2007-2019 Intel Corporation; src/mfx/LICENSE).
+- FFmpeg's libavcodec and libavutil 7.1 (LGPL-2.1-or-later, built without GPL parts by apps/drplay/build.sh),
+  linked statically: LICENSE.ffmpeg (written by build.sh) ships with the binary.
+
+camcluster's own files (src/camera.*, src/pipeline.*, src/decoder_ffmpeg.*, src/main.cpp, test/, build.sh):
+GPL-3.0-or-later, Copyright (C) 2026 IterioDev.
+
+At run time it uses the head unit's own libmfxhw64, libva, libva-drm and IAS AVB bridge libraries; none of them is
+part of this program or shipped with it.

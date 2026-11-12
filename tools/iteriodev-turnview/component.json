@@ -1,0 +1,165 @@
+{
+  "id": "iteriodev-turnview",
+  "kind": "tool",
+  "version": "0.2.0",
+  "title": "Turn View",
+  "description": "The front camera in the instrument cluster widget with navigation arrows on the road and a turn card, from BMW navigation, CarPlay or Android Auto (iDrive 8). Pick Turn View in the cluster widget menu; set up and calibrated in the Turn View app. Drawn by Cluster renderer (robertnisipeanu/idrive-apps) 0.3.6 or newer. No coding needed.",
+  "optional": true,
+  "uninstallable": true,
+  "mguHmi": [
+    "ID8"
+  ],
+  "requires": {
+    "cluster-render": "0.3.6",
+    "mgu-deploy": "0.7.11"
+  },
+  "files": [
+    {
+      "path": "turnview.js",
+      "from": "turnview.js",
+      "mode": "0644"
+    },
+    {
+      "path": "wire.js",
+      "from": "wire.js",
+      "mode": "0644"
+    },
+    {
+      "path": "nav.js",
+      "from": "nav.js",
+      "mode": "0644"
+    },
+    {
+      "path": "track.js",
+      "from": "track.js",
+      "mode": "0644"
+    },
+    {
+      "path": "scene.js",
+      "from": "scene.js",
+      "mode": "0644"
+    },
+    {
+      "path": "shaders.js",
+      "from": "shaders.js",
+      "mode": "0644"
+    },
+    {
+      "path": "card.js",
+      "from": "card.js",
+      "mode": "0644"
+    },
+    {
+      "path": "cluster_render_client.js",
+      "from": "cluster_render_client.js",
+      "mode": "0644"
+    },
+    {
+      "path": "kit/canvas.js",
+      "from": "kit/canvas.js",
+      "mode": "0644"
+    },
+    {
+      "path": "kit/fonts.js",
+      "from": "kit/fonts.js",
+      "mode": "0644"
+    },
+    {
+      "path": "kit/LICENSE",
+      "from": "kit/LICENSE",
+      "mode": "0644"
+    },
+    {
+      "path": "kit/SOURCE",
+      "from": "kit/SOURCE",
+      "mode": "0644"
+    },
+    {
+      "path": "kit/fonts/num.json",
+      "from": "kit/fonts/num.json",
+      "mode": "0644"
+    },
+    {
+      "path": "kit/fonts/bold.json",
+      "from": "kit/fonts/bold.json",
+      "mode": "0644"
+    },
+    {
+      "path": "kit/fonts/label.json",
+      "from": "kit/fonts/label.json",
+      "mode": "0644"
+    },
+    {
+      "path": "schemas/guidance-conclusiveDart.json",
+      "from": "schemas/guidance-conclusiveDart.json",
+      "mode": "0644"
+    },
+    {
+      "path": "schemas/guidance-state.json",
+      "from": "schemas/guidance-state.json",
+      "mode": "0644"
+    },
+    {
+      "path": "schemas/guidance-provider.json",
+      "from": "schemas/guidance-provider.json",
+      "mode": "0644"
+    },
+    {
+      "path": "schemas/vehicle2-speed.json",
+      "from": "schemas/vehicle2-speed.json",
+      "mode": "0644"
+    },
+    {
+      "path": "schemas/eventlist-query-in.json",
+      "from": "schemas/eventlist-query-in.json",
+      "mode": "0644"
+    },
+    {
+      "path": "schemas/eventlist-query-out.json",
+      "from": "schemas/eventlist-query-out.json",
+      "mode": "0644"
+    },
+    {
+      "path": "hmictl",
+      "from": "hmictl",
+      "mode": "0755"
+    },
+    {
+      "path": "mgu-camcluster",
+      "from": "mgu-camcluster",
+      "mode": "0755"
+    },
+    {
+      "path": "LICENSE.camcluster",
+      "from": "LICENSE.camcluster",
+      "mode": "0644"
+    },
+    {
+      "path": "LICENSE.ffmpeg",
+      "from": "LICENSE.ffmpeg",
+      "mode": "0644"
+    }
+  ],
+  "units": [
+    {
+      "name": "iteriodev-turnview.service",
+      "from": "iteriodev-turnview.service"
+    }
+  ],
+  "enable": [
+    {
+      "unit": "iteriodev-turnview.service",
+      "target": "multi-user.target"
+    }
+  ],
+  "recmgr": [
+    "iteriodev-turnview"
+  ],
+  "crashNames": [
+    "hmictl",
+    "mgu-camcluster"
+  ],
+  "restart": [
+    "iteriodev-turnview.service"
+  ]
+}

@@ -24,6 +24,10 @@
   {
    "id": "iteriodev-tailscale",
    "path": "tools/iteriodev-tailscale"
+  },
+  {
+   "id": "iteriodev-turnview",
+   "path": "tools/iteriodev-turnview"
   }
  ]
 }

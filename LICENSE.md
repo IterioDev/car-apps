@@ -47,7 +47,7 @@ with the software already on it. The customer uses the software under the PolyFo
 ## Code from robertnisipeanu/mgu-store
 
 The app host code in the packages of Car Data, Drag Timer, eDrive, Fault Codes, Live Adjustments, Overlays,
-Service and Tailscale (`oap-shared/online-host.js`) follows and contains code from
+Service, Tailscale and Turn View (`oap-shared/online-host.js`) follows and contains code from
 robertnisipeanu/mgu-store's Store app. It is used here under these terms with RobertNisipeanu's permission.
 
 ## Not covered
@@ -56,6 +56,12 @@ robertnisipeanu/mgu-store's Store app. It is used here under these terms with Ro
 - `tools/iteriodev-drplay/mgu-drplay` contains FFmpeg (GNU LGPL 2.1, `LICENSE.ffmpeg`), libjpeg-turbo
   (`LICENSE.libjpeg-turbo`) and OpenH264 (`LICENSE.openh264`). For this one file, as the LGPL 2.1 requires, you may
   change it for your own use and reverse engineer it to debug such changes.
+- `tools/iteriodev-turnview/mgu-camcluster` contains code from RobertNisipeanu's waze-on-cluster and cluster-render
+  (robertnisipeanu/idrive-apps, GPL-3.0-or-later), shipped as a program without its source with RobertNisipeanu's
+  permission (`LICENSE.camcluster` names the parts), and FFmpeg (GNU LGPL 2.1, `LICENSE.ffmpeg`; for this one file
+  you may change it for your own use and reverse engineer it to debug such changes).
+  `tools/iteriodev-turnview/cluster_render_client.js`: RobertNisipeanu's Cluster renderer client, Mozilla Public
+  License 2.0 (its header).
 - Code ported from cauliflowermossgrape/idrive7-apps in Car Data (Trips, Transmission, the grouped Details): MIT License,
   with its copyright; the package's `renderer/kit/NOTICE` names the files.
 - The drawing runtime inside the app packages (`renderer/kit/`): based on cauliflowermossgrape/idrive7-apps, MIT

@@ -1,0 +1,19 @@
+Vendored from https://github.com/cauliflowermossgrape/idrive7-apps @ f277cc9 (kit/runtime), MIT - see LICENSE.
+Unchanged copies: themes.js fonts.js.
+renderd.js: + touch (claim(), 'touch' / 'closed' events, READY touch flag) for our renderer build, protocol 2
+(scripts/renderd: kit/renderd @ f277cc9 + src/touch.c); + pictures, protocol 3 (M_IMAGE / M_DROP_IMAGE, the
+least-recently-used upload limit, plain tiles for an older renderer).
+record.js, canvas.js: + pictures (makeImage / dropImage, Recorder.image -> OP_IMAGE, Canvas.image).
+png.js: not from the kit - PNG decoder for the pictures (MGU7 workspace).
+vicons.js: not from the kit - vector icons drawn with the kit's primitives, for the store (App Manager 2): the same on
+iDrive 7 and 8, unlike the HMI's own icons (MGU7 workspace).
+gauges.js: two changes, marked "hmi-ui-builder": radialLive() - the dial's number shrinks to fit inside its tick
+numbers (needed for the wider BMW digits); chart() - the y unit sits above the top number instead of on it.
+fonts/*.json: NOT the kit's Ubuntu atlases - rebaked from the HMI's own BMW fonts (BMW_TA_RG / BDCN / RGCN / LG,
+the HMI's [fontconfig.bmw] roles) by scripts/hmi-tools/bake_bmw_fonts.py; same format and sizes, Latin-1 letters
+added. Rendered from BMW's fonts: keep private. The kit's originals: kit/runtime/fonts in the repo.
+fonts/icon.json: not from the kit - 144 of the HMI's own icons as glyphs (U+E000..), family 'icon', for the
+builder's widgets (../widgets.js); baked by scripts/hmi-tools/bake_hmi_icons.py. Keep private as well.
+The builder draws renderer screens with these exactly as an app on the car would.
+
+Copied into iteriodev-turnview (canvas.js, fonts.js, fonts num / bold / label) for the turn card and the notices, 2026-11-06.

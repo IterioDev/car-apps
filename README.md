@@ -25,6 +25,7 @@ app platform and show up in *All apps* like BMW's apps.
 | Seats | `iteriodev_seats` | **iDrive 7 and iDrive 8.** Move the front seats from the screen, also while driving, both on one page (hold the controls round each seat), three memories per seat, the Make room button (parked only) for the passenger seat, Easy exit for both front seats (the seat, and on the driver's side an electric steering column, out of the way when its door opens, back once the door is shut: the driver's with the car on, the passenger's with someone seated); a right-hand drive setting. Needs the Comfort tool below (the Store installs it with the app). |
 | Service | `iteriodev_service` | **iDrive 8 only.** The car's service requirements as the instrument cluster has them: engine oil, brakes, brake fluid, vehicle check, inspections, each with the distance and date left and whether it is due, and what it is when you tap it. Read-only: a service is reset in the cluster's own menu or at a workshop. Not car-tested yet. |
 | Tailscale | `iteriodev_tailscale` | **iDrive 7 and iDrive 8** (from 1.1.1; on iDrive 7 not run on a car yet). The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`) and Log out. Needs the Tailscale tool below (the Store installs it with the app). |
+| Turn View | `iteriodev_turnview` | **iDrive 8 only.** The front camera in the instrument cluster's widget during a route, with a turn card and chevrons on the road, from BMW Maps, CarPlay or Android Auto. Needs a front camera (360 or front + rear), the Turn View tool and Cluster renderer 0.3.6+ (robertnisipeanu/idrive-apps); see below. |
 
 All of them draw their screens through the GPU renderer `mgu-render`.
 
@@ -232,6 +233,25 @@ cd /var/opt/iteriodev-screencast/current && XDG_RUNTIME_DIR=/run/wayland SCREENC
 then open port 5881. Size, frame rate and the encoder settings are the `SCREENCAST_*` environment variables at the
 top of `screencast.js`.
 
+## Turn View (tool `iteriodev-turnview`, iDrive 8 only)
+
+> [!NOTE]
+> **Camera and turn card work in the car** (M4 with 360 cameras, Apple Maps over CarPlay). BMW Maps, Android Auto
+> and cars with front + rear cameras only are not car-tested yet. Waze sends the car no turns.
+
+The front camera in the instrument cluster's widget during a route, with a turn card and chevrons on the road. The
+tool (`iteriodev-turnview.service`, root) reads the turns (BMW guidance, or the phone's turns for CarPlay and Android
+Auto), runs the front camera through its own decoder (`mgu-camcluster`) and draws into the cluster widget through
+Cluster renderer (`cluster-render`, robertnisipeanu/idrive-apps, 0.3.6 or newer). The app shows the status and
+calibrates the chevrons.
+
+**Needs a front camera:** the 360 cameras (Surround View) or front + rear cameras. A car with a rear camera only, or
+no cameras, gets *No front camera* in the widget and nothing else.
+
+**Install:** in the Store, **Turn View** -> *Install* (it installs the tool too). A first install starts at the next
+start of the head unit; then pick **Cluster renderer** in the cluster's widget menu. After each tool update the
+cluster parks the widget: pick it again. Tool messages: `/var/opt/iteriodev-turnview/turnview.log`.
+
 ## What is in this repository
 
 - `apps/<id>/`: one folder per app with its package `<id>@<version>.tgz`, its `app.json` (version, title,
@@ -248,7 +268,8 @@ Each release is a tag `x.y.z`. The apps need the Store's deploy tool 0.7.5 or ne
 
 Use at your own risk. These apps are not made or endorsed by BMW. Fault Codes can clear fault memories (only
 when you ask); Live Adjustments switches MHD maps and drives the exhaust flap (not affiliated with MHD); Ambient Light sets the interior light's colours and Seats moves the
-front seats and an electric steering column (through the Comfort tool); the other apps only read from the car.
+front seats and an electric steering column (through the Comfort tool); Turn View asks the camera unit for its front
+view during a route; the other apps only read from the car.
 
 ## License
 
