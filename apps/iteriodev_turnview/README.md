@@ -10,8 +10,8 @@ With a distance set, the cluster shows Turn View by itself from that far before 
 closes it after; it is not in the widget menu then. The app keeps the front camera asked for the whole route, so the
 picture is there when it pops up.
 
-**Smoother camera (1.2.0, tool 0.3.0):** 20 pictures a second instead of 10, at a lower resolution, for the same
-load on the head unit.
+**Smoother camera (tool 0.3.1):** 15 pictures a second instead of 10, at a lower resolution, with less load on the
+head unit than before.
 
 **Needs a front camera:** cars with the 360 cameras (Surround View) or front + rear cameras. When the camera unit
 does not give the front camera alone, Turn View asks for front + rear, then all cameras, and shows the front camera
@@ -25,7 +25,7 @@ Version 1.2.0 (tool `iteriodev-turnview` 0.3.0) · iDrive 8 only · package `ite
 > [!NOTE]
 > Car-tested (2026-11-07, M4, Apple Maps over CarPlay): the camera and the turn card in the cluster widget. The
 > chevrons' look and the head unit's load are still being tuned. Waze sends no turns to the car (route summary only),
-> so with Waze the widget shows the camera's notice without a turn. BMW Maps and Android Auto are not car-tested yet, nor are cars with front + rear cameras only (no 360). The pop-up and the 20 fps camera (1.2.0) are not car-tested yet.
+> so with Waze the widget shows the camera's notice without a turn. BMW Maps and Android Auto are not car-tested yet, nor are cars with front + rear cameras only (no 360). The pop-up and the 15 fps camera (1.2.0, tool 0.3.1) are not car-tested yet.
 
 Needs Cluster renderer (`cluster-render`, robertnisipeanu/idrive-apps) 0.4.1 or newer (the pop-up). The cluster's widget menu
 lists it under that name. After every update of the Turn View tool, pick the widget again in the cluster menu.

@@ -40,6 +40,7 @@ const CR_SOCKET = process.env.TURNVIEW_CR_SOCKET || '/dev/shm/cluster-render/ren
 const TICK_MS = +process.env.TURNVIEW_TICK_MS || 100;
 const START_MS = +process.env.TURNVIEW_START_MS || 30000;
 const APP_ID = 'iteriodev_turnview';
+const CAM_FPS = 15;                         // camcluster --fps (1-30)
 // the YouTube player's claim on the cluster (rewritten every second while its pictures go there): cluster-render has two
 // video layers for all its clients and camcluster holds both, so camcluster stops until the claim is gone or stale
 const CLAIM = process.env.TURNVIEW_CLAIM || '/run/mgu-ytplay/cluster-claim', CLAIM_MS = 3000, CLAIM_POLL_MS = 500;
@@ -265,7 +266,8 @@ function main() {
         // the widget in the cluster's widget menu (user 2026-11-06: only where it is picked), or the pop-up (2026-11-13:
         // a setting, near the turns)
         camTarget = wantTarget();
-        const c = child(CAMCLUSTER, ['--control', 'stdin', '--target', camTarget], log, (why) => {
+        // 0.3.1 (user 2026-11-13): 15 pictures a second, not camcluster's 20: room for the head unit (~3 MB/s upload)
+        const c = child(CAMCLUSTER, ['--control', 'stdin', '--target', camTarget, '--fps', String(CAM_FPS)], log, (why) => {
             log(`mgu-camcluster ended (${why})`);
             if (cam === c) { cam = null; camOut = ''; }
             if (yielded) { camState(YIELDED); return; }     // stopped for YouTube: started again when it leaves

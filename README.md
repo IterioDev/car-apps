@@ -282,7 +282,7 @@ tool (`iteriodev-turnview.service`, root) reads the turns (BMW guidance, or the 
 Auto), runs the front camera through its own decoder (`mgu-camcluster`) and draws into the cluster widget through
 Cluster renderer (`cluster-render`, robertnisipeanu/idrive-apps, 0.4.1 or newer). The app shows the status and
 calibrates the chevrons. 1.2.0 (tool 0.3.0): *Pop up before a turn* (Off, 500, 250, 100 or 50 m) lets the cluster show
-Turn View by itself near each turn instead of the widget menu, and the camera runs at 20 pictures a second (was 10)
+Turn View by itself near each turn instead of the widget menu, and the camera runs at 15 pictures a second (was 10; tool 0.3.1)
 at a lower resolution; neither is car-tested yet.
 
 **Needs a front camera:** the 360 cameras (Surround View) or front + rear cameras. When the camera unit does not give
