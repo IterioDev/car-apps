@@ -8,12 +8,16 @@
  *   scene.js                  the tool's cluster-render layers for the view (vendored cluster_render_client.js)
  *   mgu-camcluster (child)    --control stdin: `video on|off` in, `rect ...` / `video ...` status lines out; stopped
  *                             while the YouTube player's claim file is fresh (camera "YouTube in the cluster")
+ *   where                     settings.popup 0: target `widget` (picked in the cluster's widget menu); 500 / 250 / 100 /
+ *                             50: target `popup` (cluster-render 0.4.1+, shown by the cluster by itself while drawn),
+ *                             drawn only from that many metres before each turn through its passing, and while
+ *                             calibrating (user 2026-11-13); camcluster runs again on the other target when it changes
  *   control socket            /run/iteriodev-turnview/ctl.sock (0666, JSON lines) for the app oap-turnview:
  *       -> { op: 'get' | 'reset' } | { op: 'set', settings } | { op: 'preview', cal } | { op: 'calib', on } | { op: 'camreq', state }
  *       <- { state: { settings, status } }   (pushed on every change, at most 4 a second)
  *   The app asks the camera ECU for the front view (its CameraProxy / ICAM2Proxy grants); the tool starts it in the
  *   background (`hmictl start iteriodev_turnview`) when the camera is wanted and the app is not connected.
- * Data: /var/opt/iteriodev-turnview/settings.json { enabled, cal { h, pitch, fov, yaw, x } }, rear-only (0.2.1: the
+ * Data: /var/opt/iteriodev-turnview/settings.json { enabled, popup, cal { h, pitch, fov, yaw, x } }, rear-only (0.2.1: the
  * car has the rear camera alone, the widget says "No front camera" only until the front view works), turnview.log (1 MB, one
  * old file kept). Never stops a system service; the native parts are children, restarted with a growing delay when
  * they die young. Times are monotonic (the MGU sets its clock after boot).
@@ -85,12 +89,22 @@ function clampCal(cur, p) {
     });
     return out;
 }
+const POPUP_M = [0, 500, 250, 100, 50];   // the pop-up's distances (0: the widget only)
+const POPUP_KEEP = 1.2;                     // up, it stays up to 20 % past its distance (a sync jumping back a little)
 function mergeSettings(cur, p) {
-    const out = { enabled: cur && typeof cur.enabled === 'boolean' ? cur.enabled : true, cal: clampCal(cur && cur.cal) };
+    const out = { enabled: cur && typeof cur.enabled === 'boolean' ? cur.enabled : true,
+        popup: cur && POPUP_M.indexOf(cur.popup) >= 0 ? cur.popup : 0, cal: clampCal(cur && cur.cal) };
     if (!p || typeof p !== 'object') return out;
     if (typeof p.enabled === 'boolean') out.enabled = p.enabled;
+    if (POPUP_M.indexOf(p.popup) >= 0) out.popup = p.popup;
     if (p.cal) out.cal = clampCal(out.cal, p.cal);
     return out;
+}
+/* Turn View drawn now? m: settings.popup (0: the widget, always); up: drawn a tick ago; v: track.js view; toTurn: metres */
+function popupUp(m, up, v, toTurn) {
+    if (!m || v.state === 'calib') return true;
+    if (v.state === 'passed') return up;                 // through the turn; then the next one's distance decides
+    return (v.state === 'route' || v.state === 'near') && toTurn <= (up ? m * POPUP_KEEP : m);
 }
 
 function main() {
@@ -117,7 +131,8 @@ function main() {
     log(`start: enabled ${settings.enabled}, cal ${JSON.stringify(settings.cal)}${noFront ? ', no front camera (saved)' : ''}`);
 
     const status = { camera: 'off', rect: null, route: 'none', provider: null, maneuver: null, cr: 'connecting', backend: null,
-        nav: 'waiting', state: 'none', camreq: 'idle', noFront };
+        nav: 'waiting', state: 'none', camreq: 'idle', noFront, popup: false };
+    const wantTarget = () => (settings.popup ? 'popup' : 'widget');
     function setNoFront(on) {
         if (on === noFront) return;
         noFront = on; status.noFront = on; scene.noFront(on);
@@ -131,7 +146,7 @@ function main() {
     // ---- cluster-render: the client keeps trying (also while the service is not installed yet) and makes every layer
     // again on each connection ----
     const { ClusterRender } = require('./cluster_render_client');
-    const cr = new ClusterRender('iteriodev-turnview', CR_SOCKET), scene = createScene(cr, { log, now: mono });
+    const cr = new ClusterRender('iteriodev-turnview', CR_SOCKET), scene = createScene(cr, { log, now: mono, target: wantTarget() });
     scene.setCal(settings.cal); scene.noFront(noFront);
     if (!settings.enabled) scene.drop();
     cr.on('ready', () => {
@@ -235,7 +250,7 @@ function main() {
     subscribe();
 
     // ---- mgu-camcluster: the video, as its status lines say ----
-    let cam = null, camOut = '', videoOn = false, yielded = false;
+    let cam = null, camOut = '', videoOn = false, yielded = false, camTarget = null;
     const camSt = { startedAt: 0, delay: 0 };
     function camState(s) {
         if (status.camera === s) return;
@@ -247,11 +262,14 @@ function main() {
         if (yielded || cam) return;                         // (a restart timer while YouTube has the cluster, or one running)
         camSt.startedAt = mono();
         if (!fs.existsSync(CAMCLUSTER)) { camState('missing'); setTimeout(camStart, backoff(camSt, mono())); return; }
-        // the widget in the cluster's widget menu (user: Turn View only where it is picked, never shown by itself)
-        const c = child(CAMCLUSTER, ['--control', 'stdin', '--target', 'widget'], log, (why) => {
+        // the widget in the cluster's widget menu (user 2026-11-06: only where it is picked), or the pop-up (2026-11-13:
+        // a setting, near the turns)
+        camTarget = wantTarget();
+        const c = child(CAMCLUSTER, ['--control', 'stdin', '--target', camTarget], log, (why) => {
             log(`mgu-camcluster ended (${why})`);
             if (cam === c) { cam = null; camOut = ''; }
             if (yielded) { camState(YIELDED); return; }     // stopped for YouTube: started again when it leaves
+            if (camTarget !== wantTarget()) { camStart(); return; }   // stopped for the other target: on it at once
             camState('restarting');
             setTimeout(camStart, backoff(camSt, mono()));
         });
@@ -316,8 +334,16 @@ function main() {
         if (v.state !== lastState) { log(`state ${lastState || '-'} -> ${v.state}`); lastState = v.state; status.state = v.state; push(); }
         if (status.nav === 'waiting' && t - subscribedAt > NAV_SILENT_MS && !lastNavAt) { status.nav = 'no navigation data'; push(); }
         if (status.cr === 'iDrive 8 only') return;            // not our cluster: nothing drawn
-        scene.show(v, t);
-        video(v.video);
+        const up = popupUp(settings.popup, status.popup, v, track.toTurn(t));
+        if (up !== status.popup) {
+            status.popup = up; push();
+            if (settings.popup) log(up ? `pop-up: up, ${Math.round(track.toTurn(t))} m to the turn` : 'pop-up: down');
+        }
+        // the pop-up down: nothing drawn (a drawn layer would bring it up); the app runs for the whole route all the same
+        // (its camera request: the front view there before the pop-up)
+        const sv = up ? v : Object.assign({}, v, { state: 'off', video: false });
+        scene.show(sv, t);
+        video(sv.video);
         if (v.video) startApp();
     }, TICK_MS);
 
@@ -348,6 +374,10 @@ function main() {
             if (settings.enabled !== was) {
                 track.enabled(settings.enabled);
                 if (settings.enabled) scene.restore(); else scene.drop();
+            }
+            if (scene.retarget(wantTarget())) {                // the pop-up setting: the layers and camcluster move
+                log(`target ${wantTarget()}${settings.popup ? `, ${settings.popup} m before a turn` : ''}`);
+                try { if (cam && camTarget !== wantTarget()) cam.stdin.end(); } catch (e) { /* gone */ }
             }
             if (!calibBy) applyCal(settings.cal);
             push();
@@ -399,4 +429,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { mergeSettings, clampCal, backoff, DEFAULT_CAL, RANGE };
+module.exports = { mergeSettings, clampCal, backoff, popupUp, DEFAULT_CAL, RANGE, POPUP_M };

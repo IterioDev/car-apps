@@ -1,16 +1,16 @@
 {
   "id": "iteriodev-turnview",
   "kind": "tool",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "title": "Turn View",
-  "description": "The front camera in the instrument cluster widget with navigation arrows on the road and a turn card, from BMW navigation, CarPlay or Android Auto (iDrive 8). Pick Turn View in the cluster widget menu; set up and calibrated in the Turn View app. Drawn by Cluster renderer (robertnisipeanu/idrive-apps) 0.3.6 or newer. No coding needed.",
+  "description": "The front camera in the instrument cluster widget with navigation arrows on the road and a turn card, from BMW navigation, CarPlay or Android Auto (iDrive 8). Pick Turn View in the cluster widget menu, or let it pop up by itself 500, 250, 100 or 50 m before each turn; set up and calibrated in the Turn View app. Drawn by Cluster renderer (robertnisipeanu/idrive-apps) 0.4.1 or newer. No coding needed.",
   "optional": true,
   "uninstallable": true,
   "mguHmi": [
     "ID8"
   ],
   "requires": {
-    "cluster-render": "0.3.6",
+    "cluster-render": "0.4.1",
     "mgu-deploy": "0.7.11"
   },
   "files": [

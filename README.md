@@ -27,7 +27,7 @@ app platform and show up in *All apps* like BMW's apps.
 | Seats | `iteriodev_seats` | **iDrive 7 and iDrive 8.** Move the front seats from the screen, also while driving, both on one page (hold the controls round each seat), three memories per seat, the Make room button (parked only) for the passenger seat, Easy exit for both front seats (the seat, and on the driver's side an electric steering column, out of the way when its door opens, back once the door is shut: the driver's with the car on, the passenger's with someone seated); a right-hand drive setting. Needs the Comfort tool below (the Store installs it with the app). |
 | Service | `iteriodev_service` | **iDrive 8 only.** The car's service requirements as the instrument cluster has them: engine oil, brakes, brake fluid, vehicle check, inspections, each with the distance and date left and whether it is due, and what it is when you tap it. Read-only: a service is reset in the cluster's own menu or at a workshop. Not car-tested yet. |
 | Tailscale | `iteriodev_tailscale` | **iDrive 7 and iDrive 8** (from 1.1.1; on iDrive 7 not run on a car yet). The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`) and Log out. Needs the Tailscale tool below (the Store installs it with the app). |
-| Turn View | `iteriodev_turnview` | **iDrive 8 only.** The front camera in the instrument cluster's widget during a route, with a turn card and chevrons on the road, from BMW Maps, CarPlay or Android Auto. Needs a front camera (360 or front + rear), the Turn View tool and Cluster renderer 0.3.6+ (robertnisipeanu/idrive-apps); see below. |
+| Turn View | `iteriodev_turnview` | **iDrive 8 only.** The front camera in the instrument cluster's widget during a route, with a turn card and chevrons on the road, from BMW Maps, CarPlay or Android Auto. In the widget menu, or popping up by itself 500 / 250 / 100 / 50 m before each turn. Needs a front camera (360 or front + rear), the Turn View tool and Cluster renderer 0.4.1+ (robertnisipeanu/idrive-apps); see below. |
 
 All of them draw their screens through the GPU renderer `mgu-render`.
 
@@ -280,8 +280,10 @@ player has handed over the whole clip and waits until it is on the stick.
 The front camera in the instrument cluster's widget during a route, with a turn card and chevrons on the road. The
 tool (`iteriodev-turnview.service`, root) reads the turns (BMW guidance, or the phone's turns for CarPlay and Android
 Auto), runs the front camera through its own decoder (`mgu-camcluster`) and draws into the cluster widget through
-Cluster renderer (`cluster-render`, robertnisipeanu/idrive-apps, 0.3.6 or newer). The app shows the status and
-calibrates the chevrons.
+Cluster renderer (`cluster-render`, robertnisipeanu/idrive-apps, 0.4.1 or newer). The app shows the status and
+calibrates the chevrons. 1.2.0 (tool 0.3.0): *Pop up before a turn* (Off, 500, 250, 100 or 50 m) lets the cluster show
+Turn View by itself near each turn instead of the widget menu, and the camera runs at 20 pictures a second (was 10)
+at a lower resolution; neither is car-tested yet.
 
 **Needs a front camera:** the 360 cameras (Surround View) or front + rear cameras. When the camera unit does not give
 the front camera alone, Turn View asks for front + rear, then all cameras. A car whose camera unit gives the rear

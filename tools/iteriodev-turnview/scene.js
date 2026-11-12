@@ -1,17 +1,18 @@
 'use strict';
 /*
  * scene.js - iteriodev-turnview: the tool's cluster-render layers on the iDrive 8 widget for a track.js view
- * (spec 5). All on target `widget` (the user picks it in the cluster's widget menu; never a pop-up: user, 2026-11-06),
- * class overlay, over the camera's rect (camcluster's last `rect` line):
+ * (spec 5). All on one target: `widget` (the user picks it in the cluster's widget menu) or `popup` (the pop-up
+ * setting, 2026-11-13: the cluster shows it by itself while a layer is drawn, so the tool shows the view 'off' while
+ * it is down), class overlay, over the camera's rect (camcluster's last `rect` line):
  *   chevrons  mesh  z 10   the road arrows (shaders.js), only over the whole frame (`rect full`) while it decodes
  *   marks     mesh  z 15   5 / 10 / 20 m lines while calibrating, same camera
  *   card      image z 20   icon + distance, top centre (card.js)
  *   shade     effect z 30  a dark fill with soft edges, no upload
  *   notice    image z 31   "No front camera" (the car has none: before everything, alone) / "no route" / "Camera busy" /
  *                          "No camera", centred
- *   const sc = createScene(cr, { log, now });   cr: a ClusterRender (cluster_render_client.js) or a fake with its methods
+ *   const sc = createScene(cr, { log, now, target });   cr: a ClusterRender (cluster_render_client.js) or a fake with its methods
  *   sc.rect(kind, r); sc.camera(status); sc.camreq(state); sc.noFront(on); sc.setCal(cal); sc.budget(capKb); sc.show(view, t);
- *   sc.drop(); sc.status()
+ *   sc.retarget(target) -> changed (the layers made again there by the next show); sc.drop(); sc.status()
  * Uploads: geometry once; the card when its icon / text changes, at most once a second (every 3 s while the shared
  * budget's cap is under 3000 KB/s); a notice when its text changes. u_travel is animated by the renderer between ticks
  * (keys 0:travel 200:travel + speed * 0.2, one animation number replaced every tick).
@@ -29,7 +30,7 @@ function camOf(cal) { return { cx: cal.x, cy: cal.h, cz: 0, crx: -cal.pitch, cry
 function createScene(cr, o) {
     o = o || {};
     const log = o.log || (() => {}), now = o.now || Date.now;
-    const target = 'widget';
+    let target = o.target || 'widget';
     let refs = null, rect = null, kind = null;
     let camera = 'off', cameraSince = now(), camreq = 'idle', capKb = 5500, noFront = false;
     let cal = { h: 0.5, pitch: 12, fov: 60, yaw: 0, x: 0 };
@@ -52,6 +53,12 @@ function createScene(cr, o) {
         cr.uniform(refs.shade, 'u_size', [rect.w, rect.h]);
         vis = {}; uni = {}; travelSent = false; animAt = -Infinity; cardKey = ''; cardAt = -Infinity; noticeKey = null;
         log(`scene: layers made on ${target} at ${rect.w}x${rect.h}@${rect.x},${rect.y}`);
+    }
+    function unmake() {
+        if (!refs) return;
+        ['chevrons', 'marks', 'card', 'shade', 'notice'].forEach((k) => cr.drop(refs[k]));
+        refs = null;
+        log(`scene: layers dropped from ${target}`);
     }
     function setVis(name, on) {
         if (vis[name] === on) return;
@@ -132,10 +139,13 @@ function createScene(cr, o) {
         },
         drop() {
             o.dropped = true;
-            if (!refs) return;
-            ['chevrons', 'marks', 'card', 'shade', 'notice'].forEach((k) => cr.drop(refs[k]));
-            refs = null;
-            log('scene: layers dropped');
+            unmake();
+        },
+        retarget(t) {
+            if (t === target) return false;
+            unmake();
+            target = t;
+            return true;
         },
         restore() { o.dropped = false; },
         status: () => ({ layers: Object.assign({ chevrons: false, marks: false, card: false, shade: false, notice: false }, vis),
