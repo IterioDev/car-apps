@@ -2,10 +2,10 @@
 
 Move the driver and passenger seats from the central display, also while driving (as with the seats' own switches, for a passenger who can't reach theirs), both on one page: each seat seen from the side with its controls round it (fore / aft, height, backrest, tilt and headrest, while you hold them), three memories per seat under it (for cars without memory buttons too), the Gentleman button (parked only) that moves the passenger seat out of the way and back, and Easy exit for both front seats: the seat (and on the driver's side an electric steering column) moves to your own getting-out position when its door opens with the car standing, and back once the door is shut (the driver's with the car on, the passenger's with someone seated). The seat's own switches always win. Needs the Comfort tool (the Store installs it with the app).
 
-Version 1.6.0 · iDrive 7 and 8 · package `iteriodev_seats` · [all apps and how to install](../../README.md)
+Version 1.6.1 · iDrive 7 and 8 · package `iteriodev_seats` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
-> Run on a car (an M4, seat modules FAS_G11 / BFS_G11): hold-to-move and memory recall work, parked. Not run on a car yet: the 1.1.0 page, Make room, and moving while driving (1.1.1; whether the seat modules take it at speed is not known yet). iDrive 7 (1.2.0): not run on an iDrive 7 car yet. Easy exit and the electric steering column (1.4.0): not run on a car yet. The passenger's Easy exit with the seat sensor and motor-only seats (1.5.0): not run on a car yet. The iDrive controller (1.6.0): not run on a car yet.
+> Run on a car (an M4, seat modules FAS_G11 / BFS_G11): hold-to-move and memory recall work, parked. Not run on a car yet: the 1.1.0 page, Make room, and moving while driving (1.1.1; whether the seat modules take it at speed is not known yet). iDrive 7 (1.2.0): not run on an iDrive 7 car yet. Easy exit and the electric steering column (1.4.0): not run on a car yet. The passenger's Easy exit with the seat sensor and motor-only seats (1.5.0): not run on a car yet. The iDrive controller (1.6.0): on an M4 only the first controller states reached the app; 1.6.1 fixes that, not run on a car yet.
 
 ### While driving
 

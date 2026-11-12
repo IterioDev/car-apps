@@ -1,6 +1,6 @@
 {
  "id": "iteriodev_ambient",
- "version": "1.4.0",
+ "version": "1.4.1",
  "title": "Ambient Light",
  "description": "Any colour on the interior ambient light. Your car's zones in a list (the ones your car has): give each the main colour, its own or the car's, or pick All zones. Colour bars for any shade, brightness (or follow the car's), the car's nine colours, and six presets that keep the whole look. Drive modes: a colour for each drive mode (Sport, Comfort, Eco Pro, their Plus and Individual, Adaptive) that the light switches to with the mode, on or off. Works while the car's own ambient light is on. Needs the Comfort tool from the same source. Works with the touchscreen or the iDrive controller. iDrive 7",
  "mguHmi": [
