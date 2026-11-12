@@ -2,7 +2,8 @@
 
 > [!WARNING]
 > **Not tested on iDrive 7.** These apps and tools have been tested only on iDrive 8, in the emulator and on a real
-> car. Ambient Light
+> car. Drive Recorder installs on iDrive 7 too; 2.3.5 to 2.3.12 recorded, saved and copied clips on one G20, 2.4.0's
+> new recording path has not run on an iDrive 7 car yet (see its section). Ambient Light
 > and Seats (with the Comfort tool), and Tailscale from 1.1.1 (with its tool), install on iDrive 7 too, not run on an
 > iDrive 7 car yet. Every other app is iDrive 8 only; iDrive 7 cars keep the versions they have: Car Data
 > 1.1.10, Drag Timer 1.1.8, Fault Codes 1.1.4 and Live Adjustments 1.0.7 (checked there only as far
@@ -18,6 +19,7 @@ app platform and show up in *All apps* like BMW's apps.
 | Ambient Light | `iteriodev_ambient` | **iDrive 7 and iDrive 8.** Any colour on the interior ambient light (a colour bar, brightness, the car's colours), per zone from a list of the car's zones, presets that keep every zone's colour, and a colour per drive mode that the light switches to with the mode. Needs the Comfort tool below (the Store installs it with the app). |
 | Car Data | `iteriodev_cardash` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep 1.1.10). Live engine data: engine speed, boost, power and torque with their peaks, oil, coolant and intake temperatures, battery voltage; fuel and air values with their last 5 minutes; a trip computer (distance, fuel, cost); gearbox data (ZF 8HP, read-only); the engine unit's values in groups; on diesel cars the particulate filter (DPF). See below. |
 | Drag Timer | `iteriodev_draggy` | **iDrive 8 only** from 1.2.0 (iDrive 7 cars that have 1.1.8 keep it). Acceleration timer: stand still, launch, and it times the run with splits and a speed-over-time chart. Power run: floor it in one gear for power and torque over rpm, with a baseline to compare (from cauliflowermossgrape's idrive7-apps). Keeps your best times; km/h or mph. |
+| Drive Recorder | `oap-driverecorder-next` | **iDrive 7 and iDrive 8** (2.4.0 car-tested on iDrive 8; see below). Keeps the car's cameras recording and saves a clip when you tap *Save clip* (by default the 20 s before and the 10 s after); watch, lock, delete and copy clips to a USB stick while the car stands still. Over 4 GB the oldest unlocked clips are replaced. Records the camera unit's stream itself, so BMW's provisioning does not matter. Needs the Drive Recorder player below (the Store installs it with the app). |
 | eDrive | `iteriodev_edrive` | **iDrive 8 only.** For plug-in hybrids: the real electric range, learned from how the car is driven, the charge level and battery health, live power and cell voltages, and a log of the charges with their cost. Read-only. On a car without a high-voltage battery it says so and shows the 12 V battery; on a 48 V mild hybrid (from 1.1.0) also its 48 V battery (charge, health, power) and DC/DC converter, from jezikk82's patch to cauliflowermossgrape's idrive7-apps. Not tested on a car yet. |
 | Fault Codes | `iteriodev_dtcscan` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep 1.1.4). Reads the fault memory of every control unit in the car, shows each fault with its text and clears it when you ask. Also lists the car's Check Control messages. |
 | Live Adjustments | `iteriodev_liveadjust` | **iDrive 8 only** (from 1.1.0; iDrive 7 cars keep 1.0.7). For an MHD-tuned DME: engine map 1-4 and MHD Max Cooling, plus the exhaust flap (open, close, back to the DME). See below. |
@@ -233,6 +235,42 @@ cd /var/opt/iteriodev-screencast/current && XDG_RUNTIME_DIR=/run/wayland SCREENC
 then open port 5881. Size, frame rate and the encoder settings are the `SCREENCAST_*` environment variables at the
 top of `screencast.js`.
 
+## Drive Recorder (tool `iteriodev-drplay`)
+
+> [!NOTE]
+> **Car-tested** (2.4.0 with the player 1.2.3, iDrive 8, G82 with the 360 cameras): recording, saving and watching
+> clips with all cameras. Not car-tested yet: Copy to USB of 2.4.0's clips (player 1.2.4), cars with front + rear
+> cameras only, 2.4.0 on iDrive 7 (2.3.5 to 2.3.12 recorded, saved and copied clips on a G20 M340i through the head
+> unit's camera service).
+
+The app asks the car's camera unit for its Drive Recorder mode at every start (Settings can switch that off).
+*Save clip* on the Record page writes the 20 s before and the 10 s after (Settings: *Clip length*). The cameras offered
+are the ones the car has: all cameras, front + rear, front or rear. A camera unit that does not take the Drive
+Recorder mode (seen on a retrofitted rear camera) shows *No drive-recorder cameras found*. While a parking view is
+open, also the automatic one some cars show right after the start, the cameras belong to it and nothing is recorded:
+a save soon after writes the seconds recorded since then (from 5 s on, *Save clip · N s before*), not a full clip.
+
+The player runs two services:
+
+- `iteriodev-driverec-rx.service` (root, from 2.4.0): receives the camera unit's video stream itself, keeps the last
+  seconds in memory (about 220 MB) and writes a clip on *Save clip*, in the car's own Drive Recorder folder and
+  layout. The head unit's camera service and its provisioning flag are no longer used, so cars provisioned online by
+  BMW (*OTA*) record too. All cameras are kept as the camera unit sends them: two pictures of two cameras each, in
+  turn; the player puts them together into one.
+- `iteriodev-drplay.service` (uid 3912, no internet): plays the clips through the GPU renderer, makes the thumbnails,
+  locks, deletes and replaces the oldest clips, and copies to a USB stick: a whole clip as recorded, or one camera as
+  an MP4 with the date, time and speed on it. *Lock* moves a clip into the folder's `locked/`. A whole all-cameras
+  clip played on a PC switches between the two camera pairs frame by frame; for a PC, copy one camera.
+
+**Install:** in the Store, **Drive Recorder** -> *Install* (it installs the player too), then restart the head unit
+once. Coming from 2.3.x: update, then restart once, as the receiver is a new service that starts at the next start.
+
+**USB stick (player 1.1.3 on):** the car mounts a stick for its media player read-only (udisks, `/media/<label>`), and
+the player copies only to a writable one. While the app's *Copy to USB* page is open or a copy runs, the player's
+`usb-rw.sh` (root) remounts the stick read-write, and read-only again 20 s after; kept read-only otherwise, as the car
+does not unmount a stick before it is pulled. FAT32 and exFAT both work. A slow stick sits at 99 % for a while: the
+player has handed over the whole clip and waits until it is on the stick.
+
 ## Turn View (tool `iteriodev-turnview`, iDrive 8 only)
 
 > [!NOTE]
@@ -269,7 +307,8 @@ Each release is a tag `x.y.z`. The apps need the Store's deploy tool 0.7.5 or ne
 ## Disclaimer
 
 Use at your own risk. These apps are not made or endorsed by BMW. Fault Codes can clear fault memories (only
-when you ask); Live Adjustments switches MHD maps and drives the exhaust flap (not affiliated with MHD); Ambient Light sets the interior light's colours and Seats moves the
+when you ask); Live Adjustments switches MHD maps and drives the exhaust flap (not affiliated with MHD); Drive Recorder
+puts the cameras into their Drive Recorder mode; Ambient Light sets the interior light's colours and Seats moves the
 front seats and an electric steering column (through the Comfort tool); Turn View asks the camera unit for its front
 view during a route; the other apps only read from the car.
 

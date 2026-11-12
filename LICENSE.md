@@ -53,9 +53,9 @@ robertnisipeanu/mgu-store's Store app. It is used here under these terms with Ro
 ## Not covered
 
 - `tools/iteriodev-tailscale/tailscaled` and `ts`: Tailscale, BSD 3-Clause License (`tools/iteriodev-tailscale/LICENSE`).
-- `tools/iteriodev-drplay/mgu-drplay` contains FFmpeg (GNU LGPL 2.1, `LICENSE.ffmpeg`), libjpeg-turbo
-  (`LICENSE.libjpeg-turbo`) and OpenH264 (`LICENSE.openh264`). For this one file, as the LGPL 2.1 requires, you may
-  change it for your own use and reverse engineer it to debug such changes.
+- `tools/iteriodev-drplay/mgu-drplay` and `mgu-driverec-rx` contain FFmpeg (GNU LGPL 2.1, `LICENSE.ffmpeg`) and
+  libjpeg-turbo (`LICENSE.libjpeg-turbo`); `mgu-drplay` also OpenH264 (`LICENSE.openh264`). For these two files, as the
+  LGPL 2.1 requires, you may change them for your own use and reverse engineer them to debug such changes.
 - `tools/iteriodev-turnview/mgu-camcluster` contains code from RobertNisipeanu's waze-on-cluster and cluster-render
   (robertnisipeanu/idrive-apps, GPL-3.0-or-later), shipped as a program without its source with RobertNisipeanu's
   permission (`LICENSE.camcluster` names the parts), and FFmpeg (GNU LGPL 2.1, `LICENSE.ffmpeg`; for this one file

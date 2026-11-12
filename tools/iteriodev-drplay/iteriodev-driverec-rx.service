@@ -1,0 +1,17 @@
+[Unit]
+# Drive Recorder route 3: our own AVB receiver + RAM ring + clip save, so recording works with NO icam2proxy
+# VideoBuffer / DataExport (dead on OTA-provisioned cars). The camera ECU DR mode is still driven by the app over
+# ICAM2Proxy (ungated); this only consumes the stream and writes clips. See analysis/drive-recorder-route3-own-receiver.md
+Description=Drive Recorder receiver (own AVB ring buffer, route 3) for the Drive Recorder app
+After=ufipc_daemon.service avbstreamhandler.service
+
+[Service]
+# root on purpose: the UFIPC/AVB bridge receiver needs it, and clip files are written 0644 into the setgid
+# mgu_driverec clip folder so mgu-drplay (gid 929) rotates/deletes them. No privilege drop, no internet.
+ExecStartPre=/bin/mkdir -p /var/opt/iteriodev-drplay
+ExecStart=/var/opt/iteriodev-drplay/current/mgu-driverec-rx --socket /var/opt/iteriodev-drplay/recd.sock
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
