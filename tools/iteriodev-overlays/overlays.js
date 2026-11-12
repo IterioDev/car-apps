@@ -34,6 +34,7 @@ const { spawn } = require('child_process');
 const png = require('./png');
 const seats = require('./seats');
 const shift = require('./shiftlights');
+const hmiIcons = require('./hmiicons');
 
 const DATA = process.env.OVERLAYS_DATA || '/var/opt/iteriodev-overlays/slots.json';
 const CTL = process.env.OVERLAYS_CTL || '/run/iteriodev-overlays/ctl.sock';
@@ -158,8 +159,13 @@ function target(slot, apps) {
     const a = apps.find((x) => x.id === slot.app);
     return a ? { state: slot.state, applet: a.appletId + slot.offset } : null;
 }
-/* a slot -> its picture: { builtin: name } or { file } (+ missing for an app that is gone) */
+/* a slot -> its picture: { builtin: name } or { file } (+ missing for an app that is gone); the icon picked for it in the
+ * app (slot.icon, one of the head unit's own: hmiicons.js) wins: { file, hmi } */
 function iconOf(slot, apps) {
+    const b = ownIcon(slot, apps), f = slot.icon && hmiIcons.file(slot.icon);
+    return f ? Object.assign({ file: f, hmi: slot.icon }, b.missing ? { missing: true } : {}) : b;
+}
+function ownIcon(slot, apps) {
     if (!slot.app) { const s = screenList().find((x) => x.state === slot.state && x.applet === slot.applet); return { builtin: s ? s.png : 'screen' }; }
     const a = apps.find((x) => x.id === slot.app);
     if (!a) return { builtin: 'app', missing: true };
@@ -192,15 +198,19 @@ function appInfo(a) {
     } catch (e) { /* no description */ }
     return state === null ? null : { id: a.id, title, state, offset: 0 };
 }
-/* a slot as the app shows it */
+/* a slot as the app shows it (+ hmiIcon / iconName: the head unit's icon picked for it) */
 function describe(slot, apps) {
+    const own = slot.icon ? { hmiIcon: slot.icon, iconName: hmiIcons.nameOf(slot.icon) } : {};
     if (slot.app) {
         const a = apps.find((x) => x.id === slot.app), i = a && appInfo(a);
-        return { kind: 'app', app: slot.app, title: i ? i.title : slot.app, missing: !a };
+        return Object.assign({ kind: 'app', app: slot.app, title: i ? i.title : slot.app, missing: !a }, own);
     }
     const s = screenList().find((x) => x.state === slot.state && x.applet === slot.applet);
-    return { kind: 'bmw', title: s ? s.title : 'BMW screen', icon: s ? s.icon : 'Display' };
+    return Object.assign({ kind: 'bmw', title: s ? s.title : 'BMW screen', icon: s ? s.icon : 'Display' }, own);
 }
+const ICON_ID = /^icon_[A-Za-z0-9_]{1,80}$/;
+/* a slot from the file: a picked icon only by its id's form (one the head unit no longer has draws the slot's own) */
+const cleanSlot = (s) => { const o = Object.assign({}, s); if (o.icon !== undefined && !(typeof o.icon === 'string' && ICON_ID.test(o.icon))) delete o.icon; return o; };
 /* settings from the app (or the file): only known keys of the right kind; the rest stays */
 function mergeSettings(cur, p) {
     const out = JSON.parse(JSON.stringify(cur));
@@ -232,7 +242,7 @@ function loadData(file) {
     learned = lr;
     const vents = {};                                  // legacy cars: seats whose ventilation was seen on (seats.js)
     seats.SEATS.forEach((s) => { if (j.vents && j.vents[s] === true) vents[s] = true; });
-    return { slots: good ? j.slots : defaults(), layout: j.layout, learned: lr, settings: migrate(mergeSettings(SETTINGS, j.settings), j.settings),
+    return { slots: good ? j.slots.map(cleanSlot) : defaults(), layout: j.layout, learned: lr, settings: migrate(mergeSettings(SETTINGS, j.settings), j.settings),
         mcar: j.mcar === true, vents };
 }
 /* 0.3.5 and older had one switch for all seat buttons and one for the wheel; the per-button choice replaces them (the
@@ -433,7 +443,7 @@ function main() {
             if (img) blend(px, SW, (SW - img.w) >> 1, (H - img.h) >> 1, img, ic.missing ? 0.4 : 1);
             gpu.pixels(i + 1, [{ x: 0, y: 0, w: SW, h: H }], px);
             frame();
-        });
+        }, ic.hmi ? HMI_PX : undefined);               // the head unit's icons at their own size
     }
     const state = (key) => {                          // 'driver.heat' -> its { have, level, max }; 'driver.wheel' too
         const [seat, kind] = key.split('.');
@@ -737,6 +747,21 @@ function main() {
         } else if (q.op === 'slot' && Number.isInteger(q.i) && q.i >= 0 && q.i < 4 && slotOk(q.target)) {
             const t = q.target;
             setSlot(q.i, t.app ? { app: t.app, state: t.state, offset: t.offset } : { state: t.state, applet: t.applet });
+        } else if (q.op === 'icon' && Number.isInteger(q.i) && q.i >= 0 && q.i < 4 && (q.icon === null || hmiIcons.known(q.icon))) {
+            // the slot's picture: one of the head unit's icons, or null = its own again (a new target resets it too)
+            const s = Object.assign({}, slots[q.i]);
+            if (q.icon) s.icon = q.icon; else delete s.icon;
+            setSlot(q.i, s);
+        } else if (q.op === 'icons') {
+            // the picker: a page (search q, page n) or the ids asked for (the slots' own), each with its PNG
+            if (Array.isArray(q.ids)) {
+                const items = q.ids.filter((id) => hmiIcons.known(id)).slice(0, 8).map((id) => ({ id, name: hmiIcons.nameOf(id) }));
+                c.write(JSON.stringify({ icons: { ids: true, items: hmiIcons.withPics(items) } }) + '\n');
+            } else {
+                const p = hmiIcons.page(typeof q.q === 'string' ? q.q.slice(0, 40) : '', Number.isInteger(q.page) ? q.page : 0);
+                p.items = hmiIcons.withPics(p.items);
+                c.write(JSON.stringify({ icons: p }) + '\n');
+            }
         } else if (q.op === 'reset') {
             slots = defaults();
             save(); redrawAll(); push();
@@ -841,6 +866,13 @@ function test() {
     assert.deepStrictEqual(describe({ state: 1, applet: 32 }, []), { kind: 'bmw', title: 'Navigation', icon: 'Navigation' });
     assert.deepStrictEqual(describe({ state: 9, applet: 77 }, []), { kind: 'bmw', title: 'BMW screen', icon: 'Display' });
     assert.deepStrictEqual(describe({ app: 'gone', state: 1, offset: 0 }, []), { kind: 'app', app: 'gone', title: 'gone', missing: true });
+    // a head-unit icon picked for a slot: named for the app; a bad id from the file is dropped; one not on this head unit
+    // (no folder here) draws the slot's own picture
+    assert.deepStrictEqual(describe({ state: 1, applet: 32, icon: 'icon_Call_Filled' }, []),
+        { kind: 'bmw', title: 'Navigation', icon: 'Navigation', hmiIcon: 'icon_Call_Filled', iconName: 'Call Filled' });
+    assert.deepStrictEqual([cleanSlot({ state: 1, applet: 2, icon: '../x' }), cleanSlot({ state: 1, applet: 2, icon: 'icon_Spotify' })],
+        [{ state: 1, applet: 2 }, { state: 1, applet: 2, icon: 'icon_Spotify' }]);
+    assert.deepStrictEqual(iconOf({ state: 20000, applet: 4, icon: 'icon_Nope' }, []), { builtin: 'home' });
     // buttons: only what the car has and the settings allow, in the HMI's spots
     const keys = (st, set) => buttons(LAYOUT, st, set).map((b) => b.key + '@' + b.x).join(' ');
     const all = seats.state(true);
