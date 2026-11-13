@@ -38,8 +38,9 @@ function parse(hex) {
 class Uds {
     constructor(hmi, log) { this.hmi = hmi; this.log = log || (() => {}); this.q = []; this.cur = null; }
 
-    send(target, sid, data) {
-        return new Promise((res, rej) => { this.q.push({ target, sid, data, res, rej }); this.pump(); });
+    /** ms: how long to wait for the answer (a probe of a unit the car may lack: shorter, the queue waits behind it) */
+    send(target, sid, data, ms) {
+        return new Promise((res, rej) => { this.q.push({ target, sid, data, ms, res, rej }); this.pump(); });
     }
 
     pump() {
@@ -48,7 +49,7 @@ class Uds {
         // the answer's time counts from the request's going out, not from its waiting behind hmictl's line before it
         this.hmi(line(c.target, c.sid, c.data)).then((r) => {
             if (this.cur !== c) return;
-            if (/^ok/.test(r)) this.arm(TIMEOUT_MS); else this.finish(null, new Error('gateway: ' + r));
+            if (/^ok/.test(r)) this.arm(c.ms || TIMEOUT_MS); else this.finish(null, new Error('gateway: ' + r));
         });
     }
 

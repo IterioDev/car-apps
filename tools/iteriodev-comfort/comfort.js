@@ -33,6 +33,13 @@
  *             are. The mode: FES 0xB50D notifier 0x8025, and its getter 37 read every second by hmictl's own poll thread
  *             (a head-unit getter on the MGU's signal gateway, nothing asked on the bus; FES notifiers did not run for
  *             Car Data). NOT car-tested.
+ *   0.6.0 (issues #19 / #24 / #28 / #29, user 2026-11-13): seat moves smoother and recalls precise (seat.js); a seat
+ *             module that does not answer is asked again when an app opens and told to the app (seats.found); easy exit:
+ *             a column that cannot move (not calibrated, no answer) no longer stops the seat; where the seat sat is kept
+ *             again only when nobody moved it since our last move (seats.out: else an old place came back); the way back
+ *             on the car switching on waits ON_SETTLE_MS (the seat module holds its motors then) and a way back that
+ *             stood short keeps the place for the next try. Log also in comfort.log beside the data (the journal is
+ *             gone within minutes).
  * All UDS goes through the head unit's diagnostic gateway on one `hmictl serve` (uds.js).
  * Control socket /run/iteriodev-comfort/ctl.sock, JSON lines in and out; every change is pushed to every client:
  *   {op:'get'}  {op:'ambient', settings:{on, rgb:[r,g,b], bright 5-100, follow, zones:{dash:{rgb}|{off:true}|null},
@@ -43,7 +50,8 @@
  *               no seat: the driver's)
  *   {op:'set', settings:{easyExit:true|false}}
  * Data /var/opt/iteriodev-comfort/data.json { ambient, memories:{driver:[3], passenger:[3]}, room, exit:{driver, passenger},
- * pre:{driver, passenger}, settings } (0.3.x: exit / pre the driver's alone, read as the driver's).
+ * pre:{driver, passenger}, out:{driver, passenger} (where our last easy exit move left it), settings } (0.3.x: exit / pre
+ * the driver's alone, read as the driver's).
  *   node comfort.js           the service
  *   node comfort.js --test    the modules' self-checks
  */
@@ -77,7 +85,15 @@ const carOn = (hex) => [7, 8, 10].indexOf(parseInt((hex || '').slice(10, 12), 16
 // holding the lights 254 s while the head unit stayed awake); not told yet: as before
 const COND = { 1: 'parked', 2: 'parked', 3: 'standby, nobody in the car', 5: 'residing', 7: 'test', 8: 'ready to drive', 10: 'driving', 12: 'ending ready to drive' };
 const IN_CAR = [5, 7, 8, 10, 12];
-const log = (m) => console.log(m);
+const ON_SETTLE_MS = 2000;                                     // the way back on the car switching on: after this
+const NEAR = 32;                                               // counts: a seat where our move left it (easy exit)
+// the log also in a file beside the data (0.6.0): the car's journal keeps only minutes; 256 KB, then one old file
+const LOG_FILE = path.join(path.dirname(DATA), 'comfort.log');
+const log = (m) => {
+    console.log(m);
+    try { if (fs.statSync(LOG_FILE).size > 256 * 1024) fs.renameSync(LOG_FILE, LOG_FILE + '.1'); } catch (e) { /* none yet */ }
+    try { fs.appendFileSync(LOG_FILE, `${new Date().toISOString()} ${m}\n`); } catch (e) { /* no folder yet */ }
+};
 
 function load() {
     let d = {};
@@ -87,11 +103,12 @@ function load() {
     const bySeat = (o) => (o && ('driver' in o || 'passenger' in o) ? per((s) => obj(o[s])) : { driver: obj(o), passenger: null });
     return { ambient: amb.settings(d.ambient), memories: { driver: mem(d.memories && d.memories.driver),
         passenger: mem(d.memories && d.memories.passenger) }, room: d.room || null, exit: bySeat(d.exit), pre: bySeat(d.pre),
-        settings: { easyExit: !(d.settings && d.settings.easyExit === false) } };
+        out: per((s) => obj(d.out && d.out[s])), settings: { easyExit: !(d.settings && d.settings.easyExit === false) } };
 }
+const mkdir = () => { try { fs.mkdirSync(path.dirname(DATA)); } catch (e) { /* there already (Node 8: no recursive) */ } };
 function save(d) {
     try {
-        try { fs.mkdirSync(path.dirname(DATA)); } catch (e) { /* there already (Node 8: no recursive) */ }
+        mkdir();
         fs.writeFileSync(DATA + '.tmp', JSON.stringify(d));
         fs.renameSync(DATA + '.tmp', DATA);
     } catch (e) { log('save: ' + e.message); }
@@ -99,6 +116,7 @@ function save(d) {
 
 
 function main() {
+    mkdir();
     const data = load();
     /* hmictl serve: one line out, one line back, in order; "ev" lines are notifications. low: a getter, sent only
      * when no UDS request / subscription waits (hmictl holds a call to a service the car lacks up 3 s) */
@@ -157,8 +175,8 @@ function main() {
         }
         const on = carOn(hex);
         if (on === car.on) return;
-        car.on = on; log(`car ${on ? 'on' : 'off'} (${hex})`); push(); SEATS.forEach(back);
-        if (on) SEATS.filter((s) => !mover.axes(s).length).forEach((s) => mover.probe(s));   // a seat asleep at the start
+        car.on = on; log(`car ${on ? 'on' : 'off'} (${hex})`); push(); SEATS.forEach((s) => back(s, true));
+        if (on) SEATS.filter((s) => !mover.axes(s).length).forEach((s) => mover.probe(s, true));   // a seat asleep at the start
     };
     // stands: under 2 km/h; no fresh speed: the engine under 1000 rpm (idle or off); neither: the car switched off
     const fresh = (t) => Date.now() - t < SPEED_FRESH_MS;
@@ -192,12 +210,13 @@ function main() {
     const person = (s) => car.occ[s] === 1, childSeat = (s) => [2, 3, 8].indexOf(car.occ[s]) >= 0;
     const known = (s) => [0, 1, 2, 3, 4, 8].indexOf(car.occ[s]) >= 0;   // else: no seat sensor news, the doors alone
     // back to where it sat, whichever comes last: its door closed and - the driver - the ignition or the engine on,
-    // - the passenger - someone in the seat (not told: the car on, as the driver); never with a child seat on it
+    // - the passenger - someone in the seat (not told: the car on, as the driver); never with a child seat on it.
+    // switchedOn: the car just switched on (its seat modules hold the motors a moment: the way back waits ON_SETTLE_MS)
     const ready = { driver: false, passenger: false };
-    function back(s) {
+    function back(s, switchedOn) {
         const on = car.on || (fresh(car.rpmAt) && car.rpm >= RUN_RPM);
         const r = car.door[s] === false && !childSeat(s) && (known(s) ? person(s) && (s === 'passenger' || on) : on);
-        if (r && !ready[s]) { log(`${s} door closed, ${known(s) && s === 'passenger' ? 'seated' : 'car on'}`); easyBack(s); }
+        if (r && !ready[s]) { log(`${s} door closed, ${known(s) && s === 'passenger' ? 'seated' : 'car on'}`); easyBack(s, switchedOn ? ON_SETTLE_MS : 0); }
         ready[s] = r;
     }
     function ambientStatus(hex) {
@@ -312,34 +331,63 @@ function main() {
         if (s === 'driver' && (await hasWheel())) p.wheel = Object.assign({}, await mover.read('wheel'));
         return p;
     }
-    /** to a saved position: the seat, then the driver's column (wheelFirst: the column first, out of the way) */
+    /** to a saved position: the seat, then the driver's column (wheelFirst: the column first, out of the way). A column
+     * that cannot move (not calibrated, no answer) leaves the seat to go on (0.6.0: it stopped easy exit, issue #19);
+     * 'short' (stood short, blocked) goes on too */
     async function seatTo(s, p, wheelFirst, parkedOnly) {
         const steps = [() => mover.recall(s, p, parkedOnly),
             async () => (s === 'driver' && p.wheel && (await hasWheel()) ? mover.recall('wheel', p.wheel) : 'done')];
         if (wheelFirst) steps.reverse();
-        for (const st of steps) { const r = await st(); if (r !== 'done') return r; }
-        return 'done';
+        let short = false;
+        for (let i = 0; i < steps.length; i++) {
+            const r = await steps[i](), column = (i === 0) === !!wheelFirst;
+            if (r === 'short') short = true;
+            else if (r !== 'done' && (!column || r === 'stopped' || r === 'not parked')) return r;
+            else if (r !== 'done') log(`${s} steering column: ${r} (the seat goes on)`);
+        }
+        return short ? 'short' : 'done';
     }
-    // out of the way (the door, or the app's Easy exit): where it was kept until the way back - a second door opening
-    // before that keeps the first one. The door alone moves a seat only with someone in it (or the car not telling)
-    // and never one with a child seat on it
+    /** the seat (its hall axes) within NEAR counts of a saved place */
+    const near = (p, q) => {
+        const k = Object.keys(q || {}).filter((a) => a !== 'wheel' && typeof p[a] === 'number');
+        return k.length > 0 && k.every((a) => Math.abs(p[a] - q[a]) <= NEAR);
+    };
+    // where our last easy exit move left it (0.3.x / 0.5.x data: its Exit position)
+    const lastOut = (s) => data.out[s] || data.exit[s];
+    // out of the way (the door, or the app's Easy exit): where it was kept until the way back - kept again only while
+    // the seat stands where our last move left it (a second door opening, a way back that did not finish); moved by
+    // someone since (its switches, a memory): where it is now (0.6.0: an old place came back). The door alone moves a
+    // seat only with someone in it (or the car not telling) and never one with a child seat on it
     function easyExit(s, manual) {
         if (!data.exit[s] || (!manual && !data.settings.easyExit)) return;
         if (!parked()) { log(`easy exit ${s}: the car is not standing`); return; }
         if (!manual && (childSeat(s) || (known(s) && !person(s)))) { log(`easy exit ${s}: nobody in the seat (${car.occ[s]})`); return; }
         auto(s, 'exit', async () => {
-            if (!data.pre[s]) { data.pre[s] = await seatPos(s); save(data); push(); }
-            return seatTo(s, data.exit[s], true, true);
+            const p = await seatPos(s);
+            if (!data.pre[s] || !near(p, lastOut(s))) { data.pre[s] = p; save(data); push(); }
+            return outAt(s, await seatTo(s, data.exit[s], true, true));
         });
     }
-    function easyBack(s) {
+    // back where it sat - only while it stands where our move left it: moved since (its switches, a memory), the place is
+    // dropped, not driven back to (it came back later, at a car start); stood short: kept for the next try
+    function easyBack(s, wait) {
         if (!data.pre[s]) return;
         if (!parked()) { log(`easy exit ${s} back: the car is not standing`); return; }
         auto(s, 'back', async () => {
+            const h0 = Date.now();
+            if (wait) await new Promise((r) => setTimeout(r, wait));
+            if (mover.haltAt >= h0) return 'stopped';
+            if (!near(await mover.read(s), lastOut(s))) { data.pre[s] = null; save(data); push(); return 'moved since: stays'; }
             const r = await seatTo(s, data.pre[s], false, true);
-            if (r === 'done') { data.pre[s] = null; save(data); push(); }
-            return r;
+            if (r === 'done') data.pre[s] = null;
+            return outAt(s, r);
         });
+    }
+    /** keeps where our move left the seat (a job's end, however it ended) */
+    async function outAt(s, r) {
+        try { data.out[s] = Object.assign({}, await mover.read(s)); } catch (e) { log(`${s} seat: ${e.message}`); }
+        save(data); push();
+        return r;
     }
     // parked only, both ways (a mistaken tap while driving with a front passenger); a press while one runs still stops it
     const gentleman = () => (!busyJob && !parked() ? log('gentleman: not parked') : job('gentleman', async () => {
@@ -357,7 +405,7 @@ function main() {
             modules: (mods || []).map((m) => ({ id: amb.key(m), name: m.name, zone: m.zone, fault: m.fault })) },
         seats: { pos: mover.pos, moving: mover.motion ? { seat: mover.motion.seat, axis: mover.motion.axis } : null, job: busyJob,
             jobSeat, memories: data.memories, roomOut: !!data.room, wheel: mover.hasWheel === true,
-            axes: per((s) => mover.axes(s)), hall: per((s) => mover.axes(s).some((a) => mover.hall(s, a))),
+            axes: per((s) => mover.axes(s)), hall: per((s) => mover.axes(s).some((a) => mover.hall(s, a))), found: mover.found,
             exit: per((s) => !!data.exit[s]), pre: per((s) => !!data.pre[s]) },
         settings: data.settings } });
     let pushTimer = null;
@@ -402,6 +450,8 @@ function main() {
         // the app gone: nothing it started keeps moving (the door's moves run without it)
         c.on('close', () => { clients.delete(c); if (!clients.size && AUTO.indexOf(busyJob) < 0) mover.halt(); });
         c.write(JSON.stringify(status()) + '\n');
+        // an app opened with a seat still unknown: asked again (at most every 20 s; issue #29: never asked again before)
+        SEATS.filter((s) => !mover.axes(s).length).forEach((s) => mover.probe(s));
     });
     srv.on('error', (e) => log('control socket: ' + e.message));
     srv.listen(CTL, () => { try { fs.chmodSync(CTL, 0o666); } catch (e) { log('control socket: ' + e.message); } });
@@ -413,7 +463,7 @@ function main() {
     }, 2000);
     setInterval(() => { if (lit && Date.now() - litAt > amb.RENEW_MS) light(true); }, 10000);
     setTimeout(() => {
-        SEATS.forEach((s) => mover.probe(s));         // where it is (no position at all: its motors, D700)
+        SEATS.forEach((s) => mover.probe(s, true));   // where it is (no position at all: its motors, D700)
         mover.probeWheel();
         light(true);
     }, 3000);
