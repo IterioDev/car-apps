@@ -27,7 +27,7 @@ app platform and show up in *All apps* like BMW's apps.
 | Seats | `iteriodev_seats` | **iDrive 7 and iDrive 8.** Move the front seats from the screen, also while driving, both on one page (hold the controls round each seat), three memories per seat, the Make room button (parked only) for the passenger seat, Easy exit for both front seats (the seat, and on the driver's side an electric steering column, out of the way when its door opens, back once the door is shut: the driver's with the car on, the passenger's with someone seated); a right-hand drive setting. Needs the Comfort tool below (the Store installs it with the app). |
 | Service | `iteriodev_service` | **iDrive 8 only.** The car's service requirements as the instrument cluster has them: engine oil, brakes, brake fluid, vehicle check, inspections, each with the distance and date left and whether it is due, and what it is when you tap it. Read-only: a service is reset in the cluster's own menu or at a workshop. Not car-tested yet. |
 | Tailscale | `iteriodev_tailscale` | **iDrive 7 and iDrive 8** (from 1.1.1; on iDrive 7 not run on a car yet). The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`) and Log out. Needs the Tailscale tool below (the Store installs it with the app). |
-| Turn View | `iteriodev_turnview` | **iDrive 7 and iDrive 8** (from 1.4.0; iDrive 7 camera car-tested on a G20). The front camera in the instrument cluster, with a turn card and chevrons on the road during a route, from BMW Maps, CarPlay or Android Auto; the camera alone without a route. iDrive 8: its own widget "Turn View AR"; iDrive 7: the cluster's central map area in Map view (over Waze on cluster's map while on). Needs a front camera (360 or front + rear), the Turn View tool and Cluster renderer 0.5.10+ (robertnisipeanu/idrive-apps); not Drive Recorder. See below. |
+| Turn View | `iteriodev_turnview` | **iDrive 7 and iDrive 8** (from 1.4.0; iDrive 7 camera car-tested on a G20). The front camera in the instrument cluster, with a turn card and chevrons on the road during a route, from BMW Maps, CarPlay or Android Auto; the camera alone without a route. iDrive 8: its own widget "Turn View AR"; iDrive 7: off at every car start, switched on in the app, the cluster's central map area in Map view; not with Waze on cluster on the cluster (set Waze to HUD only). Needs a front camera (360 or front + rear), the Turn View tool and Cluster renderer 0.5.10+ (robertnisipeanu/idrive-apps); not Drive Recorder. See below. |
 
 All of them draw their screens through the GPU renderer `mgu-render`.
 
@@ -304,12 +304,16 @@ chevrons.
 
 - **iDrive 8:** Turn View's own widget, **Turn View AR** in the cluster's widget menu (a Cluster renderer drop-in, read
   at its next start). The camera is sent only while the widget is shown.
-- **iDrive 7:** set **Instrument cluster > Central display area** to **Map view**: while Turn View is on, the camera
-  takes the cluster's central map area, as Waze on cluster's map does. Waze's map is hidden while Turn View shows and
-  comes back when Turn View is switched off (or the stock map, without Waze). The app has its own iDrive 7 screens.
-- **Two videos at most** (cluster and HUD together): with Waze on cluster's map on both the cluster and the HUD there
-  is no room for the camera. Turn View then shows *Cluster video full* (cluster and app) and asks again every 5 s
-  (tool 0.6.1); put Waze on one of them.
+- **iDrive 7:** **off at every start of the car** (tool 0.7.0; the last setting is not kept). Switch it on in the Turn
+  View app and set **Instrument cluster > Central display area** to **Map view**: the camera then takes the cluster's
+  central map area. Off, it holds nothing: no camera request (Drive Recorder keeps the cameras), no video, the map
+  area the car's. The app has its own iDrive 7 screens.
+
+**Waze on cluster: do not use Turn View together with Waze on cluster on the cluster - set Waze on cluster to HUD
+only.** Both draw into the cluster's central map area, and the cluster and the HUD together show at most 2 videos:
+Waze on the cluster and the HUD takes both, and Turn View's camera gets no room (*Cluster video full* in the cluster
+and the app; Turn View asks again every 5 s). With Waze on the HUD only, both work: Waze on the HUD, Turn View in the
+cluster.
 
 **Needs a front camera:** the 360 cameras (Surround View) or front + rear cameras. When the camera unit does not give
 the front camera alone, Turn View asks for front + rear, then all cameras. A car whose camera unit gives the rear

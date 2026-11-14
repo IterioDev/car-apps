@@ -48,6 +48,7 @@ const CR_SOCKET = process.env.TURNVIEW_CR_SOCKET || '/dev/shm/cluster-render/ren
 const TICK_MS = +process.env.TURNVIEW_TICK_MS || 100;
 const START_MS = +process.env.TURNVIEW_START_MS || 30000;
 const START_SOON_MS = +process.env.TURNVIEW_START_SOON_MS || 10000;   // (the app start while the MainApp starts up)
+const CAMERA_UP = { waiting: true, decoding: true, stalled: true, refused: true };   // camcluster's decoder running
 const APP_ID = 'iteriodev_turnview';
 const CAM_FPS = 15;                         // camcluster --fps (1-30)
 const CAM_RECT = '1320x640@400,136';        // camcluster --rect: its widget default (it knows no `turnview`)
@@ -125,8 +126,10 @@ function main() {
     }
     let settings = mergeSettings(null, null);
     try { settings = mergeSettings(JSON.parse(fs.readFileSync(SETTINGS, 'utf8')), null); } catch (e) { /* defaults */ }
+    // (iDrive 7: the on / off switch is never remembered, only the calibration: below)
     const save = () => {
-        try { fs.writeFileSync(`${SETTINGS}.new`, JSON.stringify(settings, null, 2)); fs.renameSync(`${SETTINGS}.new`, SETTINGS); } catch (e) { log(`settings: ${e.message}`); }
+        const keep = GEN === 7 ? Object.assign({}, settings, { enabled: false }) : settings;
+        try { fs.writeFileSync(`${SETTINGS}.new`, JSON.stringify(keep, null, 2)); fs.renameSync(`${SETTINGS}.new`, SETTINGS); } catch (e) { log(`settings: ${e.message}`); }
     };
     // no front camera on this car (the app's camreq 'rearonly': the ECU gave the rear camera alone, never the front) -
     // kept in a file so the widget says so at once after every start, with or without a route; gone as soon as the
@@ -136,7 +139,11 @@ function main() {
     const NOFRONT = path.join(DATA, 'rear-only');
     try { fs.unlinkSync(path.join(DATA, 'nofront')); } catch (e) { /* none */ }
     let noFront = fs.existsSync(NOFRONT);
-    log(`start: enabled ${settings.enabled}, cal ${JSON.stringify(settings.cal)}${noFront ? ', no front camera (saved)' : ''}`);
+    // 0.7.0 iDrive 7 (user 2026-11-15): no widget menu to pick it, so it is off at every start of the car, whatever
+    // was set before (never remembered), and the driver switches it on in the app; off it holds nothing (no camera
+    // request, no video slot, the map area the stock map's / Waze's)
+    if (GEN === 7) settings.enabled = false;
+    log(`start: enabled ${settings.enabled}${GEN === 7 ? ' (iDrive 7: off at every start)' : ''}, cal ${JSON.stringify(settings.cal)}${noFront ? ', no front camera (saved)' : ''}`);
 
     const status = { camera: 'off', rect: null, route: 'none', provider: null, maneuver: null, cr: 'connecting', backend: null,
         nav: 'waiting', state: 'none', camreq: 'idle', noFront, widget: WIDGETS.widget };
@@ -346,7 +353,10 @@ function main() {
         if (status.cr === 'unsupported') return;              // not our cluster: nothing drawn
         scene.show(v, t);
         video(v.video);
-        if (v.video) startApp();
+        // the app (it asks the camera ECU for the front view) only while the camera is really wanted: the widget shown
+        // (iDrive 8) or Turn View switched on (iDrive 7) - camcluster decoding, not merely the video allowed (0.7.0,
+        // user 2026-11-15: never start in the background and take Drive Recorder's camera when not in use)
+        if (v.video && CAMERA_UP[status.camera]) startApp();
     }, TICK_MS);
 
     // ---- the control socket ----

@@ -7,20 +7,24 @@ chevrons.
 
 **iDrive 8:** pick **Turn View AR** in the cluster's widget menu (from the car's next start after installing).
 
-**iDrive 7 (1.4.0, tool 0.6.0):** set **Instrument cluster > Central display area** to **Map view**. While Turn View is
-on, the camera takes the cluster's central map area, where Waze on cluster draws its map. Waze's map is hidden while
-Turn View shows and comes back as soon as Turn View is switched off. The app has its own iDrive 7 screens.
+**iDrive 7:** Turn View is **off at every start of the car** (1.5.0, tool 0.7.0; the last setting is not kept): switch it
+on in the Turn View app when you want it, and set **Instrument cluster > Central display area** to **Map view**. While
+it is on, the camera takes the cluster's central map area. Off, it holds nothing: no camera request (Drive Recorder
+keeps the cameras), no video, the map area the car's. The app has its own iDrive 7 screens.
 
-**Two videos at most:** the cluster and the HUD together show at most 2 videos. With Waze on cluster's map on both
-the cluster and the HUD, there is no room for the camera: the cluster then says *Cluster video full* (and so does the
-app), and Turn View asks again every 5 s (1.4.2, tool 0.6.1). Put Waze on one of them to see the camera.
+## Waze on cluster
+
+**Do not use Turn View together with Waze on cluster on the cluster. Set Waze on cluster to HUD only.** Both draw
+into the cluster's central map area, and the cluster and the HUD together show at most 2 videos: Waze on the cluster
+and the HUD takes both, and Turn View's camera then gets no room (the cluster and the app say *Cluster video full*;
+Turn View asks again every 5 s). With Waze on the HUD only, Waze stays on the HUD and Turn View has the cluster.
 
 **Needs a front camera:** cars with the 360 cameras (Surround View) or front + rear cameras. When the camera unit
 does not give the front camera alone, Turn View asks for front + rear, then all cameras, and shows the front camera
 from those. Only a camera unit that gives the rear camera and never the front makes the iDrive 8 widget show *No front
 camera* and nothing else. Turn View does not need Drive Recorder: it receives the camera itself.
 
-Version 1.4.2 (tool `iteriodev-turnview` 0.6.1) · iDrive 7 + iDrive 8 · package `iteriodev_turnview` ·
+Version 1.5.0 (tool `iteriodev-turnview` 0.7.0) · iDrive 7 + iDrive 8 · package `iteriodev_turnview` ·
 [all apps and how to install](../../README.md)
 
 > [!NOTE]
