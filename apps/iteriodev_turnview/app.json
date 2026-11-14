@@ -1,6 +1,6 @@
 {
  "id": "iteriodev_turnview",
- "version": "1.4.0",
+ "version": "1.4.1",
  "title": "Turn View",
  "description": "The front camera in the instrument cluster with the next turn drawn on the road as chevrons and a turn card, from BMW Maps, Apple CarPlay or Android Auto; the camera shows with or without a route. iDrive 8: pick \"Turn View AR\" in the cluster's widget menu (from the car's next start after installing). iDrive 7: set Instrument cluster > Central display area to Map view; while Turn View is on the camera replaces the map there (Waze on cluster's map too, back when Turn View is off). Calibrate the camera once on a straight road. Needs the Turn View tool from the same source and Cluster renderer fro",
  "mguHmi": [

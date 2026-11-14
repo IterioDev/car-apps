@@ -16,7 +16,7 @@ does not give the front camera alone, Turn View asks for front + rear, then all 
 from those. Only a camera unit that gives the rear camera and never the front makes the iDrive 8 widget show *No front
 camera* and nothing else. Turn View does not need Drive Recorder: it receives the camera itself.
 
-Version 1.4.0 (tool `iteriodev-turnview` 0.6.0) · iDrive 7 + iDrive 8 · package `iteriodev_turnview` ·
+Version 1.4.1 (tool `iteriodev-turnview` 0.6.0) · iDrive 7 + iDrive 8 · package `iteriodev_turnview` ·
 [all apps and how to install](../../README.md)
 
 > [!NOTE]
