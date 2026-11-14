@@ -1,12 +1,13 @@
 {
   "id": "iteriodev-turnview",
   "kind": "tool",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "title": "Turn View",
-  "description": "The front camera in the instrument cluster widget with navigation arrows on the road and a turn card, from BMW navigation, CarPlay or Android Auto (iDrive 8). Pick \"Turn View AR\" in the cluster widget menu (from the car's next start after installing); set up and calibrated in the Turn View app. Drawn by Cluster renderer (robertnisipeanu/idrive-apps) 0.5.10 or newer. No coding needed.",
+  "description": "The front camera in the instrument cluster with navigation arrows on the road and a turn card, from BMW navigation, CarPlay or Android Auto; the camera alone without a route. iDrive 8: pick \"Turn View AR\" in the cluster widget menu (from the car's next start after installing). iDrive 7: set Instrument cluster > Central display area to Map view; the camera takes the map area there (Waze on cluster's map is hidden while Turn View is on). Set up and calibrated in the Turn View app. Drawn by Cluster renderer (robertnisipeanu/idrive-apps) 0.5.10 or newer. No coding needed.",
   "optional": true,
   "uninstallable": true,
   "mguHmi": [
+    "ID7",
     "ID8"
   ],
   "requires": {
@@ -117,6 +118,36 @@
     {
       "path": "schemas/eventlist-query-out.json",
       "from": "schemas/eventlist-query-out.json",
+      "mode": "0644"
+    },
+    {
+      "path": "schemas/id7/guidance-conclusiveDart.json",
+      "from": "schemas/id7/guidance-conclusiveDart.json",
+      "mode": "0644"
+    },
+    {
+      "path": "schemas/id7/guidance-state.json",
+      "from": "schemas/id7/guidance-state.json",
+      "mode": "0644"
+    },
+    {
+      "path": "schemas/id7/guidance-provider.json",
+      "from": "schemas/id7/guidance-provider.json",
+      "mode": "0644"
+    },
+    {
+      "path": "schemas/id7/vehicle2-speed.json",
+      "from": "schemas/id7/vehicle2-speed.json",
+      "mode": "0644"
+    },
+    {
+      "path": "schemas/id7/eventlist-query-in.json",
+      "from": "schemas/id7/eventlist-query-in.json",
+      "mode": "0644"
+    },
+    {
+      "path": "schemas/id7/eventlist-query-out.json",
+      "from": "schemas/id7/eventlist-query-out.json",
       "mode": "0644"
     },
     {

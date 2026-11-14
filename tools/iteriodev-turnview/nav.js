@@ -6,7 +6,7 @@
  *   CarPlay / Android Auto (car, 2026-11-07): Guidance stays INACTIVE with a placeholder dart; the phone's maneuvers
  *   land in GuidanceEventList 0xFB1B (queryContent reply, 'events'): the first way-ahead event = the maneuver, a
  *   route = at least one such event. Waze sends none (route summary only).
- *   const nav = createNav({ log, now });  nav.payload('dart' | 'state' | 'provider' | 'events', hex);  nav.on('change', rec)
+ *   const nav = createNav({ log, now, gen });  (gen 7: iDrive 7's schemas)  nav.payload('dart' | 'state' | 'provider' | 'events', hex);  nav.on('change', rec)
  *   rec = { active, recalc, provider, kind, angle, side, exit, icon, text, meters, uid, t }
  * The decoder options (enum / union widths) are found on the first conclusiveDart that parses (wire.decodeAny) and
  * kept for every field from then on. A payload that does not parse is dropped (the last good state stays) and its hex
@@ -16,9 +16,11 @@ const EventEmitter = require('events');
 const path = require('path');
 const wire = require('./wire');
 
-const S = (f) => require(path.join(__dirname, 'schemas', f));
-const SCHEMA = { dart: S('guidance-conclusiveDart.json'), state: S('guidance-state.json'), provider: S('guidance-provider.json'),
-    speed: S('vehicle2-speed.json'), events: S('eventlist-query-out.json') };
+// iDrive 7 (gen 7): schemas/id7/ (tools/make_schemas7.js, from an iDrive 7 catalogue); its guidanceState is a plain enum
+const S = (f, gen) => require(path.join(__dirname, 'schemas', gen === 7 ? 'id7' : '', f));
+const schemas = (gen) => ({ dart: S('guidance-conclusiveDart.json', gen), state: S('guidance-state.json', gen),
+    provider: S('guidance-provider.json', gen), speed: S('vehicle2-speed.json', gen), events: S('eventlist-query-out.json', gen) });
+const SCHEMA = schemas(8), SCHEMA8 = SCHEMA;
 const PROVIDER = { NONE: 'BMW', CAR_PLAY: 'CarPlay', ANDROID_AUTO: 'Android Auto', CAR_LIFE: 'CarLife', OTHER: 'Other' };
 const UNIT = { METER: 'm', KM: 'km', FEET: 'ft', YARD: 'yd', MILE_UK: 'mi', MILE_US: 'mi', NONE: '' };
 // the members that are the way ahead; alongMainRoad ("follow the road") reads as straight on. Every other member
@@ -70,7 +72,7 @@ function maneuverOf(dart) {
 
 function createNav(o) {
     o = o || {};
-    const log = o.log || (() => {}), now = o.now || Date.now;
+    const log = o.log || (() => {}), now = o.now || Date.now, SCHEMA = o.gen === 7 ? schemas(7) : SCHEMA8;
     const nav = new EventEmitter();
     let opts = null, errors = 0;
     const lastLog = {};
@@ -125,8 +127,9 @@ function createNav(o) {
             if (m.kind === 'ignored' || (m.kind && m.meters === null)) return true;
             setManeuver(m);
         } else if (field === 'state') {
-            guided = value.guidanceState === 'ACTIVE';
-            cur.recalc = value.guidanceState === 'CALCULATING_ROUTE';
+            const gs = typeof value === 'string' ? value : value.guidanceState;     // iDrive 7: the enum alone
+            guided = gs === 'ACTIVE';
+            cur.recalc = gs === 'CALCULATING_ROUTE';
         } else if (field === 'provider') {
             cur.provider = PROVIDER[value] || 'Other';
             if (cur.provider === 'BMW' && proj) { proj = false; projKey = ''; setManeuver({}); }   // the phone gone
@@ -165,16 +168,16 @@ function createNav(o) {
 
 /* the GuidanceEventList 0xFB1B queryContent (method 4) request, hex: the way ahead from the car position, stateless
  * (no setViewConfig: the HMI's own views stay untouched) */
-const QUERY = S('eventlist-query-in.json');
-function queryHex(opts) {
-    const vc = QUERY.e[0].e, q = wire.sample(QUERY, {});
+const QUERY = { 7: S('eventlist-query-in.json', 7), 8: S('eventlist-query-in.json', 8) };
+function queryHex(opts, gen) {
+    const Q = QUERY[gen === 7 ? 7 : 8], vc = Q.e[0].e, q = wire.sample(Q, {});
     q.viewConfigs = [Object.assign(wire.sample(vc), {
         viewport: Object.assign(wire.sample(vc.e[0]), {
             startPoint: { anchorPoint: { type: 'standardReferencePoint', value: 'CCP' }, offsets: [] },
             maxElementCount: 4, endPoints: [], includedActiveTypes: [],
             includedTypes: ['INCLUDE_ACTIVE_MANEUVERS', 'INCLUDE_DESTINATIONS', 'INCLUDE_TUNNELS', 'INCLUDE_ALONG_MAIN_ROAD'] }),
         options: [], minimumUpdateIntervalMs: 0, segmentItemRasterLength: 0 })];
-    return wire.encode(QUERY, q, opts).toString('hex');
+    return wire.encode(Q, q, opts).toString('hex');
 }
 
 /* Vehicle2 statusCarSpeed2 (getter 8) reply -> km/h; null: invalid (65535) or no payload */
@@ -184,4 +187,4 @@ function speedKmh(hex) {
     return raw === 65535 ? null : raw / 64;
 }
 
-module.exports = { createNav, speedKmh, maneuverOf, iconOf, queryHex, textMeters, SCHEMA };
+module.exports = { createNav, speedKmh, maneuverOf, iconOf, queryHex, textMeters, SCHEMA, schemas };

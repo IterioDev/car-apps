@@ -11,11 +11,12 @@
  * else travel + NO_BEND (spec 5.1: no bend drawn).
  * States: off (enabled false) - none (no guidance / no maneuver) - route (> NEAR_M) - near (<= NEAR_M) - passed (counted
  * past the turn, or a new maneuver came: PASSED_MS fade of the old one) - recalc (calculating: dimmed up to RECALC_MS,
- * then none) - calib (calibrating: wins over everything). video: route / near / passed / recalc / calib.
+ * then none) - calib (calibrating: wins over everything). video: every state but off (0.6.0, user 2026-11-14: the
+ * front camera also without a route).
  */
 const NEAR_M = 80, JUMP_M = 30, BLEND_MS = 1000, PASSED_MS = 500, RECALC_MS = 5000, STALE_MS = 1000;
 const GUARD_M = 10000, NO_BEND = 10000;
-const VIDEO = { route: true, near: true, passed: true, recalc: true, calib: true };
+const VIDEO = { none: true, route: true, near: true, passed: true, recalc: true, calib: true };
 const NONE = { uid: null, angle: 0, side: 1, exit: 0, icon: '', text: '' };
 
 function createTrack(o) {

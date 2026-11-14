@@ -1,9 +1,13 @@
 'use strict';
 /*
- * turnview.js - iteriodev-turnview: Turn View, the front camera in the iDrive 8 cluster widget with navigation
- * chevrons on the road and a turn card (docs/superpowers/specs/2026-11-06-turn-view-design.md). Root service, Node 8.
- *   hmictl serve (child)      Guidance 0xFB1A inst 128: conclusiveDart / guidanceStateWithReason / guidingProvider
- *                             (subscribed, getters once if silent), Vehicle2 0xB519 statusCarSpeed2 (getter, 5 a s)
+ * turnview.js - iteriodev-turnview: Turn View, the front camera in the iDrive 8 cluster widget (0.6.0: or iDrive 7's
+ * central map area, Map view, as Waze on cluster) with navigation chevrons on the road and a turn card
+ * (docs/superpowers/specs/2026-11-06-turn-view-design.md). Root service, Node 8. 0.6.0 (user 2026-11-14): the camera
+ * also without a route; on iDrive 7 it hides Waze on cluster's map while on (camcluster's exclusive video layer),
+ * which is back when Turn View is off or gone.
+ *   hmictl serve (child)      Guidance 0xFB1A inst 128: conclusiveDart / guidanceStateWithReason (iDrive 7:
+ *                             guidanceState) / guidingProvider (subscribed, getters once if silent; NAV: the ids per
+ *                             iDrive), Vehicle2 0xB519 statusCarSpeed2 (getter, 5 a s)
  *   nav.js -> track.js        the next maneuver counted down with the speed -> a view, 10 a second
  *   scene.js                  the tool's cluster-render layers for the view (vendored cluster_render_client.js)
  *   mgu-camcluster (child)    --control stdin: `video on|off` in, `rect full ...` / `video ...` status lines out.
@@ -12,9 +16,9 @@
  *   where                     0.4.0 (user 2026-11-14): Turn View's own widget, target `turnview` ("Turn View AR" in the
  *                             cluster's widget menu: cluster-render.d/turnview.conf, a cluster-render drop-in read at
  *                             its next start) when cluster-render's hello lists it, else its `widget` ("Cluster
- *                             renderer"); camcluster starts with the first hello, on that target, and moves with the
- *                             layers when a later hello names the other one. No pop-up any more (an old saved `popup`
- *                             setting is dropped)
+ *                             renderer"); iDrive 7 (backend id7): `map`, the whole target. camcluster starts with the
+ *                             first hello, on that target, and moves with the layers when a later hello names another
+ *                             one. No pop-up any more (an old saved `popup` setting is dropped)
  *   control socket            /run/iteriodev-turnview/ctl.sock (0666, JSON lines) for the app oap-turnview:
  *       -> { op: 'get' | 'reset' } | { op: 'set', settings } | { op: 'preview', cal } | { op: 'calib', on } | { op: 'camreq', state }
  *       <- { state: { settings, status } }   (pushed on every change, at most 4 a second)
@@ -25,7 +29,8 @@
  * old file kept). Never stops a system service; the native parts are children, restarted with a growing delay when
  * they die young. Times are monotonic (the MGU sets its clock after boot).
  * Env (tests): TURNVIEW_DATA, TURNVIEW_CTL, TURNVIEW_HMICTL, TURNVIEW_CAMCLUSTER, TURNVIEW_CR_SOCKET, TURNVIEW_TICK_MS,
- * TURNVIEW_START_MS (app start retry), TURNVIEW_PASSED_MS.
+ * TURNVIEW_START_MS (app start retry), TURNVIEW_PASSED_MS, TURNVIEW_GEN (7 | 8; else by MainApp's folder, as
+ * cluster-render's generation.cpp).
  */
 const fs = require('fs');
 const net = require('net');
@@ -45,14 +50,24 @@ const START_MS = +process.env.TURNVIEW_START_MS || 30000;
 const APP_ID = 'iteriodev_turnview';
 const CAM_FPS = 15;                         // camcluster --fps (1-30)
 const CAM_RECT = '1320x640@400,136';        // camcluster --rect: its widget default (it knows no `turnview`)
-const WIDGETS = { turnview: 'Turn View AR', widget: 'Cluster renderer' };   // target -> its widget menu entry
+// target -> where the driver finds it: the widget menu entry (iDrive 8), the cluster setting (iDrive 7)
+const WIDGETS = { turnview: 'Turn View AR', widget: 'Cluster renderer', map: 'Map view' };
 const SETTINGS = path.join(DATA, 'settings.json'), LOG = path.join(DATA, 'turnview.log');
 const LOG_MAX = 1024 * 1024, PUSH_MS = 250, RESTART_MS = 5000, RESTART_MAX_MS = 60000, YOUNG_MS = 10000;
 const SPEED_MS = 200, EVENTS_MS = 1000, NAV_SILENT_MS = 10000, BUSY_MS = 10000, KILL_MS = 2000;
 const MAX_CLIENTS = 4, CLIENT_BUF = 65536, LINE_MAX = 65536;
-const SUBS = ['sub 0xfb1a 128 7 24 0x8018', 'sub 0xfb1a 128 7 3 0x8003', 'sub 0xfb1a 128 7 23 0x8017'];
-const GETTERS = { dart: 'call 0xfb1a 128 30 7', state: 'call 0xfb1a 128 3 7', provider: 'call 0xfb1a 128 29 7' };
-const EVENTS = { 0x8018: 'dart', 0x8003: 'state', 0x8017: 'provider' };
+const GEN = +process.env.TURNVIEW_GEN || (fs.existsSync('/usr/lib/oap-mainapp21') ? 8 : fs.existsSync('/usr/lib/oap-mainapp') ? 7 : 8);
+// Guidance 0xFB1A major 7 on both; iDrive 7 (G20 catalogue v7.8, car-read 2026-11-14) has other ids and a plain
+// guidanceState
+const NAV = {
+    8: { subs: ['sub 0xfb1a 128 7 24 0x8018', 'sub 0xfb1a 128 7 3 0x8003', 'sub 0xfb1a 128 7 23 0x8017'],
+        getters: { dart: 'call 0xfb1a 128 30 7', state: 'call 0xfb1a 128 3 7', provider: 'call 0xfb1a 128 29 7' },
+        events: { 0x8018: 'dart', 0x8003: 'state', 0x8017: 'provider' } },
+    7: { subs: ['sub 0xfb1a 128 7 22 0x8016', 'sub 0xfb1a 128 7 2 0x8002', 'sub 0xfb1a 128 7 21 0x8015'],
+        getters: { dart: 'call 0xfb1a 128 28 7', state: 'call 0xfb1a 128 2 7', provider: 'call 0xfb1a 128 27 7' },
+        events: { 0x8016: 'dart', 0x8002: 'state', 0x8015: 'provider' } },
+};
+const { subs: SUBS, getters: GETTERS, events: EVENTS } = NAV[GEN === 7 ? 7 : 8];
 const SPEED = 'call 0xb519 1 8 1';
 
 const mono = () => { const t = process.hrtime(); return t[0] * 1000 + t[1] / 1e6; };
@@ -131,7 +146,7 @@ function main() {
         try { if (on) fs.writeFileSync(NOFRONT, 'rear camera only\n'); else fs.unlinkSync(NOFRONT); } catch (e) { log(`rear-only: ${e.message}`); }
         log(on ? 'camera: this car has no front camera' : 'camera: the front camera works');
     }
-    const nav = createNav({ log, now: mono }), track = createTrack({ passedMs: +process.env.TURNVIEW_PASSED_MS || 0 });
+    const nav = createNav({ log, now: mono, gen: GEN }), track = createTrack({ passedMs: +process.env.TURNVIEW_PASSED_MS || 0 });
     let calibBy = null, lastNavAt = 0;
     track.enabled(settings.enabled);
 
@@ -142,15 +157,15 @@ function main() {
     scene.setCal(settings.cal); scene.noFront(noFront); scene.disabled(!settings.enabled);
     cr.on('ready', () => {
         status.backend = cr.backend;
-        status.cr = cr.backend === 'id8' ? 'connected' : 'iDrive 8 only';
-        log(`cluster-render: backend ${cr.backend}, targets ${cr.targets}`);
-        // Turn View's own widget when this cluster-render has it, else the shared one; another one than before: the
-        // layers and camcluster move (camcluster's end starts it again at once on the new one)
-        const t = `,${cr.targets}`.indexOf(',turnview:') >= 0 ? 'turnview' : 'widget';
+        status.cr = cr.backend === 'id8' || cr.backend === 'id7' ? 'connected' : 'unsupported';
+        log(`cluster-render: backend ${cr.backend}, targets ${cr.targets} (head unit: iDrive ${GEN})`);
+        // iDrive 7: the central map area; iDrive 8: Turn View's own widget when this cluster-render has it, else the
+        // shared one. Another one than before: the layers and camcluster move (camcluster's end starts it again at once)
+        const t = cr.backend === 'id7' ? 'map' : `,${cr.targets}`.indexOf(',turnview:') >= 0 ? 'turnview' : 'widget';
         if (t !== crTarget) {
             crTarget = t; status.widget = WIDGETS[t];
             scene.retarget(t);
-            log(`target ${t}: "${status.widget}" in the cluster's widget menu`);
+            log(t === 'map' ? 'target map: the cluster\'s central map area (Map view)' : `target ${t}: "${status.widget}" in the cluster's widget menu`);
             if (cam) { try { cam.stdin.end(); } catch (e) { /* gone */ } } else camStart();
         }
         push();
@@ -240,7 +255,7 @@ function main() {
     setInterval(() => {
         const o = nav.opts();
         if (eventsQueued || hmWait || !o || nav.record().provider === 'BMW') return;
-        if (o !== queryOpts) { queryOpts = o; query = `call 0xfb1b 128 4 5 ${queryHex(o)}`; }
+        if (o !== queryOpts) { queryOpts = o; query = `call 0xfb1b 128 4 5 ${queryHex(o, GEN)}`; }
         eventsQueued = true;
         hmi(query).then((r) => {
             eventsQueued = false;
@@ -265,7 +280,9 @@ function main() {
         // the widget picked in the cluster's widget menu (user 2026-11-06: only where it is picked)
         // 0.3.1 (user 2026-11-13): 15 pictures a second, not camcluster's 20: room for the head unit (~3 MB/s upload)
         camTarget = crTarget;
-        const c = child(CAMCLUSTER, ['--control', 'stdin', '--target', camTarget, '--rect', CAM_RECT, '--fps', String(CAM_FPS)], log, (why) => {
+        // iDrive 7's map: the whole target, its size from the hello (map:WxH)
+        const m = /(?:^|,)map:(\d+)x(\d+)/.exec(cr.targets || ''), rect = camTarget !== 'map' ? CAM_RECT : m ? `${m[1]}x${m[2]}@0,0` : '1088x480@0,0';
+        const c = child(CAMCLUSTER, ['--control', 'stdin', '--target', camTarget, '--rect', rect, '--fps', String(CAM_FPS)], log, (why) => {
             log(`mgu-camcluster ended (${why})`);
             if (cam === c) { cam = null; camOut = ''; }
             if (camTarget !== crTarget) { camStart(); return; }   // stopped for the other widget: on it at once
@@ -321,7 +338,7 @@ function main() {
         const t = mono(), v = track.tick(t);
         if (v.state !== lastState) { log(`state ${lastState || '-'} -> ${v.state}`); lastState = v.state; status.state = v.state; push(); }
         if (status.nav === 'waiting' && t - subscribedAt > NAV_SILENT_MS && !lastNavAt) { status.nav = 'no navigation data'; push(); }
-        if (status.cr === 'iDrive 8 only') return;            // not our cluster: nothing drawn
+        if (status.cr === 'unsupported') return;              // not our cluster: nothing drawn
         scene.show(v, t);
         video(v.video);
         if (v.video) startApp();

@@ -1,15 +1,19 @@
 'use strict';
 /*
- * scene.js - iteriodev-turnview: the tool's cluster-render layers on the iDrive 8 widget for a track.js view
- * (spec 5). All on one target, picked in the cluster's widget menu: `turnview` ("Turn View AR", the tool's drop-in) or
- * `widget` ("Cluster renderer"); 0.4.0: no pop-up. Class overlay, over the camera's rect (camcluster's last `rect` line):
+ * scene.js - iteriodev-turnview: the tool's cluster-render layers for a track.js view (spec 5). All on one target:
+ * iDrive 8 the widget picked in the cluster's widget menu, `turnview` ("Turn View AR", the tool's drop-in) or `widget`
+ * ("Cluster renderer"); iDrive 7 (0.6.0) `map`, the cluster's central map area (Map view), which the cluster shows by
+ * itself while a layer wants it: the layers `contend` (take it from the stock map), and Turn View off or no front
+ * camera draws nothing there, so the stock map (or Waze on cluster's) comes back. Class overlay, over the camera's rect
+ * (camcluster's last `rect` line):
  *   chevrons  mesh  z 10   the road arrows (shaders.js) while the camera decodes (0.5.0: always the whole frame)
  *   marks     mesh  z 15   5 / 10 / 20 m lines while calibrating, same camera
- *   card      image z 20   icon + distance, top centre (card.js)
+ *   card      image z 20   icon + distance, top centre (card.js; on `map` 0.8x, below the cluster's model badge)
  *   shade     effect z 30  a dark fill with soft edges, no upload
- *   notice    image z 31   "No front camera" (the car has none: before everything, alone) / "no route" / "Camera busy" /
- *                          "No camera", centred; "Turn View is off" (switched off: camcluster keeps the widget in the
- *                          cluster's menu, so picked it would be black - car 2026-11-14)
+ *   notice    image z 31   "No front camera" (the car has none: before everything, alone) / "Camera busy" / "No camera",
+ *                          centred; "Turn View is off" (switched off, iDrive 8: camcluster keeps the widget in the
+ *                          cluster's menu, so picked it would be black - car 2026-11-14). 0.6.0 (user 2026-11-14): no
+ *                          route = the camera alone, no notice
  *   const sc = createScene(cr, { log, now, target });   cr: a ClusterRender (cluster_render_client.js) or a fake with its methods
  *   sc.rect(r); sc.camera(status); sc.camreq(state); sc.noFront(on); sc.disabled(on); sc.setCal(cal); sc.budget(capKb); sc.show(view, t);
  *   sc.retarget(target) -> changed (the layers made again there by the next show); sc.drop(); sc.restore(); sc.status()
@@ -24,6 +28,11 @@ const KLASS = 'overlay';
 const K1 = 0;                       // the lens term (car step C2 measures it; 0 = no correction)
 const NOCAM_MS = 30000, CARD_MS = 1000, CARD_SLOW_MS = 3000, SLOW_CAP_KB = 3000, FAR_SEND = 10000, ANIM_MS = 200;
 const DRAWN = { route: true, near: true, passed: true, recalc: true };
+// targets the cluster shows by itself while a layer wants them (iDrive 7's central map area): nothing drawn = given back
+const SELF_SHOWN = { map: true };
+// iDrive 7's map: the cluster draws its model badge over the top 64 rows and its readouts over the sides (waze-on-cluster
+// PATCH.md "Safe area" 504x368@286,72): the card smaller, at the clear middle's top
+const CARD_MAP = { k: 0.8, y: 80 };
 
 function camOf(cal) { return { cx: cal.x, cy: cal.h, cz: 0, crx: -cal.pitch, cry: -cal.yaw, crz: 0, fov: cal.fov }; }
 
@@ -39,15 +48,20 @@ function createScene(cr, o) {
     const place = (w, h, at) => (at === 'top'
         ? { x: Math.round(rect.x + (rect.w - w) / 2), y: rect.y + 16, w, h }
         : { x: Math.round(rect.x + (rect.w - w) / 2), y: Math.round(rect.y + (rect.h - h) / 2), w, h });
+    function cardRect() {
+        if (target !== 'map') return place(C.CARD.w, C.CARD.h, 'top');
+        const w = Math.round(C.CARD.w * CARD_MAP.k), h = Math.round(C.CARD.h * CARD_MAP.k);
+        return { x: Math.round(rect.x + (rect.w - w) / 2), y: rect.y + CARD_MAP.y, w, h };
+    }
     function make() {
-        const base = { target, klass: KLASS, visible: false };
+        const base = { target, klass: KLASS, visible: false, contend: SELF_SHOWN[target] ? 1 : 0 };
         const mesh = (z) => cr.mesh(Object.assign({}, base, rect, { z, near: 0.5, far: 150 }, camOf(cal)));
         refs = { chevrons: mesh(10), marks: mesh(15) };
         cr.part(refs.chevrons, 1, { vs: SH.CHEVRON_VS, fs: SH.CHEVRON_FS, depth: false, cull: 'none', blend: 'alpha' });
         cr.geometry(refs.chevrons, 1, SH.chevronGeometry());
         cr.part(refs.marks, 1, { vs: SH.MARKS_VS, fs: SH.MARKS_FS, depth: false, cull: 'none', blend: 'alpha' });
         cr.geometry(refs.marks, 1, SH.marksGeometry());
-        refs.card = cr.image(Object.assign({}, base, place(C.CARD.w, C.CARD.h, 'top'), { z: 20, iw: C.CARD.w, ih: C.CARD.h }));
+        refs.card = cr.image(Object.assign({}, base, cardRect(), { z: 20, iw: C.CARD.w, ih: C.CARD.h }));
         refs.shade = cr.effect(Object.assign({}, base, rect, { z: 30, fs: SH.SHADE_FS }));
         refs.notice = cr.image(Object.assign({}, base, place(C.NOTICE.w, C.NOTICE.h, 'mid'), { z: 31, iw: C.NOTICE.w, ih: C.NOTICE.h }));
         cr.uniform(refs.shade, 'u_size', [rect.w, rect.h]);
@@ -72,7 +86,6 @@ function createScene(cr, o) {
     }
     function noticeOf(view, t) {
         if (noFront) return 'nofront';                  // (user 2026-11-12: such a car gets that and nothing else)
-        if (view.state === 'none') return 'none';
         if (camera === 'stalled') return 'busy';
         if (camreq === 'refused' || (camera === 'waiting' && t - cameraSince >= NOCAM_MS)) return 'nocam';
         return null;
@@ -86,7 +99,7 @@ function createScene(cr, o) {
             if (!refs) { if (!o.dropped) make(); return; }
             if (!moved) return;
             ['chevrons', 'marks', 'shade'].forEach((n) => cr.set(refs[n], rect));
-            cr.set(refs.card, place(C.CARD.w, C.CARD.h, 'top'));
+            cr.set(refs.card, cardRect());
             cr.set(refs.notice, place(C.NOTICE.w, C.NOTICE.h, 'mid'));
             cr.uniform(refs.shade, 'u_size', [rect.w, rect.h]);
         },
@@ -104,12 +117,13 @@ function createScene(cr, o) {
             if (!refs && rect && !o.dropped) make();
             if (!refs) return;
             const st = view.state, drawn = !!DRAWN[st], decoding = camera === 'decoding';
-            const off = st === 'off';
-            const offNote = off && disabled;                // switched off: said, not black
-            const shade = offNote || (!off && (noFront || st === 'none' || (view.video && !decoding)));
+            const off = st === 'off', self = !!SELF_SHOWN[target];
+            const offNote = off && disabled && !self;       // switched off: said, not black (iDrive 8's picked widget)
+            const gone = self && noFront;                   // iDrive 7, no front camera: the map area given back
+            const shade = !gone && (offNote || (!off && (noFront || (view.video && !decoding))));
             const n = offNote ? 'off' : shade ? noticeOf(view, t) : null;
-            const want = { chevrons: !off && drawn && decoding && !shade, marks: !off && st === 'calib' && decoding && !shade,
-                card: !off && drawn && !shade, shade, notice: !!n };
+            const want = { chevrons: !off && !gone && drawn && decoding && !shade, marks: !off && !gone && st === 'calib' && decoding && !shade,
+                card: !off && !gone && drawn && !shade, shade, notice: !!n };
             lastNotice = n;
             // pixels before they show: a layer without content would be stalled
             if (n && n !== noticeKey) { const p = C.notice(n); cr.pixels(refs.notice, null, p.rgba); noticeKey = n; }

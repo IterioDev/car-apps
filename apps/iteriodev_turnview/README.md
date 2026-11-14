@@ -1,34 +1,32 @@
 # Turn View
 
-The front camera in the instrument cluster's widget while a route is running, with a turn card (arrow and distance)
-and blue chevrons on the road that bend into the next turn. Navigation comes from BMW Maps, CarPlay or Android Auto.
-No coding needed: pick Turn View in the cluster's widget menu, or let it pop up by itself near each turn (below).
-The app shows the status and calibrates the chevrons.
+The front camera in the instrument cluster, with a turn card (arrow and distance) and blue chevrons on the road that
+bend into the next turn while a route is running. Navigation comes from BMW Maps, CarPlay or Android Auto. Without a
+route the cluster shows the front camera alone (1.4.0). No coding needed. The app shows the status and calibrates the
+chevrons.
 
-**Pop-up (1.2.0):** *Pop up before a turn* in the app: *Off* (the widget menu, as before) or 500, 250, 100 or 50 m.
-With a distance set, the cluster shows Turn View by itself from that far before each turn, through the turn, and
-closes it after; it is not in the widget menu then. The app keeps the front camera asked for the whole route, so the
-picture is there when it pops up.
+**iDrive 8:** pick **Turn View AR** in the cluster's widget menu (from the car's next start after installing).
 
-**Smoother camera (tool 0.3.1):** 15 pictures a second instead of 10, at a lower resolution, with less load on the
-head unit than before.
+**iDrive 7 (1.4.0, tool 0.6.0):** set **Instrument cluster > Central display area** to **Map view**. While Turn View is
+on, the camera takes the cluster's central map area, where Waze on cluster draws its map. Waze's map is hidden while
+Turn View shows and comes back as soon as Turn View is switched off. The app has its own iDrive 7 screens.
 
 **Needs a front camera:** cars with the 360 cameras (Surround View) or front + rear cameras. When the camera unit
 does not give the front camera alone, Turn View asks for front + rear, then all cameras, and shows the front camera
-from those. Only a camera unit that gives the rear camera and never the front makes the widget show *No front camera*
-and nothing else; anything else shows *No camera* until the next route. 1.1.0 showed *No front camera* on some cars
-that have the cameras: 1.1.1 (tool 0.2.1) drops that and checks again.
+from those. Only a camera unit that gives the rear camera and never the front makes the iDrive 8 widget show *No front
+camera* and nothing else. Turn View does not need Drive Recorder: it receives the camera itself.
 
-Version 1.2.0 (tool `iteriodev-turnview` 0.3.0) · iDrive 8 only · package `iteriodev_turnview` ·
+Version 1.4.0 (tool `iteriodev-turnview` 0.6.0) · iDrive 7 + iDrive 8 · package `iteriodev_turnview` ·
 [all apps and how to install](../../README.md)
 
 > [!NOTE]
-> Car-tested (2026-11-07, M4, Apple Maps over CarPlay): the camera and the turn card in the cluster widget. The
-> chevrons' look and the head unit's load are still being tuned. Waze sends no turns to the car (route summary only),
-> so with Waze the widget shows the camera's notice without a turn. BMW Maps and Android Auto are not car-tested yet, nor are cars with front + rear cameras only (no 360). The pop-up and the 15 fps camera (1.2.0, tool 0.3.1) are not car-tested yet.
+> Car-tested on iDrive 8 (M4, Apple Maps over CarPlay): the camera and the turn card in the cluster widget. Waze sends
+> no turns to the car (route summary only), so with Waze the camera shows without a turn. BMW Maps and Android Auto
+> are not car-tested yet, nor are cars with front + rear cameras only (no 360). **iDrive 7 is not car-tested yet**,
+> nor is the camera without a route (1.4.0).
 
-Needs Cluster renderer (`cluster-render`, robertnisipeanu/idrive-apps) 0.4.1 or newer (the pop-up). The cluster's widget menu
-lists it under that name. After every update of the Turn View tool, pick the widget again in the cluster menu.
+Needs Cluster renderer (`cluster-render`, robertnisipeanu/idrive-apps) 0.5.10 or newer. On iDrive 8, after every
+update of the Turn View tool, pick the widget again in the cluster menu.
 
 ## Screens
 
@@ -38,17 +36,17 @@ Screens from the app's offline test against a simulated car, so the values are m
 
 ![Status](screenshots/home.png)
 
-What the cluster widget shows: the camera, the route, where the navigation comes from and the next turn.
+What the cluster shows: the camera, the route, where the navigation comes from and the next turn.
 
-### Pop-up
+![Status on iDrive 7](screenshots/home-id7.png)
 
-![Pop-up](screenshots/popup.png)
-
-*Pop up before a turn* set to 250 m: the cluster shows Turn View by itself 250 m before each turn.
+The same on iDrive 7, with its own layout.
 
 ### Calibrate
 
 ![Calibrate](screenshots/calib.png)
+
+![Calibrate on iDrive 7](screenshots/calib-id7.png)
 
 Camera height, tilt, field of view, aim and offset, with marks at 5, 10 and 20 m: move the sliders until the marks
 lie on the road at those distances.
