@@ -8,16 +8,18 @@
  *   scene.js                  the tool's cluster-render layers for the view (vendored cluster_render_client.js)
  *   mgu-camcluster (child)    --control stdin: `video on|off` in, `rect ...` / `video ...` status lines out; stopped
  *                             while the YouTube player's claim file is fresh (camera "YouTube in the cluster")
- *   where                     settings.popup 0: target `widget` (picked in the cluster's widget menu); 500 / 250 / 100 /
- *                             50: target `popup` (cluster-render 0.4.1+, shown by the cluster by itself while drawn),
- *                             drawn only from that many metres before each turn through its passing, and while
- *                             calibrating (user 2026-11-13); camcluster runs again on the other target when it changes
+ *   where                     0.4.0 (user 2026-11-14): Turn View's own widget, target `turnview` ("Turn View AR" in the
+ *                             cluster's widget menu: cluster-render.d/turnview.conf, a cluster-render drop-in read at
+ *                             its next start) when cluster-render's hello lists it, else its `widget` ("Cluster
+ *                             renderer"); camcluster starts with the first hello, on that target, and moves with the
+ *                             layers when a later hello names the other one. No pop-up any more (an old saved `popup`
+ *                             setting is dropped)
  *   control socket            /run/iteriodev-turnview/ctl.sock (0666, JSON lines) for the app oap-turnview:
  *       -> { op: 'get' | 'reset' } | { op: 'set', settings } | { op: 'preview', cal } | { op: 'calib', on } | { op: 'camreq', state }
  *       <- { state: { settings, status } }   (pushed on every change, at most 4 a second)
  *   The app asks the camera ECU for the front view (its CameraProxy / ICAM2Proxy grants); the tool starts it in the
  *   background (`hmictl start iteriodev_turnview`) when the camera is wanted and the app is not connected.
- * Data: /var/opt/iteriodev-turnview/settings.json { enabled, popup, cal { h, pitch, fov, yaw, x } }, rear-only (0.2.1: the
+ * Data: /var/opt/iteriodev-turnview/settings.json { enabled, cal { h, pitch, fov, yaw, x } }, rear-only (0.2.1: the
  * car has the rear camera alone, the widget says "No front camera" only until the front view works), turnview.log (1 MB, one
  * old file kept). Never stops a system service; the native parts are children, restarted with a growing delay when
  * they die young. Times are monotonic (the MGU sets its clock after boot).
@@ -41,6 +43,8 @@ const TICK_MS = +process.env.TURNVIEW_TICK_MS || 100;
 const START_MS = +process.env.TURNVIEW_START_MS || 30000;
 const APP_ID = 'iteriodev_turnview';
 const CAM_FPS = 15;                         // camcluster --fps (1-30)
+const CAM_RECT = '1320x640@400,136';        // camcluster --rect: its widget default (it knows no `turnview`)
+const WIDGETS = { turnview: 'Turn View AR', widget: 'Cluster renderer' };   // target -> its widget menu entry
 // the YouTube player's claim on the cluster (rewritten every second while its pictures go there): cluster-render has two
 // video layers for all its clients and camcluster holds both, so camcluster stops until the claim is gone or stale
 const CLAIM = process.env.TURNVIEW_CLAIM || '/run/mgu-ytplay/cluster-claim', CLAIM_MS = 3000, CLAIM_POLL_MS = 500;
@@ -90,22 +94,12 @@ function clampCal(cur, p) {
     });
     return out;
 }
-const POPUP_M = [0, 500, 250, 100, 50];   // the pop-up's distances (0: the widget only)
-const POPUP_KEEP = 1.2;                     // up, it stays up to 20 % past its distance (a sync jumping back a little)
 function mergeSettings(cur, p) {
-    const out = { enabled: cur && typeof cur.enabled === 'boolean' ? cur.enabled : true,
-        popup: cur && POPUP_M.indexOf(cur.popup) >= 0 ? cur.popup : 0, cal: clampCal(cur && cur.cal) };
+    const out = { enabled: cur && typeof cur.enabled === 'boolean' ? cur.enabled : true, cal: clampCal(cur && cur.cal) };
     if (!p || typeof p !== 'object') return out;
     if (typeof p.enabled === 'boolean') out.enabled = p.enabled;
-    if (POPUP_M.indexOf(p.popup) >= 0) out.popup = p.popup;
     if (p.cal) out.cal = clampCal(out.cal, p.cal);
     return out;
-}
-/* Turn View drawn now? m: settings.popup (0: the widget, always); up: drawn a tick ago; v: track.js view; toTurn: metres */
-function popupUp(m, up, v, toTurn) {
-    if (!m || v.state === 'calib') return true;
-    if (v.state === 'passed') return up;                 // through the turn; then the next one's distance decides
-    return (v.state === 'route' || v.state === 'near') && toTurn <= (up ? m * POPUP_KEEP : m);
 }
 
 function main() {
@@ -132,8 +126,8 @@ function main() {
     log(`start: enabled ${settings.enabled}, cal ${JSON.stringify(settings.cal)}${noFront ? ', no front camera (saved)' : ''}`);
 
     const status = { camera: 'off', rect: null, route: 'none', provider: null, maneuver: null, cr: 'connecting', backend: null,
-        nav: 'waiting', state: 'none', camreq: 'idle', noFront, popup: false };
-    const wantTarget = () => (settings.popup ? 'popup' : 'widget');
+        nav: 'waiting', state: 'none', camreq: 'idle', noFront, widget: WIDGETS.widget };
+    let crTarget = null;                                // the target, from cluster-render's hello (null: none yet)
     function setNoFront(on) {
         if (on === noFront) return;
         noFront = on; status.noFront = on; scene.noFront(on);
@@ -147,12 +141,21 @@ function main() {
     // ---- cluster-render: the client keeps trying (also while the service is not installed yet) and makes every layer
     // again on each connection ----
     const { ClusterRender } = require('./cluster_render_client');
-    const cr = new ClusterRender('iteriodev-turnview', CR_SOCKET), scene = createScene(cr, { log, now: mono, target: wantTarget() });
+    const cr = new ClusterRender('iteriodev-turnview', CR_SOCKET), scene = createScene(cr, { log, now: mono });
     scene.setCal(settings.cal); scene.noFront(noFront); scene.disabled(!settings.enabled);
     cr.on('ready', () => {
         status.backend = cr.backend;
         status.cr = cr.backend === 'id8' ? 'connected' : 'iDrive 8 only';
         log(`cluster-render: backend ${cr.backend}, targets ${cr.targets}`);
+        // Turn View's own widget when this cluster-render has it, else the shared one; another one than before: the
+        // layers and camcluster move (camcluster's end starts it again at once on the new one)
+        const t = `,${cr.targets}`.indexOf(',turnview:') >= 0 ? 'turnview' : 'widget';
+        if (t !== crTarget) {
+            crTarget = t; status.widget = WIDGETS[t];
+            scene.retarget(t);
+            log(`target ${t}: "${status.widget}" in the cluster's widget menu`);
+            if (cam) { try { cam.stdin.end(); } catch (e) { /* gone */ } } else camStart();
+        }
         push();
     });
     cr.on('disconnected', () => { status.cr = 'not running'; push(); });
@@ -259,18 +262,18 @@ function main() {
         push();
     }
     function camStart() {
-        if (yielded || cam) return;                         // (a restart timer while YouTube has the cluster, or one running)
+        // (a restart timer while YouTube has the cluster, one running, or no hello yet: the first one starts it)
+        if (yielded || cam || !crTarget) return;
         camSt.startedAt = mono();
         if (!fs.existsSync(CAMCLUSTER)) { camState('missing'); setTimeout(camStart, backoff(camSt, mono())); return; }
-        // the widget in the cluster's widget menu (user 2026-11-06: only where it is picked), or the pop-up (2026-11-13:
-        // a setting, near the turns)
-        camTarget = wantTarget();
+        // the widget picked in the cluster's widget menu (user 2026-11-06: only where it is picked)
         // 0.3.1 (user 2026-11-13): 15 pictures a second, not camcluster's 20: room for the head unit (~3 MB/s upload)
-        const c = child(CAMCLUSTER, ['--control', 'stdin', '--target', camTarget, '--fps', String(CAM_FPS)], log, (why) => {
+        camTarget = crTarget;
+        const c = child(CAMCLUSTER, ['--control', 'stdin', '--target', camTarget, '--rect', CAM_RECT, '--fps', String(CAM_FPS)], log, (why) => {
             log(`mgu-camcluster ended (${why})`);
             if (cam === c) { cam = null; camOut = ''; }
             if (yielded) { camState(YIELDED); return; }     // stopped for YouTube: started again when it leaves
-            if (camTarget !== wantTarget()) { camStart(); return; }   // stopped for the other target: on it at once
+            if (camTarget !== crTarget) { camStart(); return; }   // stopped for the other widget: on it at once
             camState('restarting');
             setTimeout(camStart, backoff(camSt, mono()));
         });
@@ -298,7 +301,6 @@ function main() {
         log(`video ${on ? 'on' : 'off'}`);
         if (cam && !yielded) cam.stdin.write(`video ${on ? 'on' : 'off'}\n`);
     }
-    camStart();
     const claimed = () => { try { return Math.abs(Date.now() - fs.statSync(CLAIM).mtime.getTime()) < CLAIM_MS; } catch (e) { return false; } };
     setInterval(() => {
         const c = claimed();
@@ -335,16 +337,8 @@ function main() {
         if (v.state !== lastState) { log(`state ${lastState || '-'} -> ${v.state}`); lastState = v.state; status.state = v.state; push(); }
         if (status.nav === 'waiting' && t - subscribedAt > NAV_SILENT_MS && !lastNavAt) { status.nav = 'no navigation data'; push(); }
         if (status.cr === 'iDrive 8 only') return;            // not our cluster: nothing drawn
-        const up = popupUp(settings.popup, status.popup, v, track.toTurn(t));
-        if (up !== status.popup) {
-            status.popup = up; push();
-            if (settings.popup) log(up ? `pop-up: up, ${Math.round(track.toTurn(t))} m to the turn` : 'pop-up: down');
-        }
-        // the pop-up down: nothing drawn (a drawn layer would bring it up); the app runs for the whole route all the same
-        // (its camera request: the front view there before the pop-up)
-        const sv = up ? v : Object.assign({}, v, { state: 'off', video: false });
-        scene.show(sv, t);
-        video(sv.video);
+        scene.show(v, t);
+        video(v.video);
         if (v.video) startApp();
     }, TICK_MS);
 
@@ -374,10 +368,6 @@ function main() {
             save();
             // 0.3.2: off keeps the layers - the widget picked says "Turn View is off" (it was black: car 2026-11-14)
             if (settings.enabled !== was) { track.enabled(settings.enabled); scene.disabled(!settings.enabled); }
-            if (scene.retarget(wantTarget())) {                // the pop-up setting: the layers and camcluster move
-                log(`target ${wantTarget()}${settings.popup ? `, ${settings.popup} m before a turn` : ''}`);
-                try { if (cam && camTarget !== wantTarget()) cam.stdin.end(); } catch (e) { /* gone */ }
-            }
             if (!calibBy) applyCal(settings.cal);
             push();
         } else if (q.op === 'preview') {
@@ -428,4 +418,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { mergeSettings, clampCal, backoff, popupUp, DEFAULT_CAL, RANGE, POPUP_M };
+module.exports = { mergeSettings, clampCal, backoff, DEFAULT_CAL, RANGE };
