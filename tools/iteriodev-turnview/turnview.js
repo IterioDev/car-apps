@@ -6,8 +6,9 @@
  *                             (subscribed, getters once if silent), Vehicle2 0xB519 statusCarSpeed2 (getter, 5 a s)
  *   nav.js -> track.js        the next maneuver counted down with the speed -> a view, 10 a second
  *   scene.js                  the tool's cluster-render layers for the view (vendored cluster_render_client.js)
- *   mgu-camcluster (child)    --control stdin: `video on|off` in, `rect ...` / `video ...` status lines out; stopped
- *                             while the YouTube player's claim file is fresh (camera "YouTube in the cluster")
+ *   mgu-camcluster (child)    --control stdin: `video on|off` in, `rect full ...` / `video ...` status lines out.
+ *                             0.5.0 (user 2026-11-14): its one video layer only while the widget is shown (the whole
+ *                             frame only), so nothing to give way to YouTube for any more (no claim file)
  *   where                     0.4.0 (user 2026-11-14): Turn View's own widget, target `turnview` ("Turn View AR" in the
  *                             cluster's widget menu: cluster-render.d/turnview.conf, a cluster-render drop-in read at
  *                             its next start) when cluster-render's hello lists it, else its `widget` ("Cluster
@@ -45,10 +46,6 @@ const APP_ID = 'iteriodev_turnview';
 const CAM_FPS = 15;                         // camcluster --fps (1-30)
 const CAM_RECT = '1320x640@400,136';        // camcluster --rect: its widget default (it knows no `turnview`)
 const WIDGETS = { turnview: 'Turn View AR', widget: 'Cluster renderer' };   // target -> its widget menu entry
-// the YouTube player's claim on the cluster (rewritten every second while its pictures go there): cluster-render has two
-// video layers for all its clients and camcluster holds both, so camcluster stops until the claim is gone or stale
-const CLAIM = process.env.TURNVIEW_CLAIM || '/run/mgu-ytplay/cluster-claim', CLAIM_MS = 3000, CLAIM_POLL_MS = 500;
-const YIELDED = 'YouTube in the cluster';
 const SETTINGS = path.join(DATA, 'settings.json'), LOG = path.join(DATA, 'turnview.log');
 const LOG_MAX = 1024 * 1024, PUSH_MS = 250, RESTART_MS = 5000, RESTART_MAX_MS = 60000, YOUNG_MS = 10000;
 const SPEED_MS = 200, EVENTS_MS = 1000, NAV_SILENT_MS = 10000, BUSY_MS = 10000, KILL_MS = 2000;
@@ -253,7 +250,7 @@ function main() {
     subscribe();
 
     // ---- mgu-camcluster: the video, as its status lines say ----
-    let cam = null, camOut = '', videoOn = false, yielded = false, camTarget = null;
+    let cam = null, camOut = '', videoOn = false, camTarget = null;
     const camSt = { startedAt: 0, delay: 0 };
     function camState(s) {
         if (status.camera === s) return;
@@ -262,8 +259,7 @@ function main() {
         push();
     }
     function camStart() {
-        // (a restart timer while YouTube has the cluster, one running, or no hello yet: the first one starts it)
-        if (yielded || cam || !crTarget) return;
+        if (cam || !crTarget) return;                      // (one running, or no hello yet: the first one starts it)
         camSt.startedAt = mono();
         if (!fs.existsSync(CAMCLUSTER)) { camState('missing'); setTimeout(camStart, backoff(camSt, mono())); return; }
         // the widget picked in the cluster's widget menu (user 2026-11-06: only where it is picked)
@@ -272,7 +268,6 @@ function main() {
         const c = child(CAMCLUSTER, ['--control', 'stdin', '--target', camTarget, '--rect', CAM_RECT, '--fps', String(CAM_FPS)], log, (why) => {
             log(`mgu-camcluster ended (${why})`);
             if (cam === c) { cam = null; camOut = ''; }
-            if (yielded) { camState(YIELDED); return; }     // stopped for YouTube: started again when it leaves
             if (camTarget !== crTarget) { camStart(); return; }   // stopped for the other widget: on it at once
             camState('restarting');
             setTimeout(camStart, backoff(camSt, mono()));
@@ -288,10 +283,9 @@ function main() {
     }
     function camLine(line) {                                // anything else on its stdout (a library's print) is ignored
         let m;
-        if (yielded) return;                                // (its last lines while it stops for YouTube)
-        if ((m = /^rect (full|half) (\d+)x(\d+)@(-?\d+),(-?\d+)$/.exec(line))) {
-            status.rect = m[1];
-            scene.rect(m[1], { w: +m[2], h: +m[3], x: +m[4], y: +m[5] });
+        if ((m = /^rect full (\d+)x(\d+)@(-?\d+),(-?\d+)$/.exec(line))) {   // 0.5.0: the whole frame only
+            status.rect = 'full';
+            scene.rect({ w: +m[1], h: +m[2], x: +m[3], y: +m[4] });
             push();
         } else if ((m = /^video (idle|waiting|decoding|stalled|off)$/.exec(line))) camState(m[1]);
     }
@@ -299,17 +293,8 @@ function main() {
         if (on === videoOn) return;
         videoOn = on;
         log(`video ${on ? 'on' : 'off'}`);
-        if (cam && !yielded) cam.stdin.write(`video ${on ? 'on' : 'off'}\n`);
+        if (cam) cam.stdin.write(`video ${on ? 'on' : 'off'}\n`);
     }
-    const claimed = () => { try { return Math.abs(Date.now() - fs.statSync(CLAIM).mtime.getTime()) < CLAIM_MS; } catch (e) { return false; } };
-    setInterval(() => {
-        const c = claimed();
-        if (c === yielded) return;
-        yielded = c;
-        log(c ? 'YouTube claims the cluster: camera stopped' : 'YouTube left the cluster: camera back');
-        if (!c) camStart();
-        else { camState(YIELDED); try { if (cam) cam.stdin.end(); } catch (e) { /* gone */ } }   // stdin's end: its clean stop
-    }, CLAIM_POLL_MS);
 
     // ---- the app: started when the camera is wanted and it is not connected ----
     const clients = new Set();

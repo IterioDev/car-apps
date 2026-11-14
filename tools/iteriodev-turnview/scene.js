@@ -3,7 +3,7 @@
  * scene.js - iteriodev-turnview: the tool's cluster-render layers on the iDrive 8 widget for a track.js view
  * (spec 5). All on one target, picked in the cluster's widget menu: `turnview` ("Turn View AR", the tool's drop-in) or
  * `widget` ("Cluster renderer"); 0.4.0: no pop-up. Class overlay, over the camera's rect (camcluster's last `rect` line):
- *   chevrons  mesh  z 10   the road arrows (shaders.js), only over the whole frame (`rect full`) while it decodes
+ *   chevrons  mesh  z 10   the road arrows (shaders.js) while the camera decodes (0.5.0: always the whole frame)
  *   marks     mesh  z 15   5 / 10 / 20 m lines while calibrating, same camera
  *   card      image z 20   icon + distance, top centre (card.js)
  *   shade     effect z 30  a dark fill with soft edges, no upload
@@ -11,7 +11,7 @@
  *                          "No camera", centred; "Turn View is off" (switched off: camcluster keeps the widget in the
  *                          cluster's menu, so picked it would be black - car 2026-11-14)
  *   const sc = createScene(cr, { log, now, target });   cr: a ClusterRender (cluster_render_client.js) or a fake with its methods
- *   sc.rect(kind, r); sc.camera(status); sc.camreq(state); sc.noFront(on); sc.disabled(on); sc.setCal(cal); sc.budget(capKb); sc.show(view, t);
+ *   sc.rect(r); sc.camera(status); sc.camreq(state); sc.noFront(on); sc.disabled(on); sc.setCal(cal); sc.budget(capKb); sc.show(view, t);
  *   sc.retarget(target) -> changed (the layers made again there by the next show); sc.drop(); sc.restore(); sc.status()
  * Uploads: geometry once; the card when its icon / text changes, at most once a second (every 3 s while the shared
  * budget's cap is under 3000 KB/s); a notice when its text changes. u_travel is animated by the renderer between ticks
@@ -31,7 +31,7 @@ function createScene(cr, o) {
     o = o || {};
     const log = o.log || (() => {}), now = o.now || Date.now;
     let target = o.target || 'widget';
-    let refs = null, rect = null, kind = null;
+    let refs = null, rect = null;
     let camera = 'off', cameraSince = now(), camreq = 'idle', capKb = 5500, noFront = false, disabled = false;
     let cal = { h: 0.5, pitch: 12, fov: 60, yaw: 0, x: 0 };
     let vis = {}, uni = {}, travelSent = false, animAt = -Infinity, cardKey = '', cardWant = '', cardAt = -Infinity, noticeKey = null, lastNotice = null;
@@ -79,10 +79,10 @@ function createScene(cr, o) {
     }
 
     const sc = {
-        rect(k, r) {
+        rect(r) {
             if (!r || !(r.w > 0 && r.h > 0)) return;
             const moved = !rect || r.x !== rect.x || r.y !== rect.y || r.w !== rect.w || r.h !== rect.h;
-            kind = k; rect = { x: r.x, y: r.y, w: r.w, h: r.h };
+            rect = { x: r.x, y: r.y, w: r.w, h: r.h };
             if (!refs) { if (!o.dropped) make(); return; }
             if (!moved) return;
             ['chevrons', 'marks', 'shade'].forEach((n) => cr.set(refs[n], rect));
@@ -103,12 +103,12 @@ function createScene(cr, o) {
         show(view, t) {
             if (!refs && rect && !o.dropped) make();
             if (!refs) return;
-            const st = view.state, drawn = !!DRAWN[st], decoding = camera === 'decoding', full = kind === 'full';
+            const st = view.state, drawn = !!DRAWN[st], decoding = camera === 'decoding';
             const off = st === 'off';
             const offNote = off && disabled;                // switched off: said, not black
             const shade = offNote || (!off && (noFront || st === 'none' || (view.video && !decoding)));
             const n = offNote ? 'off' : shade ? noticeOf(view, t) : null;
-            const want = { chevrons: !off && drawn && decoding && full && !shade, marks: !off && st === 'calib' && decoding && full && !shade,
+            const want = { chevrons: !off && drawn && decoding && !shade, marks: !off && st === 'calib' && decoding && !shade,
                 card: !off && drawn && !shade, shade, notice: !!n };
             lastNotice = n;
             // pixels before they show: a layer without content would be stalled
@@ -151,7 +151,7 @@ function createScene(cr, o) {
         },
         restore() { o.dropped = false; },
         status: () => ({ layers: Object.assign({ chevrons: false, marks: false, card: false, shade: false, notice: false }, vis),
-            notice: lastNotice, rect: kind, made: !!refs }),
+            notice: lastNotice, made: !!refs }),
     };
     return sc;
 }
