@@ -148,8 +148,7 @@ function main() {
     // again on each connection ----
     const { ClusterRender } = require('./cluster_render_client');
     const cr = new ClusterRender('iteriodev-turnview', CR_SOCKET), scene = createScene(cr, { log, now: mono, target: wantTarget() });
-    scene.setCal(settings.cal); scene.noFront(noFront);
-    if (!settings.enabled) scene.drop();
+    scene.setCal(settings.cal); scene.noFront(noFront); scene.disabled(!settings.enabled);
     cr.on('ready', () => {
         status.backend = cr.backend;
         status.cr = cr.backend === 'id8' ? 'connected' : 'iDrive 8 only';
@@ -373,10 +372,8 @@ function main() {
             const was = settings.enabled;
             settings = mergeSettings(settings, q.settings);
             save();
-            if (settings.enabled !== was) {
-                track.enabled(settings.enabled);
-                if (settings.enabled) scene.restore(); else scene.drop();
-            }
+            // 0.3.2: off keeps the layers - the widget picked says "Turn View is off" (it was black: car 2026-11-14)
+            if (settings.enabled !== was) { track.enabled(settings.enabled); scene.disabled(!settings.enabled); }
             if (scene.retarget(wantTarget())) {                // the pop-up setting: the layers and camcluster move
                 log(`target ${wantTarget()}${settings.popup ? `, ${settings.popup} m before a turn` : ''}`);
                 try { if (cam && camTarget !== wantTarget()) cam.stdin.end(); } catch (e) { /* gone */ }

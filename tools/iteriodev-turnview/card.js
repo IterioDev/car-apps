@@ -18,6 +18,7 @@ const NOTICES = {
     busy: ['Camera busy', 'A parking view has the cameras'],
     nocam: ['No camera', 'The camera did not answer'],
     nofront: ['No front camera', 'Turn View needs the car\'s front camera'],
+    off: ['Turn View is off', 'Switch it on in the Turn View app'],
 };
 
 /* an arrow head at (x, y) pointing along unit (dx, dy) */

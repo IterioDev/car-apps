@@ -9,9 +9,10 @@
  *   card      image z 20   icon + distance, top centre (card.js)
  *   shade     effect z 30  a dark fill with soft edges, no upload
  *   notice    image z 31   "No front camera" (the car has none: before everything, alone) / "no route" / "Camera busy" /
- *                          "No camera", centred
+ *                          "No camera", centred; "Turn View is off" (switched off, on the widget: camcluster keeps the widget
+ *                          in the cluster's menu, so picked it would be black - car 2026-11-14)
  *   const sc = createScene(cr, { log, now, target });   cr: a ClusterRender (cluster_render_client.js) or a fake with its methods
- *   sc.rect(kind, r); sc.camera(status); sc.camreq(state); sc.noFront(on); sc.setCal(cal); sc.budget(capKb); sc.show(view, t);
+ *   sc.rect(kind, r); sc.camera(status); sc.camreq(state); sc.noFront(on); sc.disabled(on); sc.setCal(cal); sc.budget(capKb); sc.show(view, t);
  *   sc.retarget(target) -> changed (the layers made again there by the next show); sc.drop(); sc.status()
  * Uploads: geometry once; the card when its icon / text changes, at most once a second (every 3 s while the shared
  * budget's cap is under 3000 KB/s); a notice when its text changes. u_travel is animated by the renderer between ticks
@@ -32,7 +33,7 @@ function createScene(cr, o) {
     const log = o.log || (() => {}), now = o.now || Date.now;
     let target = o.target || 'widget';
     let refs = null, rect = null, kind = null;
-    let camera = 'off', cameraSince = now(), camreq = 'idle', capKb = 5500, noFront = false;
+    let camera = 'off', cameraSince = now(), camreq = 'idle', capKb = 5500, noFront = false, disabled = false;
     let cal = { h: 0.5, pitch: 12, fov: 60, yaw: 0, x: 0 };
     let vis = {}, uni = {}, travelSent = false, animAt = -Infinity, cardKey = '', cardWant = '', cardAt = -Infinity, noticeKey = null, lastNotice = null;
 
@@ -93,6 +94,7 @@ function createScene(cr, o) {
         camera(s) { if (s !== camera) { camera = s; cameraSince = now(); } },
         camreq(s) { camreq = s || 'idle'; },
         noFront(on) { noFront = !!on; },
+        disabled(on) { disabled = !!on; },
         budget(kb) { if (typeof kb === 'number') capKb = kb; },
         setCal(c) {
             const was = JSON.stringify(camOf(cal));
@@ -104,8 +106,10 @@ function createScene(cr, o) {
             if (!refs) return;
             const st = view.state, drawn = !!DRAWN[st], decoding = camera === 'decoding', full = kind === 'full';
             const off = st === 'off';
-            const shade = !off && (noFront || st === 'none' || (view.video && !decoding));
-            const n = shade ? noticeOf(view, t) : null;
+            // switched off: said on the widget only (on the pop-up a drawn layer would bring it up)
+            const offNote = off && disabled && target === 'widget';
+            const shade = offNote || (!off && (noFront || st === 'none' || (view.video && !decoding)));
+            const n = offNote ? 'off' : shade ? noticeOf(view, t) : null;
             const want = { chevrons: !off && drawn && decoding && full && !shade, marks: !off && st === 'calib' && decoding && full && !shade,
                 card: !off && drawn && !shade, shade, notice: !!n };
             lastNotice = n;
