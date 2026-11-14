@@ -22,7 +22,7 @@ app platform and show up in *All apps* like BMW's apps.
 | Drive Recorder | `oap-driverecorder-next` | **iDrive 7 and iDrive 8** (2.4.0 car-tested on iDrive 8; see below). Keeps the car's cameras recording and saves a clip when you tap *Save clip* (by default the 20 s before and the 10 s after); watch, lock, delete and copy clips to a USB stick while the car stands still. Over 4 GB the oldest unlocked clips are replaced. Records the camera unit's stream itself, so BMW's provisioning does not matter. Needs the Drive Recorder player below (the Store installs it with the app). |
 | eDrive | `iteriodev_edrive` | **iDrive 8 only.** For plug-in hybrids: the real electric range, learned from how the car is driven, the charge level and battery health, live power and cell voltages, and a log of the charges with their cost. Read-only. On a car without a high-voltage battery it says so and shows the 12 V battery; on a 48 V mild hybrid (from 1.1.0) also its 48 V battery (charge, health, power) and DC/DC converter, from jezikk82's patch to cauliflowermossgrape's idrive7-apps. Not tested on a car yet. |
 | Fault Codes | `iteriodev_dtcscan` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep 1.1.4). Reads the fault memory of every control unit in the car, shows each fault with its text and clears it when you ask. Also lists the car's Check Control messages. |
-| Live Adjustments | `iteriodev_liveadjust` | **iDrive 8 only** (from 1.1.0; iDrive 7 cars keep 1.0.7). For an MHD-tuned DME: engine map 1-4 and MHD Max Cooling, plus the exhaust flap (open, close, back to the DME). See below. |
+| Live Adjustments | `iteriodev_liveadjust` | **iDrive 8 only** (from 1.1.0; iDrive 7 cars keep 1.0.7). For an MHD- or MG Flasher-tuned DME, a tab each: engine map (MHD 1-4, MG Flasher 1-5), MG Flasher burble slots, Max Cooling, plus the exhaust flap (open, close, back to the DME). See below. |
 | Overlays | `iteriodev_overlays` | **iDrive 8 only.** Sets up the Overlays strip in the climate bar: four shortcuts to BMW screens or apps, seat heating / ventilation and steering wheel heating buttons, shift lights on the cluster (cars without their own), and on M cars the M Mode that M1 / M2 switch to. Needs the Overlays tool below (the Store installs it with the app). |
 | Seats | `iteriodev_seats` | **iDrive 7 and iDrive 8.** Move the front seats from the screen, also while driving, both on one page (hold the controls round each seat), three memories per seat, the Make room button (parked only) for the passenger seat, Easy exit for both front seats (the seat, and on the driver's side an electric steering column, out of the way when its door opens, back once the door is shut: the driver's with the car on, the passenger's with someone seated); a right-hand drive setting. Needs the Comfort tool below (the Store installs it with the app). |
 | Service | `iteriodev_service` | **iDrive 8 only.** The car's service requirements as the instrument cluster has them: engine oil, brakes, brake fluid, vehicle check, inspections, each with the distance and date left and whether it is due, and what it is when you tap it. Read-only: a service is reset in the cluster's own menu or at a workshop. Not car-tested yet. |
@@ -38,9 +38,13 @@ is scaled against the engine unit's own figure, learned per car while Car Data i
 while the app's screen is closed; Transmission (marked Experimental, read-only: the ZF 8HP variants 0F25D0 and 0F21E0
 only, any other shows "not supported yet"); DPF (marked Experimental, read-only, never run on a diesel).
 
-**Live Adjustments** (one screen, sends a command only when you tap a choice). Car-tested: the engine map switch
+**Live Adjustments** (one screen with a tab per tune, MHD and MG Flasher; sends a command only when you tap a choice,
+never when you change tabs; the tab you picked last opens next time). Car-tested: the engine map switch
 works (1.0.1, MHD). BMW's regulated flap job opens and closes the flap on a G80 S58 MHD, but the DME drops it once
-the car moves (issue #3). Max Cooling and MHD's own flap control (1.0.7) are not car-tested yet.
+the car moves (issue #3). Max Cooling, MHD's own flap control (1.0.7) and the MG Flasher tab (1.2.0) are not
+car-tested yet.
+
+MHD tab:
 
 - **Engine map 1-4** (MHD): at any time, also while driving (from 1.1.1), as MHD itself switches maps on the fly from
   the cruise control buttons. The DME has to echo the request back, or the screen
@@ -54,6 +58,18 @@ the car moves (issue #3). Max Cooling and MHD's own flap control (1.0.7) are not
   until the car moves, and the DME controls the flap again. The flap position is read from the DME every 2 s while the
   screen shows. A DME without an electric flap shows *NONE*.
 - A DME without MHD refuses map and cooling: after the first refusal the screen shows *MHD not found* and greys both out (the flap still works through BMW's job).
+
+MG Flasher tab (Custom Code 6.9 or later; from 1.2.0). The requests are the ones MG Flasher's own Android app sends,
+as found by mlurker's [bmw-idrive7-advokat](https://github.com/mlurker/bmw-idrive7-advokat) (MIT): a UDS write to the
+DME of the value and a checksum, `2E 69 xx <value> <(0x69 + xx + value) & 0xFF>`, accepted on `6E 69 xx`; a busy DME
+is asked again up to 20 times, 200 ms apart, as MG Flasher's app does.
+
+- **Engine map 1-5** (MG Flasher's slots 0-4, DID `6945`) and **Burbles slot 0-5** (DID `6946`): at any time, also while
+  driving. No read-back: the screen shows what the DME accepted.
+- **Max Cooling** (DID `6947`): *On* only with the engine running (over 500 rpm), *Off* any time, as on the MHD tab.
+- **Exhaust flap**: BMW's own DME job, as without MHD above (no MG Flasher flap request is known).
+- A DME without the Custom Code refuses the write: the screen shows *MG Flasher not found* and greys map, burbles and
+  cooling out until the app is opened again.
 
 ## Installing
 
@@ -309,7 +325,7 @@ Each release is a tag `x.y.z`. The apps need the Store's deploy tool 0.7.5 or ne
 ## Disclaimer
 
 Use at your own risk. These apps are not made or endorsed by BMW. Fault Codes can clear fault memories (only
-when you ask); Live Adjustments switches MHD maps and drives the exhaust flap (not affiliated with MHD); Drive Recorder
+when you ask); Live Adjustments switches MHD and MG Flasher maps and burbles and drives the exhaust flap (not affiliated with MHD or MG Flasher); Drive Recorder
 puts the cameras into their Drive Recorder mode; Ambient Light sets the interior light's colours and Seats moves the
 front seats and an electric steering column (through the Comfort tool); Turn View asks the camera unit for its front
 view during a route; the other apps only read from the car.
