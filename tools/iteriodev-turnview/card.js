@@ -4,7 +4,7 @@
  * cluster-render image layers (straight alpha), drawn with the renderer kit's canvas (kit/: pure JS, the HMI's BMW
  * fonts), so any text the navigation sends draws.
  *   card(icon, text, opts) -> { w, h, rgba }   opts.exit: a roundabout's exit number; opts.dim: recalculating
- *   notice('busy' | 'nocam' | 'nofront' | 'off') -> { w, h, rgba }   (0.6.0: no route = the camera alone, no notice)
+ *   notice('busy' | 'nocam' | 'full' | 'nofront' | 'off') -> { w, h, rgba }   (0.6.0: no route = the camera alone, no notice)
  */
 const { Canvas } = require('./kit/canvas');
 
@@ -16,6 +16,7 @@ const TURN = { straight: 0, slight: 30, '': 90, hard: 135 };
 const NOTICES = {
     busy: ['Camera busy', 'A parking view has the cameras'],
     nocam: ['No camera', 'The camera did not answer'],
+    full: ['Cluster video full', 'Other apps hold its 2 videos (Waze map + HUD map?)'],
     nofront: ['No front camera', 'Turn View needs the car\'s front camera'],
     off: ['Turn View is off', 'Switch it on in the Turn View app'],
 };

@@ -47,6 +47,7 @@ const CAMCLUSTER = process.env.TURNVIEW_CAMCLUSTER || path.join(__dirname, 'mgu-
 const CR_SOCKET = process.env.TURNVIEW_CR_SOCKET || '/dev/shm/cluster-render/render.sock';
 const TICK_MS = +process.env.TURNVIEW_TICK_MS || 100;
 const START_MS = +process.env.TURNVIEW_START_MS || 30000;
+const START_SOON_MS = +process.env.TURNVIEW_START_SOON_MS || 10000;   // (the app start while the MainApp starts up)
 const APP_ID = 'iteriodev_turnview';
 const CAM_FPS = 15;                         // camcluster --fps (1-30)
 const CAM_RECT = '1320x640@400,136';        // camcluster --rect: its widget default (it knows no `turnview`)
@@ -304,7 +305,7 @@ function main() {
             status.rect = 'full';
             scene.rect({ w: +m[1], h: +m[2], x: +m[3], y: +m[4] });
             push();
-        } else if ((m = /^video (idle|waiting|decoding|stalled|off)$/.exec(line))) camState(m[1]);
+        } else if ((m = /^video (idle|waiting|decoding|stalled|off|refused)$/.exec(line))) camState(m[1]);   // 0.6.1: refused
     }
     function video(on) {
         if (on === videoOn) return;
@@ -316,12 +317,16 @@ function main() {
     // ---- the app: started when the camera is wanted and it is not connected ----
     const clients = new Set();
     let startedAt = -Infinity;
+    // 0.6.1 (G20, iDrive 7, 2026-11-14): AppStart 0xF9CA is the same service there, but for about the first minute
+    // after a start of the head unit it is not offered yet or answers "no reply" / code 4 (UNKNOWN_ERROR): asked again
+    // after START_SOON_MS; code 2 is iDrive 7's APP_ALREADY_RUNNING (its connection comes)
     function startApp() {
         if (clients.size || mono() - startedAt < START_MS) return;
         startedAt = mono();
         hmi(`start ${APP_ID}`).then((r) => {
             log(`app start: ${r}`);
             if (/code 1\b/.test(r)) startedAt += 9 * START_MS;     // APP_NOT_INSTALLED: asked again far less often
+            else if (/not there|no reply|code 4\b/.test(r)) startedAt -= START_MS - START_SOON_MS;   // not ready yet
         });
     }
 
@@ -391,6 +396,7 @@ function main() {
     const srv = net.createServer((c) => {
         if (clients.size >= MAX_CLIENTS) { c.destroy(); return; }
         clients.add(c);
+        log(`control: a client connected (${clients.size})`);   // (the app, or a test tool: when the app came)
         let buf = '';
         c.setEncoding('utf8');
         c.on('data', (d) => {
@@ -405,6 +411,7 @@ function main() {
         c.on('error', () => {});
         c.on('close', () => {
             clients.delete(c);
+            log(`control: a client left (${clients.size})`);
             if (calibBy === c) { log('app gone while calibrating: saved calibration back'); calibOff(); push(); }
             // no app: nobody asks the camera any more (its "refused" would make the next handover read No camera at once)
             if (!clients.size && status.camreq !== 'idle') { status.camreq = 'idle'; scene.camreq('idle'); }

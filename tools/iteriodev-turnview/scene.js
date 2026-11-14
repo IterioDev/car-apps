@@ -87,6 +87,7 @@ function createScene(cr, o) {
     function noticeOf(view, t) {
         if (noFront) return 'nofront';                  // (user 2026-11-12: such a car gets that and nothing else)
         if (camera === 'stalled') return 'busy';
+        if (camera === 'refused') return 'full';        // (0.6.1: the cluster's 2 videos are other apps')
         if (camreq === 'refused' || (camera === 'waiting' && t - cameraSince >= NOCAM_MS)) return 'nocam';
         return null;
     }

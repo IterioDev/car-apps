@@ -11,19 +11,23 @@ chevrons.
 on, the camera takes the cluster's central map area, where Waze on cluster draws its map. Waze's map is hidden while
 Turn View shows and comes back as soon as Turn View is switched off. The app has its own iDrive 7 screens.
 
+**Two videos at most:** the cluster and the HUD together show at most 2 videos. With Waze on cluster's map on both
+the cluster and the HUD, there is no room for the camera: the cluster then says *Cluster video full* (and so does the
+app), and Turn View asks again every 5 s (1.4.2, tool 0.6.1). Put Waze on one of them to see the camera.
+
 **Needs a front camera:** cars with the 360 cameras (Surround View) or front + rear cameras. When the camera unit
 does not give the front camera alone, Turn View asks for front + rear, then all cameras, and shows the front camera
 from those. Only a camera unit that gives the rear camera and never the front makes the iDrive 8 widget show *No front
 camera* and nothing else. Turn View does not need Drive Recorder: it receives the camera itself.
 
-Version 1.4.1 (tool `iteriodev-turnview` 0.6.0) · iDrive 7 + iDrive 8 · package `iteriodev_turnview` ·
+Version 1.4.2 (tool `iteriodev-turnview` 0.6.1) · iDrive 7 + iDrive 8 · package `iteriodev_turnview` ·
 [all apps and how to install](../../README.md)
 
 > [!NOTE]
-> Car-tested on iDrive 8 (M4, Apple Maps over CarPlay): the camera and the turn card in the cluster widget. Waze sends
-> no turns to the car (route summary only), so with Waze the camera shows without a turn. BMW Maps and Android Auto
-> are not car-tested yet, nor are cars with front + rear cameras only (no 360). **iDrive 7 is not car-tested yet**,
-> nor is the camera without a route (1.4.0).
+> Car-tested on iDrive 8 (M4, Apple Maps over CarPlay): the camera and the turn card in the cluster widget. **iDrive 7
+> car-tested** (G20 with 360 cameras): the front camera in the cluster's centre without a route, about 15 pictures a
+> second. Waze sends no turns to the car (route summary only), so with Waze the camera shows without a turn. BMW Maps
+> and Android Auto are not car-tested yet, nor are cars with front + rear cameras only (no 360), nor turns on iDrive 7.
 
 Needs Cluster renderer (`cluster-render`, robertnisipeanu/idrive-apps) 0.5.10 or newer. On iDrive 8, after every
 update of the Turn View tool, pick the widget again in the cluster menu.
