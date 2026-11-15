@@ -307,7 +307,8 @@ robertnisipeanu/idrive-apps, 0.5.10 or newer) at 15 pictures a second. The app s
 chevrons.
 
 - **iDrive 8:** Turn View's own widget, **Turn View AR** in the cluster's widget menu (a Cluster renderer drop-in, read
-  at its next start). The camera is sent only while the widget is shown.
+  at its next start), with its own picture in the menu like BMW's widgets (tool 0.7.1). The camera is sent only while
+  the widget is shown.
 - **iDrive 7:** **off at every start of the car** (tool 0.7.0; the last setting is not kept). Switch it on in the Turn
   View app and set **Instrument cluster > Central display area** to **Map view**: the camera then takes the cluster's
   central map area. Off, it holds nothing: no camera request (Drive Recorder keeps the cameras), no video, the map
