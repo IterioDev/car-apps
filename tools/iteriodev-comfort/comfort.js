@@ -254,7 +254,12 @@ function main() {
         // the car's own brightness, before ours: a module's first reading only (renewals read our own back)
         found.forEach((m) => { if (m.bright && oem[amb.key(m)] === undefined) oem[amb.key(m)] = m.bright; });
         // a bus that did not answer (the BDC busy right after a start, mgu-m4 2026-11-07): asked again in 20 s
-        if (missed) setTimeout(() => { mods = null; light(true); }, 20000);
+        if (missed) setTimeout(() => {
+            const set = amb.effective(data.ambient, car.mode);
+            // Keep known modules for OEM release when OFF; rediscover only a wanted override.
+            if (set.on && car.ambientOn === true && inCar()) mods = null;
+            light(true);
+        }, 20000);
         mods = amb.split(found);                     // a zone with two kinds of light (line above, decor below): two parts
         log(`ambient: ${mods.length} modules: ${mods.map((m) => `${m.bus}.${m.nad} ${m.name} (${m.zone})`).join(', ')}`);
         push();
@@ -279,9 +284,14 @@ function main() {
                 const wait = roundAt + GAP_MS - Date.now();
                 if (wait > 0) await new Promise((r) => setTimeout(r, wait));
                 roundAt = Date.now();
+                // OFF with no owned output needs no discovery or discovery retry.
+                // Previously lit modules must still reach the OEM release path below.
+                let set = amb.effective(data.ambient, car.mode), want = set.on && car.ambientOn === true && inCar();
+                if (!want && !lit) { force = false; break; }
                 if (!mods) await discover();
-                const set = amb.effective(data.ambient, car.mode), want = set.on && car.ambientOn === true && inCar(), all = force;
-                force = false;
+                // Settings may change while discovery waits for the diagnostic gateway.
+                set = amb.effective(data.ambient, car.mode); want = set.on && car.ambientOn === true && inCar();
+                const all = force; force = false;
                 if (!want && !lit) break;
                 for (const x of amb.plan(mods, want ? set : amb.settings(set, { on: false }), oem)) {
                     const b = x.off ? amb.release(x.m) : amb.frame(x.m, x.rgb, x.bright), k = amb.key(x.m), h = b.join(',');
