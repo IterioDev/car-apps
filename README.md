@@ -259,7 +259,11 @@ top of `screencast.js`.
 > cameras only, 2.4.0 on iDrive 7 (2.3.5 to 2.3.12 recorded, saved and copied clips on a G20 M340i through the head
 > unit's camera service).
 
-The app asks the car's camera unit for its Drive Recorder mode at every start (Settings can switch that off).
+The app asks the car's camera unit for its Drive Recorder mode at every start (Settings can switch that off). From
+the player 1.2.6 the player starts the app at every start of the car while *Start with the car* is on: iDrive 7
+starts it only when you open it, so before 1.2.6 recording began only then (issue #23). It asks the head unit's own
+app start every 10 s for up to 5 minutes, as the head unit takes about a minute after its start to take it; its log
+is `/var/opt/iteriodev-drplay/autostart.log`.
 *Save clip* on the Record page writes the 20 s before and the 10 s after (Settings: *Clip length*). The cameras offered
 are the ones the car has: all cameras, front + rear, front or rear. A camera unit that does not take the Drive
 Recorder mode (seen on a retrofitted rear camera) shows *No drive-recorder cameras found*. While a parking view is
@@ -273,7 +277,7 @@ The player runs two services:
   layout. The head unit's camera service and its provisioning flag are no longer used, so cars provisioned online by
   BMW (*OTA*) record too. All cameras are kept as the camera unit sends them: two pictures of two cameras each, in
   turn; the player puts them together into one.
-- `iteriodev-drplay.service` (uid 3912, no internet): plays the clips through the GPU renderer, makes the thumbnails,
+- `iteriodev-drplay.service` (uid 3912, no internet; its app start in the background as root, 1.2.6): plays the clips through the GPU renderer, makes the thumbnails,
   locks, deletes and replaces the oldest clips, and copies to a USB stick: a whole clip as recorded, or one camera as
   an MP4 with the date, time and speed on it. *Lock* moves a clip into the folder's `locked/`. A whole all-cameras
   clip played on a PC switches between the two camera pairs frame by frame; for a PC, copy one camera.
