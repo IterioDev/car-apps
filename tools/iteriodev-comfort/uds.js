@@ -24,8 +24,9 @@ function line(target, sid, data) {
 
 /** an event payload (hex) -> { unit, uds: [bytes] } | { reject: code } | null */
 function parse(hex) {
-    if (!/^[0-9a-f]{8}/i.test(hex || '')) return null;
+    if (typeof hex !== 'string' || !/^[0-9a-f]+$/i.test(hex) || hex.length < 8 || hex.length % 2) return null;
     const n = parseInt(hex.slice(0, 8), 16), b = Buffer.from(hex.slice(8, 8 + 2 * n), 'hex');
+    if (b.length !== n) return null;
     if (b.length >= 5 && b[2] === 0x7f) return { reject: b[4] };
     if (b.length < 10) return null;
     return { unit: b[6], uds: Array.from(b.slice(9)) };
@@ -35,12 +36,25 @@ function parse(hex) {
  * The request queue. hmi(line) -> Promise<"ok .." | "error ..">; feed every "ev 0xf8a6 0x8001 <hex>" line to onEvent.
  * send(target, sid, data) -> Promise<[uds bytes]> with the positive reply, rejects with an Error (code: NRC or 'timeout').
  */
+// Recognize only the existing seat/column STOP payloads, not arbitrary writes.
+function isStop(target, sid, d) {
+    return sid === 0x2e && (([0x6d, 0x6e].indexOf(target) >= 0 && d.length === 5 &&
+        d[0] === 0xd7 && d[1] === 8 && d[2] >= 0 && d[2] < 8 && d[3] === 0 && d[4] === 0) ||
+        (target === 0x40 && d.length === 4 && d[0] === 0xd0 && d[1] === 0x72 && d[2] === 0 && d[3] === 0));
+}
 class Uds {
     constructor(hmi, log) { this.hmi = hmi; this.log = log || (() => {}); this.q = []; this.cur = null; }
 
     /** ms: how long to wait for the answer (a probe of a unit the car may lack: shorter, the queue waits behind it) */
     send(target, sid, data, ms) {
-        return new Promise((res, rej) => { this.q.push({ target, sid, data, ms, res, rej }); this.pump(); });
+        return new Promise((res, rej) => {
+            const c = { target, sid, data: Array.from(data || []), ms, res, rej };
+            // Keep the current request: gateway replies carry no request ID. Only
+            // queued work is reordered, with FIFO order among multiple STOPs.
+            const next = isStop(target, sid, c.data) ? this.q.findIndex(x => !isStop(x.target, x.sid, x.data)) : -1;
+            if (next < 0) this.q.push(c); else this.q.splice(next, 0, c);
+            this.pump();
+        });
     }
 
     pump() {
@@ -49,8 +63,10 @@ class Uds {
         // the answer's time counts from the request's going out, not from its waiting behind hmictl's line before it
         this.hmi(line(c.target, c.sid, c.data)).then((r) => {
             if (this.cur !== c) return;
-            if (/^ok/.test(r)) this.arm(c.ms || TIMEOUT_MS); else this.finish(null, new Error('gateway: ' + r));
-        });
+            // A response-pending event can arrive before this method ACK.
+            if (/^ok/.test(r)) { if (!c.pending) this.arm(c.ms || TIMEOUT_MS); }
+            else this.finish(null, new Error('gateway: ' + r));
+        }, (e) => { if (this.cur === c) this.finish(null, e); });
     }
 
     arm(ms) {
@@ -76,9 +92,16 @@ class Uds {
         if (r.unit !== c.target) return;
         const u = r.uds;
         if (u[0] === 0x7f && u[1] === c.sid) {
-            if (u[2] === 0x78) { this.arm(PENDING_MS); return; }
+            if (u[2] === 0x78) { c.pending = true; this.arm(PENDING_MS); return; }
             this.finish(null, Object.assign(new Error('NRC ' + hex2(u[2])), { code: u[2] }));
-        } else if (u[0] === c.sid + 0x40) this.finish(u);
+        } else if (u[0] === c.sid + 0x40) {
+            // Match echoed DIDs/subfunctions as well as unit/SID. This rejects
+            // a late reply for another identifier, not a late identical request.
+            const count = c.sid === 0x22 || c.sid === 0x2e ? 2 : c.sid === 0x10 ? 1 : 0;
+            if (count && (u.length < count + 1 || c.data.length < count ||
+                c.data.slice(0, count).some((v, i) => u[i + 1] !== (c.sid === 0x10 ? v & 0x7f : v)))) return;
+            this.finish(u);
+        }
     }
 }
 
