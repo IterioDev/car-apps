@@ -6,7 +6,8 @@
  * itself while a layer wants it: the layers `contend` (take it from the stock map), and Turn View off or no front
  * camera draws nothing there, so the stock map (or Waze on cluster's) comes back. Class overlay, over the camera's rect
  * (camcluster's last `rect` line):
- *   chevrons  mesh  z 10   the road arrows (shaders.js) while the camera decodes (0.5.0: always the whole frame)
+ *   chevrons  mesh  z 10   the turn sign (shaders.js: 3 blue chevrons at the turn) while the camera decodes, only
+ *                          near a turn (none straight on / far away, 2026-11-16); its top held under the card
  *   marks     mesh  z 15   5 / 10 / 20 m lines while calibrating, same camera
  *   card      image z 20   icon + distance, top centre (card.js; on `map` 0.8x, below the cluster's model badge)
  *   shade     effect z 30  a dark fill with soft edges, no upload
@@ -26,7 +27,7 @@ const C = require('./card');
 
 const KLASS = 'overlay';
 const K1 = 0;                       // the lens term (car step C2 measures it; 0 = no correction)
-const NOCAM_MS = 30000, CARD_MS = 1000, CARD_SLOW_MS = 3000, SLOW_CAP_KB = 3000, FAR_SEND = 10000, ANIM_MS = 200;
+const NOCAM_MS = 30000, CARD_MS = 1000, CARD_SLOW_MS = 3000, SLOW_CAP_KB = 3000, ANIM_MS = 200, SIGN_GAP = 8;
 const DRAWN = { route: true, near: true, passed: true, recalc: true };
 // targets the cluster shows by itself while a layer wants them (iDrive 7's central map area): nothing drawn = given back
 const SELF_SHOWN = { map: true };
@@ -53,12 +54,14 @@ function createScene(cr, o) {
         const w = Math.round(C.CARD.w * CARD_MAP.k), h = Math.round(C.CARD.h * CARD_MAP.k);
         return { x: Math.round(rect.x + (rect.w - w) / 2), y: rect.y + CARD_MAP.y, w, h };
     }
+    // the sign's highest top (NDC y of the rect): SIGN_GAP px under the card
+    function signTop() { const c = cardRect(); return 1 - 2 * (c.y + c.h + SIGN_GAP - rect.y) / rect.h; }
     function make() {
         const base = { target, klass: KLASS, visible: false, contend: SELF_SHOWN[target] ? 1 : 0 };
         const mesh = (z) => cr.mesh(Object.assign({}, base, rect, { z, near: 0.5, far: 150 }, camOf(cal)));
         refs = { chevrons: mesh(10), marks: mesh(15) };
         cr.part(refs.chevrons, 1, { vs: SH.CHEVRON_VS, fs: SH.CHEVRON_FS, depth: false, cull: 'none', blend: 'alpha' });
-        cr.geometry(refs.chevrons, 1, SH.chevronGeometry());
+        cr.geometry(refs.chevrons, 1, SH.signGeometry());
         cr.part(refs.marks, 1, { vs: SH.MARKS_VS, fs: SH.MARKS_FS, depth: false, cull: 'none', blend: 'alpha' });
         cr.geometry(refs.marks, 1, SH.marksGeometry());
         refs.card = cr.image(Object.assign({}, base, cardRect(), { z: 20, iw: C.CARD.w, ih: C.CARD.h }));
@@ -123,7 +126,8 @@ function createScene(cr, o) {
             const gone = self && noFront;                   // iDrive 7, no front camera: the map area given back
             const shade = !gone && (offNote || (!off && (noFront || (view.video && !decoding))));
             const n = offNote ? 'off' : shade ? noticeOf(view, t) : null;
-            const want = { chevrons: !off && !gone && drawn && decoding && !shade, marks: !off && !gone && st === 'calib' && decoding && !shade,
+            const turn = (st === 'near' || st === 'passed') && view.angle > 0;
+            const want = { chevrons: !off && !gone && turn && decoding && !shade, marks: !off && !gone && st === 'calib' && decoding && !shade,
                 card: !off && !gone && drawn && !shade, shade, notice: !!n };
             lastNotice = n;
             // pixels before they show: a layer without content would be stalled
@@ -139,10 +143,8 @@ function createScene(cr, o) {
                 if (!cardKey) want.card = false;          // nothing drawn yet
             }
             if (want.chevrons) {
-                uniform('u_angle', view.angle); uniform('u_side', view.side); uniform('u_alpha', view.alpha);
-                uniform('u_k1', K1); uniform('u_aspect', rect.w / rect.h);
-                if (st === 'near' || st === 'passed') uniform('u_l0', view.l0);
-                else if (uni.u_l0 === undefined || uni.u_l0 - view.travel < FAR_SEND / 2 || uni.u_l0 - view.travel > FAR_SEND * 2) uniform('u_l0', view.travel + FAR_SEND);
+                uniform('u_side', view.side); uniform('u_alpha', view.alpha); uniform('u_l0', view.l0);
+                uniform('u_k1', K1); uniform('u_aspect', rect.w / rect.h); uniform('u_top', signTop());
                 if (!travelSent) { cr.uniform(refs.chevrons, 'u_travel', [view.travel], { part: 1 }); travelSent = true; }
                 // one animation per ANIM_MS (its keys span that long): each one is a scene change cluster-render
                 // sends to the cluster (car 2026-11-07: the head unit lagged)

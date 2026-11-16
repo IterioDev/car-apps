@@ -1,9 +1,9 @@
 # Turn View
 
-The front camera in the instrument cluster, with a turn card (arrow and distance) and blue chevrons on the road that
-bend into the next turn while a route is running. Navigation comes from BMW Maps, CarPlay or Android Auto. Without a
-route the cluster shows the front camera alone (1.4.0). No coding needed. The app shows the status and calibrates the
-chevrons.
+The front camera in the instrument cluster, with a turn card (arrow and distance) and, near each turn, a blue turn sign
+(three chevrons pointing the way, like a curve sign; 1.5.1, tool 0.8.0) while a route is running; none while driving
+straight. Navigation comes from BMW Maps, CarPlay or Android Auto. Without a route the cluster shows the front camera
+alone (1.4.0). No coding needed. The app shows the status and calibrates the camera.
 
 **iDrive 8:** pick **Turn View AR** in the cluster's widget menu (from the car's next start after installing).
 
