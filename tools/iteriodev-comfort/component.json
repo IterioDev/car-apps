@@ -3,7 +3,7 @@
   "kind": "tool",
   "version": "0.7.0",
   "title": "Comfort",
-  "description": "Service behind Ambient Light and Seats. Driver easy entry/exit has independent Fixed or Adaptive driving and exit targets. Passenger automatic movement is deferred pending occupancy validation; passenger manual controls remain available.",
+  "description": "Service behind Ambient Light and Seats. A manual Calibration page saves driving/Exit positions and a buffered rear limit before any driver automation is enabled. Independent Fixed/Adaptive Drive and Exit modes; passenger automation deferred, manual controls retained.",
   "optional": true,
   "uninstallable": true,
   "mguHmi": [
@@ -22,6 +22,11 @@
     {
       "path": "driver-access.js",
       "from": "driver-access.js",
+      "mode": "0644"
+    },
+    {
+      "path": "calibration.js",
+      "from": "calibration.js",
       "mode": "0644"
     },
     {

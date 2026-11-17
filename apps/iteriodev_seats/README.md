@@ -15,7 +15,7 @@ Everything works but Make room, which needs the car parked.
 
 ## Proposed driver modes
 
-This contribution keeps the original seat-control design and adds the functional split settings page. Driver Drive and Exit targets can each be Fixed or Adaptive; relative Exit distance is 75/150/225 counts with explicit per-vehicle calibration. See [driver policy, migration and validation](../../tools/iteriodev-comfort/DRIVER_MODES.md) and [reviewable UI sources](source/README.md).
+This contribution keeps the original seat controls, adds the functional split settings page, and adds a permanently accessible Calibration tab. All automatic modes remain blocked until calibration saves app M1, Exit and the30count buffered rear limit. Driver Drive and Exit targets can each be Fixed or Adaptive; relative Exit distance is 75/150/225 counts with explicit per-vehicle calibration. See [driver policy, migration and validation](../../tools/iteriodev-comfort/DRIVER_MODES.md) and [reviewable UI sources](source/README.md).
 
 **Passenger automatic Exit/return is disabled in this proposal** pending a verified occupancy path. Passenger manual controls, memories, manual Exit and Make room remain available. Historical screenshots and descriptions below show the released 1.6.2 behavior; they are retained as reference, not current validation of this proposal.
 

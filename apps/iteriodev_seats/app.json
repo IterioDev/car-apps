@@ -2,7 +2,7 @@
  "id": "iteriodev_seats",
  "version": "1.7.0",
  "title": "Seats",
- "description": "Front seat controls and app memories in the original design. Independent driver Fixed/Adaptive Drive and Exit settings; relative Exit requires per-vehicle calibration. Passenger automation is deferred; passenger manual controls and Make room remain available.",
+ "description": "Front seat controls and app memories in the original design. Seats, Settings and Calibration tabs. Calibration saves driving/Exit positions and a buffered rear limit before enabling independent Fixed/Adaptive driver automation. Passenger automation deferred; manual controls retained.",
  "mguHmi": [
   "ID7",
   "ID8"

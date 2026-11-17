@@ -2,7 +2,7 @@
 Uses Python standard library and local Git history only. No network or target execution.
 """
 from pathlib import Path
-import argparse, gzip, hashlib, io, json, subprocess, tarfile
+import argparse, copy, gzip, hashlib, io, json, subprocess, tarfile, xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parent
 BASE = "a9361d7522a58b11e9c083727d6365b26563ae82"
 BASE_PATH = "apps/iteriodev_seats/iteriodev_seats@1.6.2.tgz"
@@ -25,7 +25,30 @@ def build(base):
                 assert settings["name"] == "settings"
                 assert [screen["name"] for screen in obj["screens"]] == ["seats", "settings"]
                 obj["screens"][1] = settings
+                obj["screens"].append(json.loads((ROOT / "renderer/calibration.json").read_text()))
+                # Main controls are preserved; the shell gains the third navigation tab.
+                for screen in obj["screens"]:
+                    for components in [screen["components"],screen.get("id7",{}).get("components",[])]:
+                        for component in components:
+                            if component["gpu"]=="teleShell":
+                                component["opts"]["tabs"]="Seats, Settings, Calibration"
                 data = (json.dumps(obj, indent=2) + "\n").encode()
+            elif name in [old + "/rhmiData/uiDescriptions/" + view + "/application.xml" for view in ["ID7","ID8"]]:
+                root = ET.fromstring(data)
+                state = copy.deepcopy(next(e for e in root if e.get("id")=="4000"))
+                for element in state.iter():
+                    if element.get("id") in ["4000","4200","4220","4400"]:
+                        element.set("id",str(int(element.get("id"))+1000))
+                root.append(state)
+                data = ET.tostring(root,encoding="utf-8",xml_declaration=True)
+            elif name in [old + "/rhmiData/uiDescriptions/" + view + "/uiDescription.json" for view in ["ID7","ID8"]]:
+                obj=json.loads(data);state=copy.deepcopy(obj["containers"]["4000"])
+                state["name"]="calibration";title=state["components"].pop("4220")
+                title["name"]="calibrationTitle";title["rows"][0]["Text"]["value"]="SID_3";state["components"]["5220"]=title
+                obj["containers"]["5000"]=state
+                data=(json.dumps(obj,indent=2)+"\n").encode()
+            elif name in [old + "/rhmiData/variantGroups/Common/texts/" + lang + ".json" for lang in ["en_GB","en_US"]]:
+                obj=json.loads(data);obj["SID_3"]="Calibration";data=(json.dumps(obj,indent=2)+"\n").encode()
             elif name == "mgu-app.json":
                 obj = json.loads(data); obj.update(version=app["version"], tree=new)
                 data = (json.dumps(obj, indent=2) + "\n").encode()

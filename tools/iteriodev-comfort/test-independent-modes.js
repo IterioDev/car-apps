@@ -8,12 +8,12 @@ function fixture(drive,exit,level,start) {
  const data={settings:P.settings({driverExitMode:drive,driverExitTargetMode:exit,driverExitLevel:level,driverRelativeLimit:calibration}),memories:{driver:[{SLV:33107,LNV:34000}]},exit:{driver:{SLV:32948,LNV:34100}},pre:{driver:null},out:{driver:null},relativeExit:{driver:null}};
  const state={pos:{SLV:start===undefined?33107:start,LNV:34000},P:true,standing:true,armed:true,occupied:true};let time=1000;
  const queue=[],moves=[],captures=[],logs=[];
- const d=new P.DriverExit({data,parked:()=>state.standing,inPark:()=>state.P,occupied:()=>state.occupied,returnReady:()=>true,executionEnabled:()=>state.armed,now:()=>time,wait:async()=>{},capture:async()=>{captures.push(1);return Object.assign({},state.pos);},current:async()=>Object.assign({},state.pos),move:async(t,out,ctx)=>{if(ctx.permission())return ctx.permission();moves.push({target:Object.assign({},t),out,parkedOnly:ctx.parkedOnly});Object.assign(state.pos,t);return 'done';},schedule:(n,f)=>queue.push(f),stopAutomatic:()=>{},save:()=>{},changed:()=>{},log:x=>logs.push(x)});
+ const d=new P.DriverExit({data,calibrated:()=>true,parked:()=>state.standing,inPark:()=>state.P,occupied:()=>state.occupied,returnReady:()=>true,executionEnabled:()=>state.armed,now:()=>time,wait:async()=>{},capture:async()=>{captures.push(1);return Object.assign({},state.pos);},current:async()=>Object.assign({},state.pos),move:async(t,out,ctx)=>{if(ctx.permission())return ctx.permission();moves.push({target:Object.assign({},t),out,parkedOnly:ctx.parkedOnly});Object.assign(state.pos,t);return 'done';},schedule:(n,f)=>queue.push(f),stopAutomatic:()=>{},save:()=>{},changed:()=>{},log:x=>logs.push(x)});
  d.door(false);d.condition(10);time=2000;
  return {data,d,state,moves,captures,queue,logs,flush:async()=>{while(queue.length)await queue.shift()();}};
 }
 (async()=>{
- eq(P.settings({driverExitMode:'fixed'}),{easyExit:true,driverExitMode:'fixed',driverExitTargetMode:'fixed',driverExitLevel:2,driverRelativeLimit:null});
+ eq(P.settings({driverExitMode:'fixed'}),{easyExit:true,driverExitMode:'fixed',driverExitTargetMode:'fixed',driverExitLevel:2,driverRelativeLimit:null,driverCalibrationVersion:0});
  for(let level=1;level<=3;level++) {eq(P.relativeTarget({SLV:33300},level,calibration).target.SLV,33300-[75,150,225][level-1]);eq(P.relativeTarget({SLV:32860},level,calibration).target.SLV,32850);}
  for(const n of [32850,32849,32000])eq(P.relativeTarget({SLV:n},3,calibration).target,null);
  for(const n of [NaN,Infinity,-1,65536,undefined])eq(P.relativeTarget({SLV:n},2,calibration),null);
@@ -61,6 +61,6 @@ function fixture(drive,exit,level,start) {
  f.hooks.car.speed=0;f.hooks.car.speedAt=100000;f.hooks.mover.read=async()=>({SLV:33107});f.hooks.door('000000000000000000000000000000');f.hooks.cond('0a000112020a02');f.hooks.gear('03');f.hooks.door('000001000000000000000000000000');await tick();
  const recalls=f.events.filter(e=>Array.isArray(e)&&e[0]==='recall');eq(recalls.length,1);eq(recalls[0][2].SLV,33032);eq(f.hooks.status().state.driverExit.relativeConfigured,true);eq(f.hooks.status().state.driverExit.passengerAutomationSupported,false);
  f.hooks.door('000001010000000000000000000000');await tick();eq(f.events.filter(e=>Array.isArray(e)&&e[0]==='recall').length,1);
- const fresh=legacy.serviceFixture({});eq(fresh.hooks.data.settings.driverRelativeLimit,null);eq(fresh.hooks.status().state.driverExit.relativeConfigured,false);eq(fresh.request({op:'set',settings:{driverExitTargetMode:'adaptive'}})[0].error,'relative exit requires vehicle calibration');
+ const fresh=legacy.serviceFixture({},{realCalibration:true});eq(fresh.hooks.data.settings.driverRelativeLimit,null);eq(fresh.hooks.status().state.driverExit.relativeConfigured,false);eq(fresh.request({op:'set',settings:{driverExitTargetMode:'adaptive'}})[0].error,'Complete driver calibration first');
  console.log('independent modes: '+checks+' assertions passed (synthetic positions; no car I/O)');
 })().catch(e=>{console.error(e.stack);process.exitCode=1;});

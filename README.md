@@ -73,7 +73,7 @@ is asked again up to 20 times, 200 ms apart, as MG Flasher's app does.
 
 ## Proposed Seats driver automation
 
-The driver-modes contribution proposes Comfort 0.7.0 / Seats 1.7.0 with independent Drive/Exit settings in the existing design. Passenger automatic movement is deferred; its manual controls remain available. See [policy and validation limits](tools/iteriodev-comfort/DRIVER_MODES.md). Historical app descriptions/screenshots refer to the released behavior until this proposal is reviewed.
+The driver-modes contribution proposes Comfort 0.7.0 / Seats 1.7.0 with independent Drive/Exit settings and a third Calibration tab in the existing design. All automatic driver modes require completed calibration. Passenger automatic movement is deferred; its manual controls remain available. See [policy and validation limits](tools/iteriodev-comfort/DRIVER_MODES.md). Historical app descriptions/screenshots refer to the released behavior until this proposal is reviewed.
 
 ## Installing
 

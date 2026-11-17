@@ -47,7 +47,7 @@ const { createHost }                   = require('./online-host.js');
 const { watchController }              = require('./frontccu.js');
 
 const LOG = '[iteriodev_seats]';
-const STATES = ['seats', 'settings'];  // screens = their RHMI host states, seats the entry (the lowest)
+const STATES = ['seats', 'settings', 'calibration'];  // screens = their RHMI host states, seats the entry (the lowest)
 const CTL = process.env.COMFORT_CTL || '/run/iteriodev-comfort/ctl.sock';
 const RETRY_MS = 2000;
 const JOG_MS = 300;               // a held control repeats its jog this often
@@ -96,6 +96,7 @@ function setSide(s) {
 
 // ---- the tool ---------------------------------------------------------------------------------------------
 let tool = null;                  // its last state, null = no connection
+let calibrationPending=null,calibrationError='';
 let settingsPending=null;
 let modePending = null, modeRejected = null, modeError = ''; // selection is confirmed by Comfort's state stream
 let sock = null;
@@ -116,6 +117,7 @@ function connect() {
         for (let n; (n = buf.indexOf('\n')) >= 0; buf = buf.slice(n + 1)) {
             let m;
             try { m = JSON.parse(buf.slice(0, n)); } catch (e) { continue; }
+            if(m.calibrationReply && m.calibrationReply===calibrationPending){calibrationPending=null;render();}
             if (m.state) {
                 tool = m.state;
                 if(settingsPending && tool.settings && tool.settings[settingsPending.key]===settingsPending.value)settingsPending=null;
@@ -125,6 +127,7 @@ function connect() {
                     modePending = modeRejected = null; modeError = '';
                 }
                 render();
+            } else if(m.error && calibrationPending){calibrationPending=null;calibrationError=String(m.error).slice(0,150);render();
             } else if(m.error && settingsPending) {settingsPending=null;modeError=String(m.error).slice(0,90);render();
             } else if (m.error && modePending !== null) {
                 modeRejected = modePending; modePending = null;
@@ -133,7 +136,7 @@ function connect() {
         }
     });
     s.on('error', (e) => { if (!/ENOENT|ECONNREFUSED/.test(e.code)) log('tool:', e.message); });
-    s.on('close', () => { busy = false; sock = null; tool = null;settingsPending=null; modePending = modeRejected = null; modeError = ''; jogEnd(false); render(); setTimeout(connect, RETRY_MS); });
+    s.on('close', () => { busy = false; sock = null; tool = null;calibrationPending=null;calibrationError='';settingsPending=null; modePending = modeRejected = null; modeError = ''; jogEnd(false); render(); setTimeout(connect, RETRY_MS); });
 }
 const send = (q) => {
     if (sock) sock.write(`${JSON.stringify(q)}\n`);
@@ -162,8 +165,8 @@ const RENDERER = path.join(SOURCE, 'renderer');
 const runtime = (f) => require(path.join(RENDERER, f));
 let screens = null;
 let content = [];                 // every element but the frames and the no-tool notes: hidden without the tool
-const MENUS = { seats: 'seatsMenu', settings: 'settingsMenu' };
-const SUBS = { seats: 'Hold a control: the seat moves while you hold it', settings: 'Independent driver driving and exit positions' };
+const MENUS = { seats: 'seatsMenu', settings: 'settingsMenu', calibration: 'calibrationMenu' };
+const SUBS = { seats: 'Hold a control: the seat moves while you hold it', settings: 'Independent driver driving and exit positions', calibration: 'Save driving and Exit positions; no automatic movement' };
 // what each seat has: the tool's axes (its motors), and whether they tell their position (memories, Easy exit, Make room)
 const axesOf = (seat) => {
     const s = tool && tool.seats, pos = (s && s.pos[seat]) || {};
@@ -178,10 +181,12 @@ function modeState() {
     const enabled = !!(tool && tool.settings && tool.settings.easyExit !== false);
     const moving = !!(tool && (tool.seats.job || tool.seats.moving || tool.seats.controlBusy));
     const hall = hallOf('driver');
-    const disabled = !supported || !enabled || moving || !hall || (modePending !== null || settingsPending!==null);
+    const calibrated=!!(tool && tool.driverExit && tool.driverExit.calibrated===true);
+    const calibrating=!!(tool && tool.calibration && tool.calibration.active);
+    const disabled = calibrating || !supported || !calibrated || !enabled || moving || !hall || (modePending !== null || settingsPending!==null);
     const saved = tool && tool.seats.memories.driver[0];
     const sub = !tool ? 'Comfort tool not running' : !supported ? 'Update Comfort to choose a mode' :
-        !hall ? 'Driver position feedback required' : !enabled ? 'Enable Easy exit to choose' :
+        calibrating ? 'Finish or cancel Calibration first' : !calibrated ? 'Complete Calibration to enable automation' : !hall ? 'Driver position feedback required' : !enabled ? 'Enable Easy exit to choose' :
         moving ? 'Available when the seats stop' : modeError || (modePending !== null ? 'Saving selection' :
         fixed ? (saved ? 'Returns to app Memory 1' : 'Save driver M1 on the Seats page') : 'Returns to the prior position');
     return { items: supported ? 'Adaptive, Fixed' : 'Unavailable', sel: supported && fixed ? 1 : 0, disabled, sub };
@@ -200,7 +205,7 @@ function render() {
         hide[`${p}NoSeat`] = axes.length > 0;
     });
     content.forEach((name) => screens.set(name, { hidden: !t || !!hide[name] }));
-    ['seatsNoTool', 'settingsNoTool'].forEach((name) => screens.set(name, { hidden: !!t }));
+    ['seatsNoTool', 'settingsNoTool', 'calibrationNoTool'].forEach((name) => screens.set(name, { hidden: !!t }));
     Object.keys(MENUS).forEach((pg) => screens.set(MENUS[pg], { sel: STATES.indexOf(pg) }));
     if (!t) {
         Object.keys(MENUS).forEach((pg) => screens.set(MENUS[pg], { chips: [['Comfort tool not running', 'crit']], sub: 'Install the Comfort tool from the Store' }));
@@ -211,18 +216,41 @@ function render() {
     Object.keys(MENUS).forEach((pg) => screens.set(MENUS[pg], { chips: [], sub: decisionSummary || SUBS[pg] }));
     screens.set('sideRow', { sel: side === 'right' ? 1 : 0, sub: side === 'right' ? 'The driver\'s seat in the right half' : 'Right: the driver\'s seat in the right half' });
     screens.set('exitRow', { sel: t.settings && t.settings.easyExit === false ? 0 : 1,
-        sub: 'Driver automation only; manual controls stay available' });
+        sub: t.driverExit && t.driverExit.calibrated?'Driver automation only; manual controls stay available':'Complete the Calibration page first' });
     const driveState=modeState();screens.set('driverModeRow',driveState);
     const config=t.settings||{}, supported=!!(t.driverExit && t.driverExit.exitModeSupported), relative=config.driverExitTargetMode==='adaptive';
     const calibrated=!!(t.driverExit && t.driverExit.relativeConfigured);
     const disabled=driveState.disabled || !supported,level=config.driverExitLevel||2;
-    screens.set('driverExitModeRow',{sel:relative?0:1,disabled,sub:!calibrated?'Fixed Exit available; relative needs calibration':relative?'Moves back by the selected level':'Uses the saved Easy exit position'});
+    screens.set('driverExitModeRow',{sel:relative?0:1,disabled,sub:!calibrated?'Complete Calibration to enable either mode':relative?'Moves back by the selected level':'Uses the saved Easy exit position'});
     const levelOff=disabled || !relative || !calibrated;
     screens.set('exitLevelMinus',{disabled:levelOff || level<=1});screens.set('exitLevelPlus',{disabled:levelOff || level>=3});
     screens.set('exitLevelValue',{text:String(level),color:levelOff?COL.dim:'#000000'});
     screens.set('exitLevelBackground',{color:levelOff?'#252525':COL.accent});
     screens.set('exitLevelLabel',{color:levelOff?COL.dim:'#f2f2f2'});
+    renderCalibration();
     ['driver', 'passenger'].forEach((seat) => renderSeat(seat));
+}
+function renderCalibration() {
+    const c=tool.calibration||{},complete=!!(tool.driverExit && tool.driverExit.calibrated),
+        owner=!!(c.active && c.owned),busy=!!(c.busy || calibrationPending),
+        available=!!(c.supported && tool.parked && tool.driverExit && tool.driverExit.gearP && !tool.seats.job && !tool.seats.moving && !tool.seats.controlBusy);
+    const limit=c.limit || (tool.settings && tool.settings.driverRelativeLimit);
+    screens.set('calibrationStatus',{text:c.active?'CALIBRATION IN PROGRESS':complete?'CALIBRATED':'CALIBRATION REQUIRED',color:complete?COL.accent:COL.dim});
+    screens.set('calibrationDetail',{text:calibrationError || c.message || (c.active && !owner?'Calibration active in another connection':
+        !available?'Park in P, release the controls and wait for the seat to stop.':
+        complete?'Saved app M1 and Exit. You can recalibrate at any time.':'Automatic modes stay blocked until both positions are saved.')});
+    screens.set('calibrationLimit',{text:limit?'Saved rear limit: '+limit.rear+' counts. New calibration adds a 30-count inward buffer.':'No rear limit saved. Calibration adds a 30-count inward buffer.'});
+    screens.set('calibrationDriving',{text:owner?'1. Recapture driving':complete?'Recalibrate: driving':'1. Capture driving',disabled:!available || busy || (c.active && !owner)});
+    screens.set('calibrationRear',{text:'2. Capture rear limit',disabled:!available || busy || !owner || !c.reference});
+    screens.set('calibrationExit',{text:'3. Save Easy Exit',disabled:!available || busy || !owner || !c.rear});
+    screens.set('calibrationCancel',{disabled:!owner && !calibrationPending});
+}
+function calibrationAction(action) {
+    const c=tool && tool.calibration;if(!c || !c.supported)return;
+    if(action!=='cancel' && (calibrationPending || c.busy || !tool.parked || !tool.driverExit.gearP || tool.seats.job || tool.seats.moving || tool.seats.controlBusy || (c.active && !c.owned)))return;
+    if(action==='limit' && (!c.active || !c.owned || !c.reference))return;
+    if(action==='exit' && (!c.active || !c.owned || !c.rear))return;
+    calibrationPending=action;calibrationError='';send({op:'calibrate',action});render();
 }
 function renderSeat(seat) {
     const p = PFX(seat), s = tool.seats, mv = s.moving, job = s.job, parked = !!tool.parked;   // moves at any speed but Make room
@@ -272,6 +300,8 @@ function renderSeat(seat) {
 function onEvent(name) {
     let m;
     if (!tool) return;
+    const calibrationButtons={calibrationDriving:'driving',calibrationRear:'limit',calibrationExit:'exit',calibrationCancel:'cancel'};
+    if(calibrationButtons[name]){calibrationAction(calibrationButtons[name]);return;}
     if(name==='exitLevelMinus' || name==='exitLevelPlus') {
         const level=(tool.settings && tool.settings.driverExitLevel)||2;
         if(!modeState().disabled && tool.driverExit.exitModeSupported && tool.driverExit.relativeConfigured && tool.settings.driverExitTargetMode==='adaptive') {
@@ -307,7 +337,7 @@ function onChange(name, o) {
     }
     if (name === 'sideRow') return setSide(o.sel === 1 ? 'right' : 'left');   // Settings: works without the tool too
     if (!tool) return null;
-    if (name === 'exitRow') { send({ op: 'set', settings: { easyExit: o.sel === 1 } }); return null; }   // the tool pushes it back
+    if (name === 'exitRow') { if(o.sel===1 && !(tool.driverExit && tool.driverExit.calibrated)){modeError='Complete Calibration first';render();return goTo('calibration');} send({ op: 'set', settings: { easyExit: o.sel === 1 } }); return null; }   // the tool pushes it back
     if(name==='driverExitModeRow') {
         if(!modeState().disabled && tool.driverExit.exitModeSupported && (o.sel===0 || o.sel===1)) {
             const value=o.sel===0?'adaptive':'fixed';
@@ -339,6 +369,7 @@ function onChange(name, o) {
 function goTo(page) {
     const now = screens.st && screens.st.name;
     if (!page || page === now) return;
+    if(now==='calibration' && tool && tool.calibration && tool.calibration.owned)calibrationAction('cancel');
     if (now && now !== 'seats') closeScreen(now);
     if (page !== 'seats') showScreen(page);
 }
@@ -372,7 +403,7 @@ function startScreens(rhmiApp) {
         jogEnd(true);
         render();
     });
-    screens.on('closed', (why) => { jogEnd(true); if (why !== 'hmi') STATES.slice().reverse().forEach(closeScreen); });
+    screens.on('closed', (why) => { if(tool && tool.calibration && tool.calibration.owned)calibrationAction('cancel');jogEnd(true); if (why !== 'hmi') STATES.slice().reverse().forEach(closeScreen); });
     gpu.connect();
     connect();
     watchController((v) => screens.controller(v), log);
@@ -385,5 +416,5 @@ createHost({
     states: STATES,
     log,
     onReady: (rhmiApp) => { startScreens(rhmiApp); log('screens ready'); },
-    onShutdown: () => jogEnd(true),
+    onShutdown: () => {if(tool && tool.calibration && tool.calibration.owned)calibrationAction('cancel');jogEnd(true);},
 });

@@ -8,7 +8,7 @@ function fixture(selected){
  const data={settings:policy.settings({driverExitMode:selected}),exit:{driver:{SLV:20}},pre:{driver:null},memories:{driver:[{SLV:80}]}};
  const state={parked:true,P:true,occupied:true,ready:true,armed:true,captures:0,stops:0,saves:0,capture:{SLV:55},result:'done'};
  const queued=[],moves=[],contexts=[];
- const d=new policy.DriverExit({data,parked:()=>state.parked,inPark:()=>state.P,occupied:()=>state.occupied,returnReady:()=>state.ready,
+ const d=new policy.DriverExit({data,calibrated:()=>true,parked:()=>state.parked,inPark:()=>state.P,occupied:()=>state.occupied,returnReady:()=>state.ready,
  executionEnabled:()=>state.armed,capture:async()=>{state.captures++;return state.capture;},
  move:async(p,out,c)=>{moves.push([p.SLV,out]);contexts.push(c);return state.result;},
  schedule:(name,fn)=>queued.push(fn),stopAutomatic:()=>state.stops++,save:()=>state.saves++,changed:()=>{},log:()=>{}});
@@ -16,8 +16,8 @@ function fixture(selected){
 }
 function baseline(f){f.d.door(false);f.d.condition(10);}
 async function policyTests(){
- eq(policy.settings(),{easyExit:true,driverExitMode:'adaptive',driverExitTargetMode:'fixed',driverExitLevel:2,driverRelativeLimit:null});
- eq(policy.settings({easyExit:false,driverExitMode:'bad'}),{easyExit:false,driverExitMode:'adaptive',driverExitTargetMode:'fixed',driverExitLevel:2,driverRelativeLimit:null});
+ eq(policy.settings(),{easyExit:true,driverExitMode:'adaptive',driverExitTargetMode:'fixed',driverExitLevel:2,driverRelativeLimit:null,driverCalibrationVersion:0});
+ eq(policy.settings({easyExit:false,driverExitMode:'bad'}),{easyExit:false,driverExitMode:'adaptive',driverExitTargetMode:'fixed',driverExitLevel:2,driverRelativeLimit:null,driverCalibrationVersion:0});
  for(let q=0;q<256;q++)eq(policy.decodeCondition('0a000112020a'+q.toString(16).padStart(2,'0')),q===2?10:null);
  ['','0a','00000000000a','00000000000a0200','ZZ000000000a02'].forEach(s=>eq(policy.decodeCondition(s),null));
  eq(policy.transition(null,10),null);eq(policy.transition(8,10),'driving');eq(policy.transition(7,8),null);
@@ -68,13 +68,13 @@ function serviceFixture(raw,options){
  const req=id=>{
   if(id==='fs')return fakefs;if(id==='net')return {createServer:()=>server};if(id==='path')return path;
   if(id==='child_process')return {spawn:options.spawn||noIO};if(id==='./uds')return {Uds:class{beginShutdown(){}}};
-  if(id==='./seat')return {Mover,AXES:['SLV']};if(id==='./driver-access')return policy;if(id==='./ambient')return require('./ambient');throw new Error(id);
+  if(id==='./seat')return {Mover,AXES:['SLV']};if(id==='./calibration')return require('./calibration');if(id==='./driver-access')return policy;if(id==='./ambient')return require('./ambient');throw new Error(id);
  };
  const module={exports:{}};const context={module,require:req,__dirname,Buffer,Date:class extends Date{static now(){return clock;}},console:{log:()=>{}},process:{env:{COMFORT_DATA:'/fake/data.json'},argv:[],exit:options.exit||(()=>{})},setTimeout:(f,ms)=>{timers.push({f,ms});return timers.length;},clearTimeout:()=>{},setInterval:noIO};
  let source=fs.readFileSync(path.join(__dirname,'comfort.js'),'utf8');if(options.armed)source=source.replace('const DRIVER_MOVEMENT_ARMED = false;','const DRIVER_MOVEMENT_ARMED = true;');
  const marker='    subscribe();';eq(source.split(marker).length,2);
- source=source.replace(marker,'    module.exports.hooks={cond,door,gear,inPark,resetAutomaticSource,hmi,request,status,data,car,mover,driverExit}; return;');source+='\nmodule.exports.startForTest=main;';
- vm.runInNewContext(source,context,{filename:'comfort.js'});eq(events,[]);module.exports.startForTest();const hooks=module.exports.hooks;const rawDoor=hooks.door;hooks.door=(hex,event)=>rawDoor(hex,event===undefined?0x8001:event);
+ source=source.replace(marker,'    module.exports.hooks={cond,door,gear,inPark,resetAutomaticSource,hmi,request,status,data,car,mover,driverExit,calibration}; return;');source+='\nmodule.exports.startForTest=main;';
+ vm.runInNewContext(source,context,{filename:'comfort.js'});eq(events,[]);module.exports.startForTest();const hooks=module.exports.hooks;if(!options.realCalibration)hooks.driverExit.d.calibrated=()=>true;const rawDoor=hooks.door;hooks.door=(hex,event)=>rawDoor(hex,event===undefined?0x8001:event);
  if(!options.realPolicyDeps){hooks.driverExit.d.wait=async()=>{};hooks.driverExit.d.current=async()=>({SLV:55});}
  return {hooks,events,files,timers,advance:ms=>{clock+=ms;},request:q=>{const replies=[];hooks.request({write:v=>replies.push(JSON.parse(v))},q);return replies;}};
 }

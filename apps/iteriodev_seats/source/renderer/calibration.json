@@ -1,0 +1,446 @@
+{
+  "name": "calibration",
+  "kind": "gpu",
+  "title": "Calibration",
+  "entry": false,
+  "bg": "#000000",
+  "bgArea": "app",
+  "components": [
+    {
+      "name": "calibrationMenu",
+      "rtype": "gpu",
+      "gpu": "teleShell",
+      "x": 0,
+      "y": 76,
+      "w": 2880,
+      "h": 172,
+      "opts": {
+        "app": "Seats",
+        "icon": "seat",
+        "tabs": "Seats, Settings, Calibration",
+        "sel": 2,
+        "chips": "",
+        "title": "Calibration",
+        "sub": "Save driving and Exit positions; no automatic movement",
+        "back": false,
+        "credit": "",
+        "hu": "id8"
+      }
+    },
+    {
+      "name": "calibrationInstructions",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 40,
+      "y": 272,
+      "w": 1360,
+      "h": 52,
+      "opts": {
+        "text": "DRIVER CALIBRATION",
+        "size": 26,
+        "font": "label",
+        "color": "#8b9099",
+        "align": "left",
+        "wrap": true
+      }
+    },
+    {
+      "name": "calibrationStepOne",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 40,
+      "y": 324,
+      "w": 1360,
+      "h": 85,
+      "opts": {
+        "text": "1. Set your driving pose with the physical controls. Stop and capture. This will become app M1.",
+        "size": 28,
+        "font": "label",
+        "color": "#f2f2f2",
+        "align": "left",
+        "wrap": true
+      }
+    },
+    {
+      "name": "calibrationStepTwo",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 40,
+      "y": 415,
+      "w": 1360,
+      "h": 85,
+      "opts": {
+        "text": "2. Move rearward manually to your rear reference. Stop and capture the limit; a 30-count buffer is added.",
+        "size": 28,
+        "font": "label",
+        "color": "#f2f2f2",
+        "align": "left",
+        "wrap": true
+      }
+    },
+    {
+      "name": "calibrationStepThree",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 40,
+      "y": 506,
+      "w": 1360,
+      "h": 90,
+      "opts": {
+        "text": "3. Move forward to your preferred Easy Exit pose, inside the limit. Stop and save to unlock all modes.",
+        "size": 28,
+        "font": "label",
+        "color": "#f2f2f2",
+        "align": "left",
+        "wrap": true
+      }
+    },
+    {
+      "name": "calibrationStatus",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 1480,
+      "y": 272,
+      "w": 1360,
+      "h": 50,
+      "opts": {
+        "text": "CALIBRATION REQUIRED",
+        "size": 28,
+        "font": "label",
+        "color": "#ffb020",
+        "align": "left",
+        "wrap": true
+      }
+    },
+    {
+      "name": "calibrationDetail",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 1480,
+      "y": 334,
+      "w": 1360,
+      "h": 132,
+      "opts": {
+        "text": "Automatic modes stay blocked until both positions are saved.",
+        "size": 28,
+        "font": "label",
+        "color": "#f2f2f2",
+        "align": "left",
+        "wrap": true
+      }
+    },
+    {
+      "name": "calibrationLimit",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 1480,
+      "y": 475,
+      "w": 1360,
+      "h": 110,
+      "opts": {
+        "text": "No rear limit saved. Calibration adds a 30-count inward buffer.",
+        "size": 25,
+        "font": "label",
+        "color": "#8b9099",
+        "align": "left",
+        "wrap": true
+      }
+    },
+    {
+      "name": "calibrationDriving",
+      "rtype": "gpu",
+      "gpu": "teleButton",
+      "x": 40,
+      "y": 690,
+      "w": 691,
+      "h": 76,
+      "opts": {
+        "text": "1. Capture driving",
+        "kind": "primary",
+        "disabled": true
+      },
+      "onTap": "event:calibrationDriving"
+    },
+    {
+      "name": "calibrationRear",
+      "rtype": "gpu",
+      "gpu": "teleButton",
+      "x": 743,
+      "y": 690,
+      "w": 691,
+      "h": 76,
+      "opts": {
+        "text": "2. Capture rear limit",
+        "kind": "primary",
+        "disabled": true
+      },
+      "onTap": "event:calibrationRear"
+    },
+    {
+      "name": "calibrationExit",
+      "rtype": "gpu",
+      "gpu": "teleButton",
+      "x": 1446,
+      "y": 690,
+      "w": 691,
+      "h": 76,
+      "opts": {
+        "text": "3. Save Easy Exit",
+        "kind": "primary",
+        "disabled": true
+      },
+      "onTap": "event:calibrationExit"
+    },
+    {
+      "name": "calibrationCancel",
+      "rtype": "gpu",
+      "gpu": "teleButton",
+      "x": 2149,
+      "y": 690,
+      "w": 691,
+      "h": 76,
+      "opts": {
+        "text": "Cancel",
+        "kind": "outline",
+        "disabled": true
+      },
+      "onTap": "event:calibrationCancel"
+    },
+    {
+      "name": "calibrationNoTool",
+      "rtype": "gpu",
+      "gpu": "teleEmpty",
+      "x": 40,
+      "y": 248,
+      "w": 2800,
+      "h": 568,
+      "opts": {
+        "icon": "warning",
+        "head": "Comfort tool not installed",
+        "line": "Install the Comfort tool from the Store",
+        "color": "",
+        "hidden": true
+      }
+    }
+  ],
+  "id7": {
+    "components": [
+      {
+        "name": "calibrationMenu",
+        "rtype": "gpu",
+        "gpu": "teleShell",
+        "x": 84,
+        "y": 76,
+        "w": 1836,
+        "h": 154,
+        "opts": {
+          "app": "Seats",
+          "icon": "seat",
+          "tabs": "Seats, Settings, Calibration",
+          "sel": 2,
+          "chips": "",
+          "title": "Calibration",
+          "sub": "Save driving and Exit positions; no automatic movement",
+          "back": false,
+          "credit": "",
+          "hu": "id7"
+        }
+      },
+      {
+        "name": "calibrationInstructions",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 116,
+        "y": 254,
+        "w": 870,
+        "h": 52,
+        "opts": {
+          "text": "DRIVER CALIBRATION",
+          "size": 26,
+          "font": "label",
+          "color": "#8b9099",
+          "align": "left",
+          "wrap": true
+        }
+      },
+      {
+        "name": "calibrationStepOne",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 116,
+        "y": 306,
+        "w": 870,
+        "h": 85,
+        "opts": {
+          "text": "1. Set your driving pose with the physical controls. Stop and capture. This will become app M1.",
+          "size": 28,
+          "font": "label",
+          "color": "#f2f2f2",
+          "align": "left",
+          "wrap": true
+        }
+      },
+      {
+        "name": "calibrationStepTwo",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 116,
+        "y": 397,
+        "w": 870,
+        "h": 85,
+        "opts": {
+          "text": "2. Move rearward manually to your rear reference. Stop and capture the limit; a 30-count buffer is added.",
+          "size": 28,
+          "font": "label",
+          "color": "#f2f2f2",
+          "align": "left",
+          "wrap": true
+        }
+      },
+      {
+        "name": "calibrationStepThree",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 116,
+        "y": 488,
+        "w": 870,
+        "h": 90,
+        "opts": {
+          "text": "3. Move forward to your preferred Easy Exit pose, inside the limit. Stop and save to unlock all modes.",
+          "size": 28,
+          "font": "label",
+          "color": "#f2f2f2",
+          "align": "left",
+          "wrap": true
+        }
+      },
+      {
+        "name": "calibrationStatus",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 1018,
+        "y": 254,
+        "w": 870,
+        "h": 50,
+        "opts": {
+          "text": "CALIBRATION REQUIRED",
+          "size": 28,
+          "font": "label",
+          "color": "#ffb020",
+          "align": "left",
+          "wrap": true
+        }
+      },
+      {
+        "name": "calibrationDetail",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 1018,
+        "y": 316,
+        "w": 870,
+        "h": 132,
+        "opts": {
+          "text": "Automatic modes stay blocked until both positions are saved.",
+          "size": 28,
+          "font": "label",
+          "color": "#f2f2f2",
+          "align": "left",
+          "wrap": true
+        }
+      },
+      {
+        "name": "calibrationLimit",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 1018,
+        "y": 457,
+        "w": 870,
+        "h": 110,
+        "opts": {
+          "text": "No rear limit saved. Calibration adds a 30-count inward buffer.",
+          "size": 25,
+          "font": "label",
+          "color": "#8b9099",
+          "align": "left",
+          "wrap": true
+        }
+      },
+      {
+        "name": "calibrationDriving",
+        "rtype": "gpu",
+        "gpu": "teleButton",
+        "x": 116,
+        "y": 610,
+        "w": 434,
+        "h": 76,
+        "opts": {
+          "text": "1. Capture driving",
+          "kind": "primary",
+          "disabled": true
+        },
+        "onTap": "event:calibrationDriving"
+      },
+      {
+        "name": "calibrationRear",
+        "rtype": "gpu",
+        "gpu": "teleButton",
+        "x": 562,
+        "y": 610,
+        "w": 434,
+        "h": 76,
+        "opts": {
+          "text": "2. Capture rear limit",
+          "kind": "primary",
+          "disabled": true
+        },
+        "onTap": "event:calibrationRear"
+      },
+      {
+        "name": "calibrationExit",
+        "rtype": "gpu",
+        "gpu": "teleButton",
+        "x": 1008,
+        "y": 610,
+        "w": 434,
+        "h": 76,
+        "opts": {
+          "text": "3. Save Easy Exit",
+          "kind": "primary",
+          "disabled": true
+        },
+        "onTap": "event:calibrationExit"
+      },
+      {
+        "name": "calibrationCancel",
+        "rtype": "gpu",
+        "gpu": "teleButton",
+        "x": 1454,
+        "y": 610,
+        "w": 434,
+        "h": 76,
+        "opts": {
+          "text": "Cancel",
+          "kind": "outline",
+          "disabled": true
+        },
+        "onTap": "event:calibrationCancel"
+      },
+      {
+        "name": "calibrationNoTool",
+        "rtype": "gpu",
+        "gpu": "teleEmpty",
+        "x": 116,
+        "y": 230,
+        "w": 1772,
+        "h": 470,
+        "opts": {
+          "icon": "warning",
+          "head": "Comfort tool not installed",
+          "line": "Install the Comfort tool from the Store",
+          "color": "",
+          "hidden": true
+        }
+      }
+    ]
+  }
+}

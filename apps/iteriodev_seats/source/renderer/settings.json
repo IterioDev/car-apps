@@ -17,7 +17,7 @@
       "opts": {
         "app": "Seats",
         "icon": "seat",
-        "tabs": "Seats, Settings",
+        "tabs": "Seats, Settings, Calibration",
         "sel": 1,
         "chips": "",
         "title": "Settings",
@@ -311,7 +311,7 @@
         "opts": {
           "app": "Seats",
           "icon": "seat",
-          "tabs": "Seats, Settings",
+          "tabs": "Seats, Settings, Calibration",
           "sel": 1,
           "chips": "",
           "title": "Settings",

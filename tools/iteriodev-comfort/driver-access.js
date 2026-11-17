@@ -13,8 +13,16 @@ function validCalibration(c) {
         Object.keys(c).length === 2 && Number.isInteger(c.rear) && c.rear >= 8192 && c.rear <= 57344 &&
         (c.direction === -1 || c.direction === 1));
 }
+function calibrated(data) {
+    const c=data.settings && data.settings.driverRelativeLimit;
+    const drive=data.memories && data.memories.driver && data.memories.driver[0],exit=data.exit && data.exit.driver;
+    return !!(data.settings && data.settings.driverCalibrationVersion===1 && validCalibration(c) &&
+        position(drive) && position(exit) && [drive.SLV,exit.SLV].every(n=>Number.isInteger(n) && n>=8192 && n<=57344) &&
+        (drive.SLV-c.rear)*c.direction<0 && (exit.SLV-c.rear)*c.direction<=0);
+}
 function settings(raw) { raw=raw||{};return {easyExit:raw.easyExit!==false,driverExitMode:mode(raw.driverExitMode),
     driverExitTargetMode:raw.driverExitTargetMode==='adaptive'?'adaptive':'fixed',driverExitLevel:[1,2,3].indexOf(raw.driverExitLevel)>=0?raw.driverExitLevel:2,
+    driverCalibrationVersion:raw.driverCalibrationVersion===1?1:0,
     driverRelativeLimit:validCalibration(raw.driverRelativeLimit)?{rear:raw.driverRelativeLimit.rear,direction:raw.driverRelativeLimit.direction}:null}; }
 function updateSettings(data, patch, busy) {
     if(!patch || typeof patch!=='object' || Array.isArray(patch))return 'invalid settings';
@@ -95,6 +103,8 @@ class DriverExit {
         const d=this.d.data;return which==='exit' ? d.exit.driver : selected==='fixed' ? d.memories.driver[0] : d.pre.driver;
     }
     blocked(a) {
+        if(this.d.calibrating && this.d.calibrating())return 'calibration in progress';
+        if(!this.d.calibrated || !this.d.calibrated())return 'complete driver calibration first';
         if(!a.manual && !this.d.data.settings.easyExit)return 'easy exit disabled';
         if(mode(this.d.data.settings.driverExitMode)!==a.selected)return 'return mode changed';
         if((this.d.data.settings.driverExitTargetMode||'fixed')!==a.exitMode || (this.d.data.settings.driverExitLevel||2)!==a.level)return 'exit settings changed';
@@ -189,4 +199,4 @@ class DriverExit {
         this.d.schedule(which==='exit'?'exit':'back',run,!!manual);
     }
 }
-module.exports={EXIT_COUNTS,validCalibration,relativeTarget,updateSettings,STARTUP_SETTLE_MS,near,DriverExit,settings,setMode,mode,ready,driveReady:ready,transition,decodeCondition,position};
+module.exports={calibrated,EXIT_COUNTS,validCalibration,relativeTarget,updateSettings,STARTUP_SETTLE_MS,near,DriverExit,settings,setMode,mode,ready,driveReady:ready,transition,decodeCondition,position};

@@ -66,6 +66,7 @@ const uds = require('./uds');
 const amb = require('./ambient');
 const seat = require('./seat');
 const driver = require('./driver-access');
+const { Calibration } = require('./calibration');
 
 const DATA = process.env.COMFORT_DATA || '/var/opt/iteriodev-comfort/data.json';
 const CTL = process.env.COMFORT_CTL || '/run/iteriodev-comfort/ctl.sock';
@@ -116,7 +117,8 @@ function save(d) {
         mkdir();
         fs.writeFileSync(DATA + '.tmp', JSON.stringify(d));
         fs.renameSync(DATA + '.tmp', DATA);
-    } catch (e) { log('save: ' + e.message); }
+        return true;
+    } catch (e) { log('save: ' + e.message); return false; }
 }
 
 
@@ -222,7 +224,7 @@ function main() {
         car.gear = v >= 1 && v <= 13 ? v : null; car.gearAt = Date.now();
         driverExit.check(); push();
     }
-    function resetAutomaticSource(reason) { car.gear = null; car.gearAt = 0; driverExit.reset(reason); }
+    function resetAutomaticSource(reason) { if(calibration.active())calibration.cancel('Calibration cancelled: '+reason); car.gear = null; car.gearAt = 0; driverExit.reset(reason); }
     const u16 = (k) => (hex) => { const v = parseInt((hex || '').slice(0, 4), 16); if (v >= 0 && v !== 0xffff) { car[k] = v; car[k + 'At'] = Date.now(); } };
     const speed = u16('speed'), rpm = u16('rpm');
     // the front doors: their changes only (a state seen first - a restart with a door open - moves nothing)
@@ -343,6 +345,7 @@ function main() {
 
     /* ---- seats ---- */
     const mover = new seat.Mover(diag, parked, log, () => push());
+    let pendingCaptures = 0;
     let cancelGeneration = 0; // invalidates awaited position reads and scheduled work on explicit cancellation
     let busyJob = null, jobSeat = null, busyAutomatic = false, automaticGeneration = 0;               // 'memory' / 'gentleman' / 'exit' / 'back' while one runs, its seat
     async function job(name, fn, s, automatic) {
@@ -425,7 +428,7 @@ function main() {
         return short ? 'short' : 'done';
     }
     const driverExit = new driver.DriverExit({
-        data, parked, inPark, occupied: () => !childSeat('driver') && (!known('driver') || person('driver')),
+        data, parked, inPark, calibrated: () => driver.calibrated(data), calibrating: () => calibration.active(), occupied: () => !childSeat('driver') && (!known('driver') || person('driver')),
         returnReady: () => car.on, executionEnabled: () => true,
         now: () => Date.now(), wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
         current: () => mover.read('driver'), capture: () => seatPos('driver'), move: (p, out, context) => seatTo('driver', p, out, context.parkedOnly, context.permission),
@@ -433,6 +436,22 @@ function main() {
         schedule: (name, fn, manual) => auto('driver', name, fn, manual),
         save: () => save(data), changed: push,
         log,
+    });
+
+    const controlsBusy = () => !!(pendingCaptures || busyJob || autoRun || mover.busy || mover.motion || mover.next || want.driver || want.passenger);
+    const calibration = new Calibration({
+        now: () => Date.now(), changed: push, capture: () => seatPos('driver'),
+        guard: () => !inPark() ? 'Fresh P required' : !parked() ? 'Car must be standing' :
+            controlsBusy() ? 'Seat control is busy' : !mover.hall('driver','SLV') ? 'Driver longitudinal feedback required' : null,
+        commit: result => {
+            const next=JSON.parse(JSON.stringify(data));
+            next.settings.driverRelativeLimit=result.limit;next.settings.driverCalibrationVersion=1;
+            next.memories.driver[0]=result.driving;next.exit.driver=result.exit;
+            next.pre.driver=result.driving;next.out.driver=result.actual;next.relativeExit.driver=null;
+            if(!driver.calibrated(next))throw Error('Invalid driver calibration');
+            if(!save(next))throw Error('Calibration was not saved; previous settings retained');
+            Object.assign(data,next);
+        },
     });
 
     // The app's manual Exit remains available for either seat; automatic driver actions use DriverExit.
@@ -480,39 +499,49 @@ function main() {
     const status = () => ({ state: {
         parked: parked(), carOn: car.on, ambient: { settings: data.ambient, carOn: car.ambientOn, lit, mode: car.mode,
             modules: (mods || []).map((m) => ({ id: amb.key(m), name: m.name, zone: m.zone, fault: m.fault })) },
-        seats: { controlBusy: !!mover.busy, pos: mover.pos, moving: mover.motion ? { seat: mover.motion.seat, axis: mover.motion.axis } : null, job: busyJob,
+        seats: { controlBusy: !!mover.busy || !!pendingCaptures || calibration.busy, pos: mover.pos, moving: mover.motion ? { seat: mover.motion.seat, axis: mover.motion.axis } : null, job: busyJob,
             jobSeat, memories: data.memories, roomOut: !!data.room, wheel: mover.hasWheel === true,
             axes: per((s) => mover.axes(s)), hall: per((s) => mover.axes(s).some((a) => mover.hall(s, a))), found: mover.found,
             exit: per((s) => !!data.exit[s]), pre: per((s) => !!data.pre[s]) },
         settings: data.settings, driverExit: { modeSupported: true, exitModeSupported: true,
-            passengerAutomationSupported: false, relativeConfigured: driver.validCalibration(data.settings.driverRelativeLimit), gearP: inPark(), last: driverExit.last } } });
+            passengerAutomationSupported: false, calibrated: driverExit.d.calibrated(), calibrationSupported: true, relativeConfigured: driverExit.d.calibrated(), gearP: inPark(), last: driverExit.last }, calibration: calibration.view(null) } });
     let pushTimer = null;
     function push() {                                 // coalesced: a move pushes every counter read
         if (pushTimer) return;
-        pushTimer = setTimeout(() => { pushTimer = null; const l = JSON.stringify(status()) + '\n'; clients.forEach((c) => c.write(l)); }, 100);
+        pushTimer = setTimeout(() => { pushTimer = null; clients.forEach((c) => c.write(JSON.stringify(clientStatus(c))+'\n')); }, 100);
     }
+    const clientStatus = c => {const state=status();state.state.calibration=calibration.view(c);return state;};
     function request(c, q) {
+        const error = message => c.write(JSON.stringify({error:message})+'\n');
+        if(q.op==='calibrate') {
+            calibration.request(c,q.action).then(message=>{if(message)error(message);c.write(JSON.stringify({calibrationReply:q.action})+'\n');push();}).catch(e=>log('calibration reply: '+e.message));return;
+        }
+        if(calibration.active() && ['jog','memory','exit','gentleman'].indexOf(q.op)>=0) {error('Finish or cancel calibration first; use physical controls');return;}
+        if(q.op==='exit' && q.seat!=='passenger' && !q.save && !driverExit.d.calibrated()) {error('Complete driver calibration first');return;}
+        if(q.op==='set' && q.settings && !driverExit.d.calibrated() &&
+            (q.settings.easyExit===true || q.settings.driverExitMode!==undefined || q.settings.driverExitTargetMode!==undefined || q.settings.driverExitLevel!==undefined)) {error('Complete driver calibration first');return;}
+
         const seatOk = q.seat === 'driver' || q.seat === 'passenger';
         if (q.op === 'ambient') { data.ambient = amb.settings(data.ambient, q.settings); saveSoon(); lightSoon(); push(); }
         else if (q.op === 'jog' && seatOk && seat.AXES.indexOf(q.axis) >= 0 && (q.dir === 1 || q.dir === -1)) {
             if (!busyJob) mover.jog(q.seat, q.axis, q.dir);
-        } else if (q.op === 'stop') stopSeats();
+        } else if (q.op === 'stop') {if(calibration.active())calibration.cancel('Calibration cancelled by Stop');stopSeats();}
         else if (q.op === 'memory' && seatOk && [0, 1, 2].indexOf(q.slot) >= 0) {
             const m = data.memories[q.seat];          // the driver's: the column too
-            if (q.save) seatPos(q.seat).then((p) => { m[q.slot] = p; save(data); push(); }).catch((e) => log('memory: ' + e.message));
+            if (q.save) { pendingCaptures++;push();seatPos(q.seat).then((p) => { m[q.slot] = p; save(data); push(); }).catch((e) => log('memory: ' + e.message)).then(() => {pendingCaptures--;push();}); }
             else if (m[q.slot]) job('memory', () => seatTo(q.seat, m[q.slot]), q.seat);
         } else if (q.op === 'exit') {                 // no seat: the driver's (Seats 1.4.x)
             const s = q.seat === 'passenger' ? 'passenger' : 'driver';
-            if (q.save) seatPos(s).then((p) => { data.exit[s] = p; save(data); push(); }).catch((e) => log('exit: ' + e.message));
+            if (q.save) { pendingCaptures++;push();seatPos(s).then((p) => { data.exit[s] = p; save(data); push(); }).catch((e) => log('exit: ' + e.message)).then(() => {pendingCaptures--;push();}); }
             else easyExit(s, true);
         } else if (q.op === 'set' && q.settings) {
             const turningOff=q.settings.easyExit===false && data.settings.easyExit;
-            const error=driver.updateSettings(data,q.settings,!!(busyJob || mover.busy || mover.motion || autoRun || want.driver || want.passenger));
+            const error=driver.updateSettings(data,q.settings,!!(controlsBusy() || calibration.active()));
             if(error){c.write(JSON.stringify({error})+'\n');push();return;}
             if(turningOff)stopAutomaticSeats();
             save(data); push();
         } else if (q.op === 'gentleman') gentleman();
-        else c.write(JSON.stringify(status()) + '\n');
+        else c.write(JSON.stringify(clientStatus(c)) + '\n');
     }
     try { fs.unlinkSync(CTL); } catch (e) { /* none yet */ }
     const srv = net.createServer((c) => {
@@ -530,8 +559,8 @@ function main() {
         });
         c.on('error', () => {});
         // the app gone: nothing it started keeps moving (the door's moves run without it)
-        c.on('close', () => { clients.delete(c); if (!clients.size && AUTO.indexOf(busyJob) < 0) stopSeats(); });
-        c.write(JSON.stringify(status()) + '\n');
+        c.on('close', () => { clients.delete(c); if(calibration.owner===c)calibration.cancel('Calibration cancelled: connection closed'); if (!clients.size && AUTO.indexOf(busyJob) < 0) stopSeats(); });
+        c.write(JSON.stringify(clientStatus(c)) + '\n');
         // an app opened with a seat still unknown: asked again (at most every 20 s; issue #29: never asked again before)
         SEATS.filter((s) => !mover.axes(s).length).forEach((s) => mover.probe(s));
     });
@@ -539,7 +568,7 @@ function main() {
     srv.listen(CTL, () => { try { fs.chmodSync(CTL, 0o666); } catch (e) { log('control socket: ' + e.message); } });
 
     subscribe();
-    setInterval(() => driverExit.check(), 100); // expiry cancels only an owned door-exit request
+    setInterval(() => {calibration.check();driverExit.check();}, 100); // expiry cancels only an owned door-exit request
     setInterval(() => {                               // HU getters, not the BDC; rpm only while no speed comes
         poll(SPEED_GET, speed);
         if (!fresh(car.speedAt)) poll(RPM_GET, (h) => { rpm(h); SEATS.forEach(back); });
@@ -551,7 +580,7 @@ function main() {
         light(true);
     }, 3000);
     process.on('SIGTERM', () => {                     // hand the ambient light back, stop any move, then go
-        stopSeats();
+        if(calibration.active())calibration.cancel('Calibration cancelled: service stopping');stopSeats();
         const end = () => { if (child) child.kill(); process.exit(0); };
         if (!lit || !mods) return end();
         Promise.all(mods.map((m) => diag.send(amb.BDC, 0x2e, amb.release(m)).catch(() => {}))).then(end);
