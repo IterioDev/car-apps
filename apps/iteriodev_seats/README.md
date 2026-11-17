@@ -2,7 +2,7 @@
 
 Move the driver and passenger seats from the central display, also while driving (as with the seats' own switches, for a passenger who can't reach theirs), both on one page: each seat seen from the side with its controls round it (fore / aft, height, backrest, tilt and headrest, while you hold them), three memories per seat under it (for cars without memory buttons too), the Gentleman button (parked only) that moves the passenger seat out of the way and back, and Easy exit for both front seats: the seat (and on the driver's side an electric steering column) moves to your own getting-out position when its door opens with the car standing, and back once the door is shut (the driver's with the car on, the passenger's with someone seated). The seat's own switches always win. Needs the Comfort tool (the Store installs it with the app).
 
-Version 1.6.2 · iDrive 7 and 8 · package `iteriodev_seats` · [all apps and how to install](../../README.md)
+Proposed version 1.7.0 · iDrive 7 and 8 · package `iteriodev_seats` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
 > Run on a car (an M4, seat modules FAS_G11 / BFS_G11): hold-to-move and memory recall work, parked. Not run on a car yet: the 1.1.0 page, Make room, and moving while driving (1.1.1; whether the seat modules take it at speed is not known yet). iDrive 7 (1.2.0): not run on an iDrive 7 car yet. Easy exit and the electric steering column (1.4.0): not run on a car yet. The passenger's Easy exit with the seat sensor and motor-only seats (1.5.0): not run on a car yet. The iDrive controller (1.6.0): on an M4 only the first controller states reached the app; 1.6.1 fixes that, not run on a car yet. Comfort tool 0.6.0 (smoother hold-to-move, recalls and Easy exit back within a few counts, seat modules asked again): not run on a car yet.
@@ -12,6 +12,12 @@ Version 1.6.2 · iDrive 7 and 8 · package `iteriodev_seats` · [all apps and ho
 ![While driving](screenshots/seats-driving.png)
 
 Everything works but Make room, which needs the car parked.
+
+## Proposed driver modes
+
+This contribution keeps the original seat-control design and adds the functional split settings page. Driver Drive and Exit targets can each be Fixed or Adaptive; relative Exit distance is 75/150/225 counts with explicit per-vehicle calibration. See [driver policy, migration and validation](../../tools/iteriodev-comfort/DRIVER_MODES.md) and [reviewable UI sources](source/README.md).
+
+**Passenger automatic Exit/return is disabled in this proposal** pending a verified occupancy path. Passenger manual controls, memories, manual Exit and Make room remain available. Historical screenshots and descriptions below show the released 1.6.2 behavior; they are retained as reference, not current validation of this proposal.
 
 ## Screens
 

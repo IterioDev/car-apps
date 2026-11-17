@@ -71,6 +71,10 @@ is asked again up to 20 times, 200 ms apart, as MG Flasher's app does.
 - A DME without the Custom Code refuses the write: the screen shows *MG Flasher not found* and greys map, burbles and
   cooling out until the app is opened again.
 
+## Proposed Seats driver automation
+
+The driver-modes contribution proposes Comfort 0.7.0 / Seats 1.7.0 with independent Drive/Exit settings in the existing design. Passenger automatic movement is deferred; its manual controls remain available. See [policy and validation limits](tools/iteriodev-comfort/DRIVER_MODES.md). Historical app descriptions/screenshots refer to the released behavior until this proposal is reviewed.
+
 ## Installing
 
 1. Install the Store from [robertnisipeanu/mgu-store](https://github.com/robertnisipeanu/mgu-store) first,

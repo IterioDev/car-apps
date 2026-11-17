@@ -175,13 +175,13 @@ class Mover {
         });
     }
     /** a motor write; refused in the default session (the column): once more in the extended one, from then on there */
-    async write(seat, data) {
-        try { await this.uds.send(UNITS[seat], 0x2e, data); } catch (e) {
+    async write(seat, data, permission) {
+        try { await this.uds.send(UNITS[seat], 0x2e, data, undefined, undefined, permission); } catch (e) {
             if (this.ext[seat] || EXT_NRC.indexOf(e.code) < 0) throw e;
             this.ext[seat] = true;
             this.log(`${seat}: ${e.message} in the default session: extended`);
             await this.session(seat);
-            await this.uds.send(UNITS[seat], 0x2e, data);
+            await this.uds.send(UNITS[seat], 0x2e, data, undefined, undefined, permission);
         }
     }
 
@@ -199,14 +199,17 @@ class Mover {
      * lands closer) }; resolves with why it stopped */
     async drive(seat, axis, dir, until, o) {
         o = o || {};
+        const permission = o.permission;
+        const denied = () => permission && permission();
         const me = { seat, axis, dir, holder: o.holder || null, why: null };
         // only the newest request waits for the move before it to stop: an older waiting one is dropped, not run later
         [this.next, this.motion].forEach((m) => { if (m && !m.why) m.why = 'replaced'; });
         this.next = me;
         this.wake();
-        while (this.busy && !me.why) await sleep(20);
+        while (this.busy && !me.why) { if (denied()) { me.why = denied(); break; } await sleep(20); }
         if (this.next === me) this.next = null;
         if (me.why) return me.why;
+        if (denied()) return denied();
         const wheel = seat === 'wheel', still = wheel ? WHEEL_STALL : STALL_COUNTS;
         const blind = !wheel && !this.hall(seat, axis);   // no position: moves while its holder asks, no end stop seen
         const parked = () => (!o.parkedOnly && !wheel) || this.parked();
@@ -225,11 +228,12 @@ class Mover {
             for (;;) {
                 const now = Date.now();
                 if (me.why) break;
+                if (denied()) { me.why = denied(); break; }
                 if (me.holder && now > me.holder.deadline) { me.why = 'released'; break; }   // let go before it even started
                 if (!parked()) { me.why = 'not parked'; break; }
                 if (now - t0 > (o.limit || LIMIT_MS)) { me.why = 'time limit'; break; }
                 if (now - sent >= RESEND_MS) {
-                    await this.write(seat, wheel ? wheelMove(axis, dir) : move(axis, dir));
+                    await this.write(seat, wheel ? wheelMove(axis, dir) : move(axis, dir), () => me.why || denied() || (!parked() ? 'not parked' : null));
                     sent = now;
                     if (this.sess[seat]) this.sess[seat] = now;
                 }
@@ -240,6 +244,8 @@ class Mover {
                     continue;
                 }
                 const r0 = Date.now(), p = await this.read(seat), v = p[axis];
+                if (denied()) { me.why = denied(); break; }
+                if (me.why) break;
                 if (v === undefined) { me.why = 'no such axis'; break; }
                 // an end stop: no progress since the newest reading at least STALL_MS old (a slow gateway takes longer
                 // than that between two readings: compared with the one just taken, it stopped half way before 0.3.3)
@@ -302,13 +308,15 @@ class Mover {
     /** drive each axis of a saved position (from read()) back to its counts (parkedOnly: the Gentleman's way back, easy
      * exit): 'done', 'short' (an axis stood short of it: blocked, or its seat module kept holding the motors) or why
      * it stopped */
-    async recall(seat, target, parkedOnly) {
+    async recall(seat, target, parkedOnly, permission) {
         const t0 = Date.now();
         let short = false;
         for (const axis of seat === 'wheel' ? WHEEL : ORDER) {
             if (this.haltAt >= t0) return 'stopped';
+            if (permission && permission()) return permission();
             if (target[axis] === undefined) continue;
-            const r = await this.approach(seat, axis, target[axis], parkedOnly, t0);
+            const r = await this.approach(seat, axis, target[axis], parkedOnly, t0, permission);
+            if (permission && permission()) return permission();
             if (r === 'short') short = true;
             else if (r !== 'there') return r;
         }
@@ -317,12 +325,15 @@ class Mover {
 
     /** one axis to its counts: stopped ahead by what it moves on after the stop (its speed x lag(), learned from each
      * stop), then corrected from standstill while that gets it closer - never back and forth more than TRIES */
-    async approach(seat, axis, want, parkedOnly, t0) {
+    async approach(seat, axis, want, parkedOnly, t0, permission) {
         const tol = seat === 'wheel' ? WHEEL_TOL : TOL, still = seat === 'wheel' ? WHEEL_STALL : STALL_COUNTS;
+        if (permission && permission()) return permission();
         let v = (await this.read(seat))[axis], best = Infinity, pauses = 0;
+        if (permission && permission()) return permission();
         for (let n = 0; v !== undefined && n < TRIES; n++) {
             const e = want - v;
             if (this.haltAt >= t0) return 'stopped';
+            if (permission && permission()) return permission();
             if (Math.abs(e) <= tol) return 'there';
             // as close as it gets: the last correction did not get closer, or the next would overshoot by more
             if (Math.abs(e) >= best || (best < Infinity && Math.abs(e) <= this.pulse(seat, axis) / 2)) break;
@@ -335,11 +346,13 @@ class Mover {
                 const r = Math.abs(rate), coast = r * this.lag(seat), step = r * Math.max(this.rtt, FAST_MS);
                 if (left - coast <= Math.max(tol, step) / 2) { stopAt = p[axis]; rateAt = r; return 'there'; }
                 return null;
-            }, { parkedOnly, fast: true });
+            }, { parkedOnly, fast: true, permission });
             if (why !== 'there' && why !== 'end stop' && why !== 'wrong way') return why;
             await sleep(SETTLE_MS);
             if (this.haltAt >= t0) return 'stopped';
+            if (permission && permission()) return permission();
             const now = (await this.read(seat))[axis];
+            if (permission && permission()) return permission();
             if (now === undefined) break;
             if (stopAt !== null && rateAt > 0.005) this.learn(seat, axis, ((now - stopAt) * s) / rateAt, rateAt);
             if (worse) { this.inv[seat][axis] = !this.inv[seat][axis]; v = now; continue; }   // its counter runs the other way
@@ -349,6 +362,7 @@ class Mover {
                 if (pauses++ >= PAUSES) return Math.abs(want - now) > 3 * tol ? 'short' : 'there';
                 await this.nap(PAUSE_MS);             // a stop ends it at once
                 if (this.haltAt >= t0) return 'stopped';
+                if (permission && permission()) return permission();
                 v = (await this.read(seat))[axis];
                 n--;
                 continue;

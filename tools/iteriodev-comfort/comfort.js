@@ -40,6 +40,8 @@
  *             on the car switching on waits ON_SETTLE_MS (the seat module holds its motors then) and a way back that
  *             stood short keeps the place for the next try. Log also in comfort.log beside the data (the journal is
  *             gone within minutes).
+ * Driver modes and readiness triggers: see DRIVER_MODES.md. Passenger automatic exit/return is deferred;
+ * passenger app memories, manual Exit, hold controls and Make room remain available.
  * All UDS goes through the head unit's diagnostic gateway on one `hmictl serve` (uds.js).
  * Control socket /run/iteriodev-comfort/ctl.sock, JSON lines in and out; every change is pushed to every client:
  *   {op:'get'}  {op:'ambient', settings:{on, rgb:[r,g,b], bright 5-100, follow, zones:{dash:{rgb}|{off:true}|null},
@@ -48,7 +50,8 @@
  *   {op:'stop'}  {op:'memory', seat, slot:0-2, save:true|false}  {op:'gentleman'}  (out of the way, again: back)
  *   {op:'exit', seat, save:true|false}  (save: the seat (+ the driver's column) as it is = its Exit; else: there now;
  *               no seat: the driver's)
- *   {op:'set', settings:{easyExit:true|false}}
+ *   {op:'set', settings:{easyExit:true|false, driverExitMode:'adaptive'|'fixed',
+ *       driverExitTargetMode:'adaptive'|'fixed', driverExitLevel:1|2|3}}
  * Data /var/opt/iteriodev-comfort/data.json { ambient, memories:{driver:[3], passenger:[3]}, room, exit:{driver, passenger},
  * pre:{driver, passenger}, out:{driver, passenger} (where our last easy exit move left it), settings } (0.3.x: exit / pre
  * the driver's alone, read as the driver's).
@@ -62,6 +65,7 @@ const { spawn } = require('child_process');
 const uds = require('./uds');
 const amb = require('./ambient');
 const seat = require('./seat');
+const driver = require('./driver-access');
 
 const DATA = process.env.COMFORT_DATA || '/var/opt/iteriodev-comfort/data.json';
 const CTL = process.env.COMFORT_CTL || '/run/iteriodev-comfort/ctl.sock';
@@ -78,6 +82,8 @@ const SEATS = ['driver', 'passenger'];
 const per = (f) => ({ driver: f('driver'), passenger: f('passenger') });
 const STOP_SPEED = 2 * 64, STOP_RPM = 1000 * 4, RUN_RPM = 400 * 4;   // raw: speed 1/64 km/h (V_VEH_COG), rpm x 0.25
 // VehicleCondition: shown to the apps (the car switched on or not)
+// Gear-display P is a door-exit guard, not proof of the physical park lock.
+const GEAR_SUB = 'sub 0x1536 1 1 4 0x8004', GEAR_FRESH_MS = 2000;
 const VCOND_SUB = 'sub 0x1531 1 1 2 0x8002';                 // no getter: its notifications only
 const carOn = (hex) => [7, 8, 10].indexOf(parseInt((hex || '').slice(10, 12), 16)) >= 0;   // test / ready to drive / driving
 // statusConditionVehicle: someone in the car (WOHNEN, test, ready to drive, driving, ending it) or not (PARKEN, STANDFUNKTIONEN:
@@ -85,8 +91,6 @@ const carOn = (hex) => [7, 8, 10].indexOf(parseInt((hex || '').slice(10, 12), 16
 // holding the lights 254 s while the head unit stayed awake); not told yet: as before
 const COND = { 1: 'parked', 2: 'parked', 3: 'standby, nobody in the car', 5: 'residing', 7: 'test', 8: 'ready to drive', 10: 'driving', 12: 'ending ready to drive' };
 const IN_CAR = [5, 7, 8, 10, 12];
-const ON_SETTLE_MS = 2000;                                     // the way back on the car switching on: after this
-const NEAR = 32;                                               // counts: a seat where our move left it (easy exit)
 // the log also in a file beside the data (0.6.0): the car's journal keeps only minutes; 256 KB, then one old file
 const LOG_FILE = path.join(path.dirname(DATA), 'comfort.log');
 const log = (m) => {
@@ -103,7 +107,8 @@ function load() {
     const bySeat = (o) => (o && ('driver' in o || 'passenger' in o) ? per((s) => obj(o[s])) : { driver: obj(o), passenger: null });
     return { ambient: amb.settings(d.ambient), memories: { driver: mem(d.memories && d.memories.driver),
         passenger: mem(d.memories && d.memories.passenger) }, room: d.room || null, exit: bySeat(d.exit), pre: bySeat(d.pre),
-        out: per((s) => obj(d.out && d.out[s])), settings: { easyExit: !(d.settings && d.settings.easyExit === false) } };
+        out: per((s) => obj(d.out && d.out[s])), relativeExit: { driver: obj(d.relativeExit && d.relativeExit.driver) },
+        settings: driver.settings(d.settings) };
 }
 const mkdir = () => { try { fs.mkdirSync(path.dirname(DATA)); } catch (e) { /* there already (Node 8: no recursive) */ } };
 function save(d) {
@@ -122,30 +127,51 @@ function main() {
      * when no UDS request / subscription waits (hmictl holds a call to a service the car lacks up 3 s) */
     let child = null, out = '', busy = null, busyTimer = null;
     const queue = [], lowQueue = [];
-    const hmi = (line, low) => new Promise((res) => { (low ? lowQueue : queue).push({ line, res }); pump(); });
+    const hmi = (line, low, cleanup, permission) => new Promise((res) => {
+        (low ? lowQueue : queue).push({ line, res, permission }); pump(); });
     function pump() {
         if (busy || !(queue.length || lowQueue.length)) return;
         if (!child) {
-            child = /\.js$/.test(HMICTL) ? spawn(process.execPath, [HMICTL, 'serve'], { stdio: ['pipe', 'pipe', 'inherit'] })
-                : spawn(HMICTL, ['serve'], { stdio: ['pipe', 'pipe', 'inherit'] });
-            child.on('error', (e) => log('hmictl: ' + e.message));
-            child.stdin.on('error', (e) => log('hmictl: ' + e.message));
+            try {
+                child = /\.js$/.test(HMICTL) ? spawn(process.execPath, [HMICTL, 'serve'], { stdio: ['pipe', 'pipe', 'inherit'] })
+                    : spawn(HMICTL, ['serve'], { stdio: ['pipe', 'pipe', 'inherit'] });
+            } catch (e) {
+                const pending = queue.splice(0).concat(lowQueue.splice(0));
+                resetAutomaticSource('helper failed to start');
+                pending.forEach((p) => p.res('error hmictl failed to start'));
+                setTimeout(subscribe, 2000); return;
+            }
+            const current = child;
+            function lost(reason) {
+                if (child !== current) return;
+                child = null; out = ''; clearTimeout(busyTimer);
+                const pending = (busy ? [busy] : []).concat(queue.splice(0), lowQueue.splice(0)); busy = null;
+                resetAutomaticSource('helper connection lost');
+                pending.forEach((p) => p.res('error ' + reason));
+                setTimeout(subscribe, 2000);
+            }
+            function failed(reason) { lost(reason); try { current.kill(); } catch (e) { /* failed spawn */ } }
+            child.on('error', (e) => { log('hmictl: ' + e.message); failed('hmictl failed'); });
+            child.stdin.on('error', (e) => { log('hmictl: ' + e.message); failed('hmictl input failed'); });
+            child.stdout.on('error', () => failed('hmictl output failed'));
             child.stdout.on('data', (d) => {
+                if (child !== current) return;
                 out += d;
+                if (out.length > 65536) { failed('hmictl output exceeded bound'); return; }
                 for (let n; (n = out.indexOf('\n')) >= 0; out = out.slice(n + 1)) {
                     const line = out.slice(0, n);
                     if (line.startsWith('ev ')) onEvent(line); else if (/^(ok|error)\b/.test(line)) done(line);
                 }
             });
             child.on('exit', (c) => {
-                log('hmictl exited ' + c); child = null; out = '';
-                if (busy) done('error hmictl exited');
-                setTimeout(subscribe, 2000);
+                if (child !== current) return;
+                log('hmictl exited ' + c); lost('hmictl exited');
             });
         }
         busy = queue.length ? queue.shift() : lowQueue.shift();
+        if (busy.permission) { const denied = busy.permission(); if (denied) { done('error ' + denied); return; } }
         busyTimer = setTimeout(() => { if (child) child.kill(); }, 10000);
-        child.stdin.write(busy.line + '\n');
+        try { child.stdin.write(busy.line + '\n'); } catch (e) { child.emit('error', e); }
     }
     function done(line) { clearTimeout(busyTimer); const b = busy; busy = null; if (b) b.res(line); pump(); }
     // a getter: low priority, never two of one waiting, and one that fails (a service this car lacks) left alone for a
@@ -164,35 +190,53 @@ function main() {
 
     const diag = new uds.Uds(hmi, log);
     const car = { speed: null, speedAt: 0, rpm: null, rpmAt: 0, ambientOn: null, on: false, mode: null, cond: null,
-        door: { driver: null, passenger: null }, occ: { driver: null, passenger: null } };
+        gear: null, gearAt: 0, door: { driver: null, passenger: null }, occ: { driver: null, passenger: null } };
     const inCar = () => car.cond === null || IN_CAR.indexOf(car.cond) >= 0;
+    let conditionUnavailable = false;
     const cond = (hex) => {
-        const v = parseInt((hex || '').slice(10, 12), 16);
-        if (COND[v] && v !== car.cond) {
+        const v = driver.decodeCondition(hex), previous = car.cond;
+        if (v === null) {
+            if (!conditionUnavailable) log('vehicle condition unavailable: previous=' + driverExit.conditionValue + ' raw=' + String(hex).slice(0, 28));
+            conditionUnavailable = true; driverExit.condition(null); return;
+        }
+        if (conditionUnavailable) log('vehicle condition recovered: value=' + v + '; transition history reset (no automatic replay)');
+        conditionUnavailable = false;
+        if (COND[v] && v !== previous) {
             const was = inCar();
             car.cond = v; log(`car ${COND[v]} (${hex})`);
             if (inCar() !== was) { light(true); push(); }
         }
         const on = carOn(hex);
-        if (on === car.on) return;
-        car.on = on; log(`car ${on ? 'on' : 'off'} (${hex})`); push(); SEATS.forEach((s) => back(s, true));
-        if (on) SEATS.filter((s) => !mover.axes(s).length).forEach((s) => mover.probe(s, true));   // a seat asleep at the start
+        if (on !== car.on) {
+            car.on = on; log(`car ${on ? 'on' : 'off'} (${hex})`); push(); SEATS.forEach(back);
+            if (on) SEATS.filter((s) => !mover.axes(s).length).forEach((s) => mover.probe(s, true));
+        }
+        driverExit.condition(v);
     };
     // stands: under 2 km/h; no fresh speed: the engine under 1000 rpm (idle or off); neither: the car switched off
     const fresh = (t) => Date.now() - t < SPEED_FRESH_MS;
     const parked = () => (fresh(car.speedAt) ? car.speed < STOP_SPEED : fresh(car.rpmAt) ? car.rpm < STOP_RPM : !car.on);
+    const inPark = () => car.gear === 3 && Date.now() >= car.gearAt && Date.now() - car.gearAt < GEAR_FRESH_MS;
+    function gear(hex) {
+        const v = typeof hex === 'string' && /^[0-9a-f]{2}$/i.test(hex) ? parseInt(hex,16) : null;
+        car.gear = v >= 1 && v <= 13 ? v : null; car.gearAt = Date.now();
+        driverExit.check(); push();
+    }
+    function resetAutomaticSource(reason) { car.gear = null; car.gearAt = 0; driverExit.reset(reason); }
     const u16 = (k) => (hex) => { const v = parseInt((hex || '').slice(0, 4), 16); if (v >= 0 && v !== 0xffff) { car[k] = v; car[k + 'At'] = Date.now(); } };
     const speed = u16('speed'), rpm = u16('rpm');
     // the front doors: their changes only (a state seen first - a restart with a door open - moves nothing)
-    function door(hex) {
+    function door(hex, event) {
+        const expected = event === 0x8006 ? 28 : 30;
+        if (typeof hex !== 'string' || hex.length !== expected || !/^[0-9a-f]+$/i.test(hex)) { driverExit.door(null); return; }
         SEATS.forEach((s) => {
             const v = parseInt((hex || '').substr(2 * DOOR_BYTE[s], 2), 16), was = car.door[s];
-            if (v !== 0 && v !== 1) return;
+            if (v !== 0 && v !== 1) { if (s === 'driver') driverExit.door(null); return; }
             car.door[s] = v === 1;
+            if (s === 'driver') driverExit.door(car.door[s]);
             if (was === null || was === car.door[s]) return;
             log(`${s} door ${car.door[s] ? 'open' : 'closed'}`);
-            if (car.door[s]) easyExit(s, false);
-            back(s);
+            // Passenger manual controls remain available; automatic movement is deferred.
         });
     }
     // who sits in the front seats (SeatInformation: ArrayD = u32 byte length, then per seat its absolute and relative
@@ -209,16 +253,8 @@ function main() {
     }
     const person = (s) => car.occ[s] === 1, childSeat = (s) => [2, 3, 8].indexOf(car.occ[s]) >= 0;
     const known = (s) => [0, 1, 2, 3, 4, 8].indexOf(car.occ[s]) >= 0;   // else: no seat sensor news, the doors alone
-    // back to where it sat, whichever comes last: its door closed and - the driver - the ignition or the engine on,
-    // - the passenger - someone in the seat (not told: the car on, as the driver); never with a child seat on it.
-    // switchedOn: the car just switched on (its seat modules hold the motors a moment: the way back waits ON_SETTLE_MS)
-    const ready = { driver: false, passenger: false };
-    function back(s, switchedOn) {
-        const on = car.on || (fresh(car.rpmAt) && car.rpm >= RUN_RPM);
-        const r = car.door[s] === false && !childSeat(s) && (known(s) ? person(s) && (s === 'passenger' || on) : on);
-        if (r && !ready[s]) { log(`${s} door closed, ${known(s) && s === 'passenger' ? 'seated' : 'car on'}`); easyBack(s, switchedOn ? ON_SETTLE_MS : 0); }
-        ready[s] = r;
-    }
+    // Passenger automation is intentionally deferred; driver readiness is handled by DriverExit.
+    function back(s) { if (s === 'driver') driverExit.check(); }
     function ambientStatus(hex) {
         const on = (hex || '').length >= 16 ? parseInt(hex.slice(14, 16), 16) === 1 : null;
         if (on !== car.ambientOn) { car.ambientOn = on; log(`car ambient light: ${on ? 'on' : 'off'} (${hex})`); light(true); push(); }
@@ -234,12 +270,13 @@ function main() {
         else if (svc === 0xb519 && ev === 0x8008) speed(w[3]);
         else if (svc === 0xb512 && ev === 0x8003) ambientStatus(w[3]);
         else if (svc === 0x1531 && ev === 0x8002) cond(w[3]);
-        else if (svc === 0x5530 && (ev === 0x8001 || ev === 0x8006)) door(w[3]);
+        else if (svc === 0x5530 && (ev === 0x8001 || ev === 0x8006)) door(w[3], ev);
+        else if (svc === 0x1536 && ev === 0x8004) gear(w[3]);
         else if (svc === 0x1030 && ev === 0x8001) occupancy(w[3]);
         else if (svc === 0xb50d && ev === 0x8025) driveMode(w[3]);
     }
     function subscribe() {
-        [uds.SUB, SPEED_SUB, AMB_SUB, VCOND_SUB, DOOR_SUB, OCC_SUB, FES_SUB, FES_POLL].forEach((l) => hmi(l));
+        [uds.SUB, SPEED_SUB, AMB_SUB, VCOND_SUB, DOOR_SUB, GEAR_SUB, OCC_SUB, FES_SUB, FES_POLL].forEach((l) => hmi(l));
         poll(AMB_GET, ambientStatus);
     }
 
@@ -306,19 +343,34 @@ function main() {
 
     /* ---- seats ---- */
     const mover = new seat.Mover(diag, parked, log, () => push());
-    let busyJob = null, jobSeat = null;               // 'memory' / 'gentleman' / 'exit' / 'back' while one runs, its seat
-    async function job(name, fn, s) {
-        if (busyJob) { mover.halt(); return; }        // a second press stops it
-        busyJob = name; jobSeat = s || null; push();
+    let cancelGeneration = 0; // invalidates awaited position reads and scheduled work on explicit cancellation
+    let busyJob = null, jobSeat = null, busyAutomatic = false, automaticGeneration = 0;               // 'memory' / 'gentleman' / 'exit' / 'back' while one runs, its seat
+    async function job(name, fn, s, automatic) {
+        if (busyJob) { stopSeats(); return; } // a second press stops the active job
+        busyJob = name; jobSeat = s || null; busyAutomatic = !!automatic; push();
         try { log(`${name}${s ? ' ' + s : ''}: ${JSON.stringify(await fn())}`); } catch (e) { log(`${name}: ${e.message}`); }
-        busyJob = jobSeat = null; push();
+        finally { busyJob = jobSeat = null; busyAutomatic = false; push(); }
     }
     // the doors' moves: one seat after the other (both doors open together: each gets its turn), a newer one for the
     // same seat replaces the older; they stop a memory move or Make room
     const AUTO = ['exit', 'back'], want = { driver: null, passenger: null };
     let autoRun = false;
-    function auto(s, name, fn) {
-        want[s] = { name, fn };
+    function stopSeats() {
+        cancelGeneration++;
+        SEATS.forEach((s) => { want[s] = null; });
+        driverExit.cancel('stopped', false);
+        mover.halt();
+    }
+    function stopAutomaticSeats() {
+        automaticGeneration++;
+        SEATS.forEach((s) => { if (want[s] && want[s].automatic) want[s] = null; });
+        const driverOwnsJob = busyAutomatic && jobSeat === 'driver';
+        if (driverExit.action && !driverExit.action.manual) driverExit.cancel('easy exit disabled');
+        if (busyAutomatic && !driverOwnsJob) mover.halt();
+    }
+    function auto(s, name, fn, manual) {
+        const generation = cancelGeneration, automaticEpoch = automaticGeneration;
+        want[s] = { name, automatic: !manual, fn: () => generation === cancelGeneration && (manual || automaticEpoch === automaticGeneration) ? fn() : 'cancelled' };
         if (busyJob && (jobSeat === s || AUTO.indexOf(busyJob) < 0)) mover.halt();
         runAuto();
     }
@@ -329,7 +381,7 @@ function main() {
             while (busyJob) await new Promise((r) => setTimeout(r, 50));
             const w = want[s];
             want[s] = null;
-            if (w) await job(w.name, w.fn, s);
+            if (w) await job(w.name, w.fn, s, w.automatic);
         }
         autoRun = false;
     }
@@ -344,60 +396,75 @@ function main() {
     /** to a saved position: the seat, then the driver's column (wheelFirst: the column first, out of the way). A column
      * that cannot move (not calibrated, no answer) leaves the seat to go on (0.6.0: it stopped easy exit, issue #19);
      * 'short' (stood short, blocked) goes on too */
-    async function seatTo(s, p, wheelFirst, parkedOnly) {
-        const steps = [() => mover.recall(s, p, parkedOnly),
-            async () => (s === 'driver' && p.wheel && (await hasWheel()) ? mover.recall('wheel', p.wheel) : 'done')];
+    async function seatTo(s, p, wheelFirst, parkedOnly, permission) {
+        const generation = cancelGeneration;
+        const cancelled = () => generation !== cancelGeneration;
+        const steps = [() => mover.recall(s, p, parkedOnly, permission),
+            async () => {
+                if (s !== 'driver' || !p.wheel) return 'done';
+                const present = await hasWheel();
+                if (cancelled()) return 'cancelled';
+                return present ? mover.recall('wheel', p.wheel, true, permission) : 'done';
+            }];
         if (wheelFirst) steps.reverse();
         let short = false;
         for (let i = 0; i < steps.length; i++) {
+            if (cancelled()) return 'cancelled';
+            if (permission && permission()) return permission();
             const r = await steps[i](), column = (i === 0) === !!wheelFirst;
+            if (cancelled()) return 'cancelled';
+            if (permission && permission()) return permission();
             if (r === 'short') short = true;
-            else if (r !== 'done' && (!column || r === 'stopped' || r === 'not parked')) return r;
-            else if (r !== 'done') log(`${s} steering column: ${r} (the seat goes on)`);
+            else if (r !== 'done') {
+                // Only equipment failures are ignorable; never swallow STOP, permission or motion guards.
+                const unavailable = r === 'not calibrated' || r === 'no such axis' || r === 'no positions' || /^error:/.test(r);
+                if (!column || !unavailable) return r;
+                log(`${s} steering column: ${r} (the seat goes on)`);
+            }
         }
         return short ? 'short' : 'done';
     }
-    /** the seat (its hall axes) within NEAR counts of a saved place */
-    const near = (p, q) => {
-        const k = Object.keys(q || {}).filter((a) => a !== 'wheel' && typeof p[a] === 'number');
-        return k.length > 0 && k.every((a) => Math.abs(p[a] - q[a]) <= NEAR);
-    };
-    // where our last easy exit move left it (0.3.x / 0.5.x data: its Exit position)
-    const lastOut = (s) => data.out[s] || data.exit[s];
-    // out of the way (the door, or the app's Easy exit): where it was kept until the way back - kept again only while
-    // the seat stands where our last move left it (a second door opening, a way back that did not finish); moved by
-    // someone since (its switches, a memory): where it is now (0.6.0: an old place came back). The door alone moves a
-    // seat only with someone in it (or the car not telling) and never one with a child seat on it
+    const driverExit = new driver.DriverExit({
+        data, parked, inPark, occupied: () => !childSeat('driver') && (!known('driver') || person('driver')),
+        returnReady: () => car.on, executionEnabled: () => true,
+        now: () => Date.now(), wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+        current: () => mover.read('driver'), capture: () => seatPos('driver'), move: (p, out, context) => seatTo('driver', p, out, context.parkedOnly, context.permission),
+        stopAutomatic: () => { if (want.driver && want.driver.automatic) want.driver = null; if (busyAutomatic && jobSeat === 'driver') mover.halt(); },
+        schedule: (name, fn, manual) => auto('driver', name, fn, manual),
+        save: () => save(data), changed: push,
+        log,
+    });
+
+    // The app's manual Exit remains available for either seat; automatic driver actions use DriverExit.
     function easyExit(s, manual) {
+        if (s === 'passenger' && !manual) return;
+        if(s==='driver' && data.settings.driverExitTargetMode==='adaptive') {driverExit.request('exit','app',!!manual);return;}
         if (!data.exit[s] || (!manual && !data.settings.easyExit)) return;
         if (!parked()) { log(`easy exit ${s}: the car is not standing`); return; }
         if (!manual && (childSeat(s) || (known(s) && !person(s)))) { log(`easy exit ${s}: nobody in the seat (${car.occ[s]})`); return; }
+        const generation = cancelGeneration, automaticEpoch = automaticGeneration;
+        const permission = () => !manual && (automaticEpoch !== automaticGeneration || !data.settings.easyExit) ? 'easy exit disabled' : null;
         auto(s, 'exit', async () => {
-            const p = await seatPos(s);
-            if (!data.pre[s] || !near(p, lastOut(s))) { data.pre[s] = p; save(data); push(); }
-            return outAt(s, await seatTo(s, data.exit[s], true, true));
-        });
-    }
-    // back where it sat - only while it stands where our move left it: moved since (its switches, a memory), the place is
-    // dropped, not driven back to (it came back later, at a car start); stood short: kept for the next try
-    function easyBack(s, wait) {
-        if (!data.pre[s]) return;
-        if (!parked()) { log(`easy exit ${s} back: the car is not standing`); return; }
-        auto(s, 'back', async () => {
-            const h0 = Date.now();
-            if (wait) await new Promise((r) => setTimeout(r, wait));
-            if (mover.haltAt >= h0) return 'stopped';
-            if (!near(await mover.read(s), lastOut(s))) { data.pre[s] = null; save(data); push(); return 'moved since: stays'; }
-            const r = await seatTo(s, data.pre[s], false, true);
-            if (r === 'done') data.pre[s] = null;
-            return outAt(s, r);
-        });
-    }
-    /** keeps where our move left the seat (a job's end, however it ended) */
-    async function outAt(s, r) {
-        try { data.out[s] = Object.assign({}, await mover.read(s)); } catch (e) { log(`${s} seat: ${e.message}`); }
-        save(data); push();
-        return r;
+            if (!manual && !data.settings.easyExit) return 'easy exit disabled';
+            const adaptiveDriver = s === 'driver' && data.settings.driverExitMode === 'adaptive';
+            if (!data.pre[s] || adaptiveDriver || s === 'passenger') {
+                const captured = await seatPos(s);
+                if (generation !== cancelGeneration) return 'cancelled';
+                if (permission()) return permission();
+                if (!data.pre[s] || !driver.near(captured, data.out[s] || data.exit[s])) {
+                    data.pre[s] = captured; save(data); push();
+                }
+            }
+            if (generation !== cancelGeneration) return 'cancelled';
+            const result = await seatTo(s, data.exit[s], true, true, permission);
+            if ((adaptiveDriver || s === 'passenger') && generation === cancelGeneration) {
+                try {
+                    const actual = await mover.read(s);
+                    if (generation === cancelGeneration && driver.position(actual)) { data.out[s] = Object.assign({}, actual); save(data); push(); }
+                } catch (e) { log('driver last-out read: ' + e.message); }
+            }
+            return result;
+        }, manual);
     }
     // parked only, both ways (a mistaken tap while driving with a front passenger); a press while one runs still stops it
     const gentleman = () => (!busyJob && !parked() ? log('gentleman: not parked') : job('gentleman', async () => {
@@ -413,11 +480,12 @@ function main() {
     const status = () => ({ state: {
         parked: parked(), carOn: car.on, ambient: { settings: data.ambient, carOn: car.ambientOn, lit, mode: car.mode,
             modules: (mods || []).map((m) => ({ id: amb.key(m), name: m.name, zone: m.zone, fault: m.fault })) },
-        seats: { pos: mover.pos, moving: mover.motion ? { seat: mover.motion.seat, axis: mover.motion.axis } : null, job: busyJob,
+        seats: { controlBusy: !!mover.busy, pos: mover.pos, moving: mover.motion ? { seat: mover.motion.seat, axis: mover.motion.axis } : null, job: busyJob,
             jobSeat, memories: data.memories, roomOut: !!data.room, wheel: mover.hasWheel === true,
             axes: per((s) => mover.axes(s)), hall: per((s) => mover.axes(s).some((a) => mover.hall(s, a))), found: mover.found,
             exit: per((s) => !!data.exit[s]), pre: per((s) => !!data.pre[s]) },
-        settings: data.settings } });
+        settings: data.settings, driverExit: { modeSupported: true, exitModeSupported: true,
+            passengerAutomationSupported: false, relativeConfigured: driver.validCalibration(data.settings.driverRelativeLimit), gearP: inPark(), last: driverExit.last } } });
     let pushTimer = null;
     function push() {                                 // coalesced: a move pushes every counter read
         if (pushTimer) return;
@@ -428,7 +496,7 @@ function main() {
         if (q.op === 'ambient') { data.ambient = amb.settings(data.ambient, q.settings); saveSoon(); lightSoon(); push(); }
         else if (q.op === 'jog' && seatOk && seat.AXES.indexOf(q.axis) >= 0 && (q.dir === 1 || q.dir === -1)) {
             if (!busyJob) mover.jog(q.seat, q.axis, q.dir);
-        } else if (q.op === 'stop') mover.halt();
+        } else if (q.op === 'stop') stopSeats();
         else if (q.op === 'memory' && seatOk && [0, 1, 2].indexOf(q.slot) >= 0) {
             const m = data.memories[q.seat];          // the driver's: the column too
             if (q.save) seatPos(q.seat).then((p) => { m[q.slot] = p; save(data); push(); }).catch((e) => log('memory: ' + e.message));
@@ -437,8 +505,12 @@ function main() {
             const s = q.seat === 'passenger' ? 'passenger' : 'driver';
             if (q.save) seatPos(s).then((p) => { data.exit[s] = p; save(data); push(); }).catch((e) => log('exit: ' + e.message));
             else easyExit(s, true);
-        } else if (q.op === 'set' && q.settings && typeof q.settings.easyExit === 'boolean') {
-            data.settings.easyExit = q.settings.easyExit; save(data); push();
+        } else if (q.op === 'set' && q.settings) {
+            const turningOff=q.settings.easyExit===false && data.settings.easyExit;
+            const error=driver.updateSettings(data,q.settings,!!(busyJob || mover.busy || mover.motion || autoRun || want.driver || want.passenger));
+            if(error){c.write(JSON.stringify({error})+'\n');push();return;}
+            if(turningOff)stopAutomaticSeats();
+            save(data); push();
         } else if (q.op === 'gentleman') gentleman();
         else c.write(JSON.stringify(status()) + '\n');
     }
@@ -458,7 +530,7 @@ function main() {
         });
         c.on('error', () => {});
         // the app gone: nothing it started keeps moving (the door's moves run without it)
-        c.on('close', () => { clients.delete(c); if (!clients.size && AUTO.indexOf(busyJob) < 0) mover.halt(); });
+        c.on('close', () => { clients.delete(c); if (!clients.size && AUTO.indexOf(busyJob) < 0) stopSeats(); });
         c.write(JSON.stringify(status()) + '\n');
         // an app opened with a seat still unknown: asked again (at most every 20 s; issue #29: never asked again before)
         SEATS.filter((s) => !mover.axes(s).length).forEach((s) => mover.probe(s));
@@ -467,6 +539,7 @@ function main() {
     srv.listen(CTL, () => { try { fs.chmodSync(CTL, 0o666); } catch (e) { log('control socket: ' + e.message); } });
 
     subscribe();
+    setInterval(() => driverExit.check(), 100); // expiry cancels only an owned door-exit request
     setInterval(() => {                               // HU getters, not the BDC; rpm only while no speed comes
         poll(SPEED_GET, speed);
         if (!fresh(car.speedAt)) poll(RPM_GET, (h) => { rpm(h); SEATS.forEach(back); });
@@ -478,7 +551,7 @@ function main() {
         light(true);
     }, 3000);
     process.on('SIGTERM', () => {                     // hand the ambient light back, stop any move, then go
-        mover.halt();
+        stopSeats();
         const end = () => { if (child) child.kill(); process.exit(0); };
         if (!lit || !mods) return end();
         Promise.all(mods.map((m) => diag.send(amb.BDC, 0x2e, amb.release(m)).catch(() => {}))).then(end);
