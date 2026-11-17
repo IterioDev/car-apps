@@ -128,8 +128,8 @@ function main() {
         if (!child) {
             child = /\.js$/.test(HMICTL) ? spawn(process.execPath, [HMICTL, 'serve'], { stdio: ['pipe', 'pipe', 'inherit'] })
                 : spawn(HMICTL, ['serve'], { stdio: ['pipe', 'pipe', 'inherit'] });
-            child.on('error', (e) => log('hmictl: ' + e.message));
-            child.stdin.on('error', (e) => log('hmictl: ' + e.message));
+            child.on('error', (e) => { resetStanding(); log('hmictl: ' + e.message); });
+            child.stdin.on('error', (e) => { resetStanding(); log('hmictl: ' + e.message); });
             child.stdout.on('data', (d) => {
                 out += d;
                 for (let n; (n = out.indexOf('\n')) >= 0; out = out.slice(n + 1)) {
@@ -138,6 +138,7 @@ function main() {
                 }
             });
             child.on('exit', (c) => {
+                resetStanding();
                 log('hmictl exited ' + c); child = null; out = '';
                 if (busy) done('error hmictl exited');
                 setTimeout(subscribe, 2000);
@@ -165,9 +166,16 @@ function main() {
     const diag = new uds.Uds(hmi, log);
     const car = { speed: null, speedAt: 0, rpm: null, rpmAt: 0, ambientOn: null, on: false, mode: null, cond: null,
         door: { driver: null, passenger: null }, occ: { driver: null, passenger: null } };
+    // A known off/standing condition is a fallback, not the default false car.on.
+    // Condition notifications may be change-only: retain it until invalidated,
+    // changed explicitly, or the helper connection is lost; no short expiry timer.
+    let conditionStanding = false;
+    function resetStanding() { conditionStanding = false; car.speedAt = car.rpmAt = 0; }
     const inCar = () => car.cond === null || IN_CAR.indexOf(car.cond) >= 0;
     const cond = (hex) => {
         const v = parseInt((hex || '').slice(10, 12), 16);
+        conditionStanding = typeof hex === 'string' && /^[0-9a-f]{14}$/i.test(hex) &&
+            parseInt(hex.slice(12, 14), 16) === 2 && [1, 2, 3, 5].indexOf(v) >= 0;
         if (COND[v] && v !== car.cond) {
             const was = inCar();
             car.cond = v; log(`car ${COND[v]} (${hex})`);
@@ -178,9 +186,9 @@ function main() {
         car.on = on; log(`car ${on ? 'on' : 'off'} (${hex})`); push(); SEATS.forEach((s) => back(s, true));
         if (on) SEATS.filter((s) => !mover.axes(s).length).forEach((s) => mover.probe(s, true));   // a seat asleep at the start
     };
-    // stands: under 2 km/h; no fresh speed: the engine under 1000 rpm (idle or off); neither: the car switched off
-    const fresh = (t) => Date.now() - t < SPEED_FRESH_MS;
-    const parked = () => (fresh(car.speedAt) ? car.speed < STOP_SPEED : fresh(car.rpmAt) ? car.rpm < STOP_RPM : !car.on);
+    // Preserve speed/RPM policy; absent readings need an explicitly valid off/standing condition.
+    const fresh = (t) => t > 0 && Date.now() >= t && Date.now() - t < SPEED_FRESH_MS;
+    const parked = () => (fresh(car.speedAt) ? car.speed < STOP_SPEED : fresh(car.rpmAt) ? car.rpm < STOP_RPM : conditionStanding);
     const u16 = (k) => (hex) => { const v = parseInt((hex || '').slice(0, 4), 16); if (v >= 0 && v !== 0xffff) { car[k] = v; car[k + 'At'] = Date.now(); } };
     const speed = u16('speed'), rpm = u16('rpm');
     // the front doors: their changes only (a state seen first - a restart with a door open - moves nothing)
