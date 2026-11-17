@@ -46,9 +46,12 @@ class Uds {
     constructor(hmi, log) { this.hmi = hmi; this.log = log || (() => {}); this.q = []; this.cur = null; }
 
     /** ms: how long to wait for the answer (a probe of a unit the car may lack: shorter, the queue waits behind it) */
-    send(target, sid, data, ms) {
+    send(target, sid, data, ms, cleanup) {
         return new Promise((res, rej) => {
-            const c = { target, sid, data: Array.from(data || []), ms, res, rej };
+            const c = { target, sid, data: Array.from(data || []), ms, res, rej, cleanup: cleanup === true };
+            if (this.shuttingDown && !isStop(target, sid, c.data) && !c.cleanup) {
+                rej(new Error('service shutting down')); return;
+            }
             // Keep the current request: gateway replies carry no request ID. Only
             // queued work is reordered, with FIFO order among multiple STOPs.
             const next = isStop(target, sid, c.data) ? this.q.findIndex(x => !isStop(x.target, x.sid, x.data)) : -1;
@@ -57,11 +60,23 @@ class Uds {
         });
     }
 
+    /** Discard queued ordinary work; retain the in-flight request and existing STOPs.
+     * cleanup=true in send() is reserved for the service's final ambient release. */
+    beginShutdown() {
+        this.shuttingDown = true;
+        const waiting = this.q.splice(0);
+        waiting.forEach(c => {
+            if (isStop(c.target, c.sid, c.data) || c.cleanup) this.q.push(c);
+            else c.rej(new Error('service shutting down'));
+        });
+        this.pump();
+    }
+
     pump() {
         if (this.cur || !this.q.length) return;
         const c = this.cur = this.q.shift();
         // the answer's time counts from the request's going out, not from its waiting behind hmictl's line before it
-        this.hmi(line(c.target, c.sid, c.data)).then((r) => {
+        this.hmi(line(c.target, c.sid, c.data), false, isStop(c.target, c.sid, c.data) || c.cleanup).then((r) => {
             if (this.cur !== c) return;
             // A response-pending event can arrive before this method ACK.
             if (/^ok/.test(r)) { if (!c.pending) this.arm(c.ms || TIMEOUT_MS); }
