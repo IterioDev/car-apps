@@ -19,15 +19,15 @@ app platform and show up in *All apps* like BMW's apps.
 | Ambient Light | `iteriodev_ambient` | **iDrive 7 and iDrive 8.** Any colour on the interior ambient light (a colour bar, brightness, the car's colours), per zone from a list of the car's zones, presets that keep every zone's colour, and a colour per drive mode that the light switches to with the mode. Needs the Comfort tool below (the Store installs it with the app). |
 | Car Data | `iteriodev_cardash` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep 1.1.10). Live engine data: engine speed, boost, power and torque with their peaks, oil, coolant and intake temperatures, battery voltage; fuel and air values with their last 5 minutes; a trip computer (distance, fuel, cost); gearbox data (ZF 8HP, read-only); the engine unit's values in groups; on diesel cars the particulate filter (DPF). See below. |
 | Drag Timer | `iteriodev_draggy` | **iDrive 8 only** from 1.2.0 (iDrive 7 cars that have 1.1.8 keep it). Acceleration timer: stand still, launch, and it times the run with splits and a speed-over-time chart. Power run: floor it in one gear for power and torque over rpm, with a baseline to compare (from cauliflowermossgrape's idrive7-apps). Keeps your best times; km/h or mph. |
-| Drive Recorder | `oap-driverecorder-next` | **iDrive 7 and iDrive 8** (2.4.0 car-tested on iDrive 8; see below). Keeps the car's cameras recording and saves a clip when you tap *Save clip* (by default the 20 s before and the 10 s after); watch, lock, delete and copy clips to a USB stick while the car stands still. Over 4 GB the oldest unlocked clips are replaced. Records the camera unit's stream itself, so BMW's provisioning does not matter. Needs the Drive Recorder player below (the Store installs it with the app). |
+| Drive Recorder | `oap-driverecorder-next` | **iDrive 7 and iDrive 8** (2.4.0 car-tested on iDrive 8; see below). Keeps the car's cameras recording and saves a clip when you tap *Save clip* (by default the 20 s before and the 10 s after); watch, lock, delete and copy clips to a USB stick while the car stands still. Over 4 GB the oldest unlocked clips are replaced. By touch or, from 2.5.0, the iDrive controller. Records the camera unit's stream itself, so BMW's provisioning does not matter. Needs the Drive Recorder player below (the Store installs it with the app). |
 | eDrive | `iteriodev_edrive` | **iDrive 8 only.** For plug-in hybrids: the real electric range, learned from how the car is driven, the charge level and battery health, live power and cell voltages, and a log of the charges with their cost. Read-only. On a car without a high-voltage battery it says so and shows the 12 V battery; on a 48 V mild hybrid (from 1.1.0) also its 48 V battery (charge, health, power) and DC/DC converter, from jezikk82's patch to cauliflowermossgrape's idrive7-apps. Not tested on a car yet. |
 | Fault Codes | `iteriodev_dtcscan` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep 1.1.4). Reads the fault memory of every control unit in the car, shows each fault with its text and clears it when you ask. Also lists the car's Check Control messages. |
-| Live Adjustments | `iteriodev_liveadjust` | **iDrive 8 only** (from 1.1.0; iDrive 7 cars keep 1.0.7). For an MHD-tuned DME: engine map 1-4 and MHD Max Cooling, plus the exhaust flap (open, close, back to the DME). See below. |
+| Live Adjustments | `iteriodev_liveadjust` | **iDrive 8 only** (from 1.1.0; iDrive 7 cars keep 1.0.7). For an MHD- or MG Flasher-tuned DME, a tab each: engine map (MHD 1-4, MG Flasher 1-5), MG Flasher burble slots, Max Cooling, plus the exhaust flap (open, close, back to the DME). See below. |
 | Overlays | `iteriodev_overlays` | **iDrive 8 only.** Sets up the Overlays strip in the climate bar: four shortcuts to BMW screens or apps, seat heating / ventilation and steering wheel heating buttons, shift lights on the cluster (cars without their own), and on M cars the M Mode that M1 / M2 switch to. Needs the Overlays tool below (the Store installs it with the app). |
 | Seats | `iteriodev_seats` | **iDrive 7 and iDrive 8.** Move the front seats from the screen, also while driving, both on one page (hold the controls round each seat), three memories per seat, the Make room button (parked only) for the passenger seat, Easy exit for both front seats (the seat, and on the driver's side an electric steering column, out of the way when its door opens, back once the door is shut: the driver's with the car on, the passenger's with someone seated); a right-hand drive setting. Needs the Comfort tool below (the Store installs it with the app). |
 | Service | `iteriodev_service` | **iDrive 8 only.** The car's service requirements as the instrument cluster has them: engine oil, brakes, brake fluid, vehicle check, inspections, each with the distance and date left and whether it is due, and what it is when you tap it. Read-only: a service is reset in the cluster's own menu or at a workshop. Not car-tested yet. |
 | Tailscale | `iteriodev_tailscale` | **iDrive 7 and iDrive 8** (from 1.1.1; on iDrive 7 not run on a car yet). The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`) and Log out. Needs the Tailscale tool below (the Store installs it with the app). |
-| Turn View | `iteriodev_turnview` | **iDrive 8 only.** The front camera in the instrument cluster's widget during a route, with a turn card and chevrons on the road, from BMW Maps, CarPlay or Android Auto. In the widget menu, or popping up by itself 500 / 250 / 100 / 50 m before each turn. Needs a front camera (360 or front + rear), the Turn View tool and Cluster renderer 0.4.1+ (robertnisipeanu/idrive-apps); see below. |
+| Turn View | `iteriodev_turnview` | **iDrive 7 and iDrive 8** (from 1.4.0; iDrive 7 camera car-tested on a G20). The front camera in the instrument cluster, with a turn card and a blue turn sign (three chevrons pointing the way) near each turn during a route, from BMW Maps, CarPlay or Android Auto; the camera alone without a route. iDrive 8: its own widget "Turn View AR"; iDrive 7: off at every car start, switched on in the app, the cluster's central map area in Map view; not with Waze on cluster on the cluster (set Waze to HUD only). Needs a front camera (360 or front + rear), the Turn View tool and Cluster renderer 0.5.10+ (robertnisipeanu/idrive-apps); not Drive Recorder. See below. |
 
 All of them draw their screens through the GPU renderer `mgu-render`.
 
@@ -38,9 +38,13 @@ is scaled against the engine unit's own figure, learned per car while Car Data i
 while the app's screen is closed; Transmission (marked Experimental, read-only: the ZF 8HP variants 0F25D0 and 0F21E0
 only, any other shows "not supported yet"); DPF (marked Experimental, read-only, never run on a diesel).
 
-**Live Adjustments** (one screen, sends a command only when you tap a choice). Car-tested: the engine map switch
+**Live Adjustments** (one screen with a tab per tune, MHD and MG Flasher; sends a command only when you tap a choice,
+never when you change tabs; the tab you picked last opens next time). Car-tested: the engine map switch
 works (1.0.1, MHD). BMW's regulated flap job opens and closes the flap on a G80 S58 MHD, but the DME drops it once
-the car moves (issue #3). Max Cooling and MHD's own flap control (1.0.7) are not car-tested yet.
+the car moves (issue #3). Max Cooling, MHD's own flap control (1.0.7) and the MG Flasher tab (1.2.0) are not
+car-tested yet.
+
+MHD tab:
 
 - **Engine map 1-4** (MHD): at any time, also while driving (from 1.1.1), as MHD itself switches maps on the fly from
   the cruise control buttons. The DME has to echo the request back, or the screen
@@ -54,6 +58,18 @@ the car moves (issue #3). Max Cooling and MHD's own flap control (1.0.7) are not
   until the car moves, and the DME controls the flap again. The flap position is read from the DME every 2 s while the
   screen shows. A DME without an electric flap shows *NONE*.
 - A DME without MHD refuses map and cooling: after the first refusal the screen shows *MHD not found* and greys both out (the flap still works through BMW's job).
+
+MG Flasher tab (Custom Code 6.9 or later; from 1.2.0). The requests are the ones MG Flasher's own Android app sends,
+as found by mlurker's [bmw-idrive7-advokat](https://github.com/mlurker/bmw-idrive7-advokat) (MIT): a UDS write to the
+DME of the value and a checksum, `2E 69 xx <value> <(0x69 + xx + value) & 0xFF>`, accepted on `6E 69 xx`; a busy DME
+is asked again up to 20 times, 200 ms apart, as MG Flasher's app does.
+
+- **Engine map 1-5** (MG Flasher's slots 0-4, DID `6945`) and **Burbles slot 0-5** (DID `6946`): at any time, also while
+  driving. No read-back: the screen shows what the DME accepted.
+- **Max Cooling** (DID `6947`): *On* only with the engine running (over 500 rpm), *Off* any time, as on the MHD tab.
+- **Exhaust flap**: BMW's own DME job, as without MHD above (no MG Flasher flap request is known).
+- A DME without the Custom Code refuses the write: the screen shows *MG Flasher not found* and greys map, burbles and
+  cooling out until the app is opened again.
 
 ## Installing
 
@@ -243,7 +259,11 @@ top of `screencast.js`.
 > cameras only, 2.4.0 on iDrive 7 (2.3.5 to 2.3.12 recorded, saved and copied clips on a G20 M340i through the head
 > unit's camera service).
 
-The app asks the car's camera unit for its Drive Recorder mode at every start (Settings can switch that off).
+The app asks the car's camera unit for its Drive Recorder mode at every start (Settings can switch that off). From
+the player 1.2.6 the player starts the app at every start of the car while *Start with the car* is on: iDrive 7
+starts it only when you open it, so before 1.2.6 recording began only then (issue #23). It asks the head unit's own
+app start every 10 s for up to 5 minutes, as the head unit takes about a minute after its start to take it; its log
+is `/var/opt/iteriodev-drplay/autostart.log`.
 *Save clip* on the Record page writes the 20 s before and the 10 s after (Settings: *Clip length*). The cameras offered
 are the ones the car has: all cameras, front + rear, front or rear. A camera unit that does not take the Drive
 Recorder mode (seen on a retrofitted rear camera) shows *No drive-recorder cameras found*. While a parking view is
@@ -257,7 +277,7 @@ The player runs two services:
   layout. The head unit's camera service and its provisioning flag are no longer used, so cars provisioned online by
   BMW (*OTA*) record too. All cameras are kept as the camera unit sends them: two pictures of two cameras each, in
   turn; the player puts them together into one.
-- `iteriodev-drplay.service` (uid 3912, no internet): plays the clips through the GPU renderer, makes the thumbnails,
+- `iteriodev-drplay.service` (uid 3912, no internet; its app start in the background as root, 1.2.6): plays the clips through the GPU renderer, makes the thumbnails,
   locks, deletes and replaces the oldest clips, and copies to a USB stick: a whole clip as recorded, or one camera as
   an MP4 with the date, time and speed on it. *Lock* moves a clip into the folder's `locked/`. A whole all-cameras
   clip played on a PC switches between the two camera pairs frame by frame; for a PC, copy one camera.
@@ -271,28 +291,45 @@ the player copies only to a writable one. While the app's *Copy to USB* page is 
 does not unmount a stick before it is pulled. FAT32 and exFAT both work. A slow stick sits at 99 % for a while: the
 player has handed over the whole clip and waits until it is on the stick.
 
-## Turn View (tool `iteriodev-turnview`, iDrive 8 only)
+## Turn View (tool `iteriodev-turnview`, iDrive 7 and iDrive 8)
 
 > [!NOTE]
-> **Camera and turn card work in the car** (M4 with 360 cameras, Apple Maps over CarPlay). BMW Maps, Android Auto
-> and cars with front + rear cameras only are not car-tested yet. Waze sends the car no turns.
+> **Camera and turn card work in the car on iDrive 8** (M4 with 360 cameras, Apple Maps over CarPlay). **On iDrive 7
+> the camera works in the cluster's centre** (G20 with 360 cameras, without a route, about 15 pictures a second).
+> Turns on iDrive 7, BMW Maps, Android Auto and cars with front + rear cameras only are not car-tested yet. Waze sends
+> the car no turns.
 
-The front camera in the instrument cluster's widget during a route, with a turn card and chevrons on the road. The
-tool (`iteriodev-turnview.service`, root) reads the turns (BMW guidance, or the phone's turns for CarPlay and Android
-Auto), runs the front camera through its own decoder (`mgu-camcluster`) and draws into the cluster widget through
-Cluster renderer (`cluster-render`, robertnisipeanu/idrive-apps, 0.4.1 or newer). The app shows the status and
-calibrates the chevrons. 1.2.0 (tool 0.3.0): *Pop up before a turn* (Off, 500, 250, 100 or 50 m) lets the cluster show
-Turn View by itself near each turn instead of the widget menu, and the camera runs at 15 pictures a second (was 10; tool 0.3.1)
-at a lower resolution; neither is car-tested yet.
+The front camera in the instrument cluster, with a turn card and, near each turn, a blue turn sign (three chevrons
+pointing the way, like a curve sign; tool 0.8.0, none while driving straight), and the camera alone without a route
+(1.4.0, tool 0.6.0). The tool (`iteriodev-turnview.service`, root) reads the turns (BMW guidance, or
+the phone's turns for CarPlay and Android Auto), receives the front camera itself and runs it through its own decoder
+(`mgu-camcluster`), so Drive Recorder is not needed, and draws through Cluster renderer (`cluster-render`,
+robertnisipeanu/idrive-apps, 0.5.10 or newer) at 15 pictures a second. The app shows the status and calibrates the
+camera.
+
+- **iDrive 8:** Turn View's own widget, **Turn View AR** in the cluster's widget menu (a Cluster renderer drop-in, read
+  at its next start), with its own picture in the menu like BMW's widgets (tool 0.7.1). The camera is sent only while
+  the widget is shown.
+- **iDrive 7:** **off at every start of the car** (tool 0.7.0; the last setting is not kept). Switch it on in the Turn
+  View app and set **Instrument cluster > Central display area** to **Map view**: the camera then takes the cluster's
+  central map area. Off, it holds nothing: no camera request (Drive Recorder keeps the cameras), no video, the map
+  area the car's. The app has its own iDrive 7 screens.
+
+**Waze on cluster: do not use Turn View together with Waze on cluster on the cluster - set Waze on cluster to HUD
+only.** Both draw into the cluster's central map area, and the cluster and the HUD together show at most 2 videos:
+Waze on the cluster and the HUD takes both, and Turn View's camera gets no room (*Cluster video full* in the cluster
+and the app; Turn View asks again every 5 s). With Waze on the HUD only, both work: Waze on the HUD, Turn View in the
+cluster.
 
 **Needs a front camera:** the 360 cameras (Surround View) or front + rear cameras. When the camera unit does not give
 the front camera alone, Turn View asks for front + rear, then all cameras. A car whose camera unit gives the rear
-camera and never the front gets *No front camera* in the widget and nothing else; no camera view at all shows
-*No camera*. (1.1.1 / tool 0.2.1: 1.1.0 showed *No front camera* on some cars that have the cameras.)
+camera and never the front gets *No front camera* in the iDrive 8 widget and nothing else (on iDrive 7 the map area
+stays the car's); no camera view at all shows *No camera*.
 
 **Install:** in the Store, **Turn View** -> *Install* (it installs the tool too). A first install starts at the next
-start of the head unit; then pick **Cluster renderer** in the cluster's widget menu. After each tool update the
-cluster parks the widget: pick it again. Tool messages: `/var/opt/iteriodev-turnview/turnview.log`.
+start of the head unit; then pick **Turn View AR** in the cluster's widget menu (iDrive 8) or set Map view (iDrive 7).
+On iDrive 8 the cluster parks the widget after each tool update: pick it again. Tool messages:
+`/var/opt/iteriodev-turnview/turnview.log`.
 
 ## What is in this repository
 
@@ -309,7 +346,7 @@ Each release is a tag `x.y.z`. The apps need the Store's deploy tool 0.7.5 or ne
 ## Disclaimer
 
 Use at your own risk. These apps are not made or endorsed by BMW. Fault Codes can clear fault memories (only
-when you ask); Live Adjustments switches MHD maps and drives the exhaust flap (not affiliated with MHD); Drive Recorder
+when you ask); Live Adjustments switches MHD and MG Flasher maps and burbles and drives the exhaust flap (not affiliated with MHD or MG Flasher); Drive Recorder
 puts the cameras into their Drive Recorder mode; Ambient Light sets the interior light's colours and Seats moves the
 front seats and an electric steering column (through the Comfort tool); Turn View asks the camera unit for its front
 view during a route; the other apps only read from the car.

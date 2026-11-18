@@ -1,71 +1,50 @@
 'use strict';
 /*
  * shaders.js - iteriodev-turnview: the cluster-render shaders (GLSL ES 1.00, PROTOCOL.md "Shaders") and geometry, and
- * JS copies of the vertex shader's road placement and of the renderer's camera for the tests (spec 5.1, 7).
- * Road: plane y = 0, metres, x right, forward = -z (the mesh camera looks down its -z). Chevrons live in "path space"
- * (s along the route, w lateral): the vertex shader moves them with the car (s' = s + AHEAD - mod(u_travel, PITCH)) and bends
- * the path into the turn L = u_l0 - u_travel ahead (an arc of R metres by u_angle toward u_side, then straight).
+ * JS copies of the vertex shader's placement and of the renderer's camera for the tests (spec 5.1, 7).
+ * Road: plane y = 0, metres, x right, forward = -z (the mesh camera looks down its -z).
+ * Turn sign (user 2026-11-16, replaces the road chevrons: "3 arrows side by side like the turn signs ... blue and only
+ * show arrows for turns, not when driving straight", picked B = chevrons only, no board): three blue chevrons standing
+ * AHEAD m past the turn point (L = u_l0 - u_travel ahead), facing the car, pointing u_side. A bumper camera sees ~100°
+ * across, so the true size is a speck: drawn at the size it has NEAR + GROW * D m away (D its real distance), it grows
+ * as the turn nears. Fades in from FADE_FAR to FADE_FAR - FADE_M m before the turn. Its top is held at u_top (NDC y,
+ * scene.js: under the turn card) so on both HMIs' rects (iDrive 8 widget 1320x640, iDrive 7 map 1088x480 with the
+ * card lower) it never runs into the card; sizes are fractions of the rect's height, so they scale with it.
  */
-const R = 8, PITCH = 3.5, COUNT = 8, AHEAD = 4, OPACITY = 0.55;
+const CH = 0.95, CT = 0.5, CP = 1.05, FOOT = 0.5, AHEAD = 8, NEAR = 4, GROW = 0.12, FADE_FAR = 80, FADE_M = 20, OPACITY = 0.85;
+const SPAN = 2 * CP + CT + CH / 2;      // the three chevrons' width (sign space x -SPAN/2 .. SPAN/2)
 
 const CHEVRON_VS = `#version 100
 attribute vec3 a_position;
-attribute vec2 a_texcoord;
 uniform mat4 u_mvp;
 uniform highp float u_travel;
 uniform highp float u_l0;
-uniform float u_angle;
 uniform float u_side;
 uniform float u_alpha;
+uniform float u_top;
 uniform float u_k1;
 uniform float u_aspect;
-varying vec2 v_tc;
 varying float v_a;
-const float R = ${R.toFixed(1)};
 void main() {
-    highp float s = a_position.z + ${AHEAD.toFixed(1)} - mod(u_travel, ${PITCH.toFixed(1)});
-    float w = a_position.x;
     highp float L = u_l0 - u_travel;
-    float th = radians(u_angle);
-    vec2 p = vec2(w, s);
-    float a = clamp((s - 3.0) / 1.5, 0.0, 1.0) * (1.0 - clamp((s - 25.0) / 5.0, 0.0, 1.0));
-    if (s > L && th > 0.001) {
-        float d = s - L;
-        float arc = R * th;
-        float t = min(d, arc) / R;
-        vec2 c = vec2(u_side * R, L);
-        vec2 on = c + vec2(-u_side * R * cos(t), R * sin(t));
-        vec2 dir = vec2(u_side * sin(t), cos(t));
-        vec2 nrm = vec2(cos(t), -u_side * sin(t));
-        p = on + nrm * w;
-        if (d > arc) {
-            p += dir * (d - arc);
-            a *= 1.0 - clamp((d - arc) / 6.0, 0.0, 1.0);
-        }
-    }
-    vec4 clip = u_mvp * vec4(p.x, a_position.y, -p.y, 1.0);
+    float D = max(L + ${AHEAD.toFixed(1)}, 1.0);
+    float k = D / (${NEAR.toFixed(1)} + ${GROW.toFixed(2)} * D);
+    vec4 clip = u_mvp * vec4(u_side * a_position.x * k, (${FOOT.toFixed(2)} + a_position.y) * k, -D, 1.0);
+    vec4 top = u_mvp * vec4(0.0, ${(FOOT + CH).toFixed(2)} * k, -D, 1.0);
+    if (top.w > 0.0) clip.y -= max(top.y / top.w - u_top, 0.0) * clip.w;
     if (u_k1 != 0.0 && clip.w > 0.0) {
         vec2 n = clip.xy / clip.w;
         float r2 = n.x * n.x * u_aspect * u_aspect + n.y * n.y;
         clip.xy = n * (1.0 + u_k1 * r2) * clip.w;
     }
     gl_Position = clip;
-    v_tc = a_texcoord;
-    v_a = a * u_alpha;
+    v_a = u_alpha * clamp((${FADE_FAR.toFixed(1)} - L) / ${FADE_M.toFixed(1)}, 0.0, 1.0);
 }`;
 
 const CHEVRON_FS = `#version 100
 precision mediump float;
-varying vec2 v_tc;
 varying float v_a;
-const float OPACITY = ${OPACITY.toFixed(2)};
-void main() {
-    // v_tc.x 0 on the road .. 1 the raised edge: deep blue at the foot, bright cyan-white along the top (lit from above);
-    // see-through (user 2026-11-07: "should be semi transparent so i can also see stuff in the camera")
-    float e = abs(v_tc.x - 0.5) * 2.0;
-    vec3 c = mix(vec3(0.0, 0.5, 1.0), vec3(0.75, 0.95, 1.0), smoothstep(0.3, 1.0, v_tc.x));
-    gl_FragColor = vec4(c, v_a * OPACITY * (1.0 - smoothstep(0.92, 1.0, e)));
-}`;
+void main() { gl_FragColor = vec4(0.0, 0.43, 1.0, v_a * ${OPACITY.toFixed(2)}); }`;
 
 const MARKS_VS = `#version 100
 attribute vec3 a_position;
@@ -94,34 +73,17 @@ void main() {
     gl_FragColor = vec4(0.0, 0.0, 0.0, 0.78 * (1.0 - smoothstep(-24.0, 0.0, d)));
 }`;
 
-/* COUNT chevrons one every PITCH m from s 0 (seen from AHEAD m on, faded out from 25 m): two arms each from the tip (0, s0 + DEPTH) to the end (±HALF_W, s0), THICK
- * wide, 8 x 2 cells per arm (a lens term can bend them); positions [w, height, s], texcoords (across, along).
- * Raised: each arm leans back from the road at TILT (a low fence of arrows), because a flat one seen from a bumper
- * camera ~0.5 m up foreshortens to a thin line (car 2026-11-07: "very dim, need actual arrows"). */
-const HALF_W = 0.65, DEPTH = 0.9, THICK = 0.5, TILT = 20 * Math.PI / 180;
-function chevronGeometry() {
-    const positions = [], texcoords = [], indices = [], N = 8, M = 2, T = THICK;
-    for (let k = 0; k < COUNT; k++) {
-        const s0 = PITCH * k;
-        [-1, 1].forEach((sd) => {
-            const base = positions.length / 3;
-            for (let i = 0; i <= N; i++) {
-                const f = i / N, w = sd * HALF_W * f, s = s0 + DEPTH - DEPTH * f;
-                for (let j = 0; j <= M; j++) {
-                    const g = j / M;
-                    positions.push(w, T * g * Math.sin(TILT), s - T * g * Math.cos(TILT));
-                    texcoords.push(g, f);
-                }
-            }
-            for (let i = 0; i < N; i++) {
-                for (let j = 0; j < M; j++) {
-                    const a = base + i * (M + 1) + j, b = a + M + 1;
-                    indices.push(a, b, a + 1, a + 1, b, b + 1);
-                }
-            }
-        });
+/* the sign: three chevrons pointing +x, each two arms (quads) from the foot / top (x0, 0 / CH) to the tip row (x0 + CH/2,
+ * CH/2), CT wide, CP apart; positions [x, y, 0] in sign space (metres, y up from the foot) */
+function signGeometry() {
+    const positions = [], indices = [], ym = CH / 2;
+    const quad = (pts) => { const b = positions.length / 3; pts.forEach(([x, y]) => positions.push(x, y, 0)); indices.push(b, b + 1, b + 2, b, b + 2, b + 3); };
+    for (let i = 0; i < 3; i++) {
+        const x0 = -SPAN / 2 + i * CP;
+        quad([[x0, CH], [x0 + CT, CH], [x0 + CT + ym, ym], [x0 + ym, ym]]);
+        quad([[x0 + ym, ym], [x0 + CT + ym, ym], [x0 + CT, 0], [x0, 0]]);
     }
-    return { positions, texcoords, indices };
+    return { positions, indices };
 }
 
 /* the calibration marks: 2 m wide lines at 5 m (red), 10 m (amber), 20 m (green); positions [x, 0, forward] */
@@ -136,21 +98,13 @@ function marksGeometry() {
     return { positions, colors, indices };
 }
 
-/* the vertex shader's placement, in JS: path point (s, w) -> road { x, z, a } (z = -forward); u: travel, l0, angle, side */
-function pathPoint(s0, w, u) {
-    const s = s0 + AHEAD - (((u.travel % PITCH) + PITCH) % PITCH), L = u.l0 - u.travel, th = u.angle * Math.PI / 180;
-    let px = w, py = s, a = Math.min(1, Math.max(0, (s - 3) / 1.5)) * (1 - Math.min(1, Math.max(0, (s - 25) / 5)));
-    if (s > L && th > 0.001) {
-        const d = s - L, arc = R * th, t = Math.min(d, arc) / R;
-        px = u.side * R - u.side * R * Math.cos(t) + Math.cos(t) * w;
-        py = L + R * Math.sin(t) - u.side * Math.sin(t) * w;
-        if (d > arc) {
-            px += u.side * Math.sin(t) * (d - arc);
-            py += Math.cos(t) * (d - arc);
-            a *= 1 - Math.min(1, Math.max(0, (d - arc) / 6));
-        }
-    }
-    return { x: px, z: -py, a };
+/* the vertex shader in JS: sign vertex (x, y) -> NDC { x, y } and alpha; u: travel, l0, side, alpha, top; null behind */
+function signPoint(x, y, u, cal, aspect) {
+    const L = u.l0 - u.travel, D = Math.max(L + AHEAD, 1), k = D / (NEAR + GROW * D);
+    const p = project({ x: u.side * x * k, y: (FOOT + y) * k, z: -D }, cal, aspect), t = project({ x: 0, y: (FOOT + CH) * k, z: -D }, cal, aspect);
+    if (!p) return null;
+    const a = (u.alpha === undefined ? 1 : u.alpha) * Math.min(1, Math.max(0, (FADE_FAR - L) / FADE_M));
+    return { x: p.x, y: p.y - (t ? Math.max(t.y - u.top, 0) : 0), a, k };
 }
 
 /* the renderer's camera (graph_ramses27: setTranslation + setRotation of the negated right-handed angles, frustum
@@ -171,4 +125,4 @@ function project(p, cal, aspect) {
     return { x: (f / aspect) * x / -z, y: f * y / -z };
 }
 
-module.exports = { CHEVRON_VS, CHEVRON_FS, MARKS_VS, MARKS_FS, SHADE_FS, chevronGeometry, marksGeometry, pathPoint, project, R, PITCH, AHEAD, COUNT };
+module.exports = { CHEVRON_VS, CHEVRON_FS, MARKS_VS, MARKS_FS, SHADE_FS, signGeometry, marksGeometry, signPoint, project, SPAN, CH, AHEAD, NEAR, GROW, FADE_FAR, FADE_M };

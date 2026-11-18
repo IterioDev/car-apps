@@ -1,6 +1,6 @@
 {
  "id": "iteriodev_seats",
- "version": "1.6.1",
+ "version": "1.6.2",
  "title": "Seats",
  "description": "Move the driver and passenger seats from the central display, also while driving, both on one page: each seat seen from the side with its controls round it (fore / aft, height, backrest, tilt and headrest, while you hold them), three memories per seat under it, the Gentleman button (parked only) that moves the passenger seat out of the way and back, and easy exit for both front seats: save each one's getting-out position and it moves there when its door opens with the car standing and someone in the seat (never with a child seat on it), and back once the door is shut (the driver with the car o",
  "mguHmi": [
@@ -11,7 +11,7 @@
   "renderer"
  ],
  "requires": {
-  "iteriodev-comfort": "0.4.0",
+  "iteriodev-comfort": "0.6.0",
   "mgu-deploy": "0.7.5"
  }
 }

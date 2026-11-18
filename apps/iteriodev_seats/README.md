@@ -2,10 +2,10 @@
 
 Move the driver and passenger seats from the central display, also while driving (as with the seats' own switches, for a passenger who can't reach theirs), both on one page: each seat seen from the side with its controls round it (fore / aft, height, backrest, tilt and headrest, while you hold them), three memories per seat under it (for cars without memory buttons too), the Gentleman button (parked only) that moves the passenger seat out of the way and back, and Easy exit for both front seats: the seat (and on the driver's side an electric steering column) moves to your own getting-out position when its door opens with the car standing, and back once the door is shut (the driver's with the car on, the passenger's with someone seated). The seat's own switches always win. Needs the Comfort tool (the Store installs it with the app).
 
-Version 1.6.1 · iDrive 7 and 8 · package `iteriodev_seats` · [all apps and how to install](../../README.md)
+Version 1.6.2 · iDrive 7 and 8 · package `iteriodev_seats` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
-> Run on a car (an M4, seat modules FAS_G11 / BFS_G11): hold-to-move and memory recall work, parked. Not run on a car yet: the 1.1.0 page, Make room, and moving while driving (1.1.1; whether the seat modules take it at speed is not known yet). iDrive 7 (1.2.0): not run on an iDrive 7 car yet. Easy exit and the electric steering column (1.4.0): not run on a car yet. The passenger's Easy exit with the seat sensor and motor-only seats (1.5.0): not run on a car yet. The iDrive controller (1.6.0): on an M4 only the first controller states reached the app; 1.6.1 fixes that, not run on a car yet.
+> Run on a car (an M4, seat modules FAS_G11 / BFS_G11): hold-to-move and memory recall work, parked. Not run on a car yet: the 1.1.0 page, Make room, and moving while driving (1.1.1; whether the seat modules take it at speed is not known yet). iDrive 7 (1.2.0): not run on an iDrive 7 car yet. Easy exit and the electric steering column (1.4.0): not run on a car yet. The passenger's Easy exit with the seat sensor and motor-only seats (1.5.0): not run on a car yet. The iDrive controller (1.6.0): on an M4 only the first controller states reached the app; 1.6.1 fixes that, not run on a car yet. Comfort tool 0.6.0 (smoother hold-to-move, recalls and Easy exit back within a few counts, seat modules asked again): not run on a car yet.
 
 ### While driving
 
@@ -21,7 +21,7 @@ Screens from the app's offline test against a simulated car, so the values are m
 
 ![Both seats](screenshots/seats.png)
 
-Hold a control: the seat moves while you hold it. Only the controls a seat has are shown. A seat whose motors have no position sensors (often the passenger's, on cars with memory on the driver's side only) gets the hold controls only: no memories, Easy exit or Make room.
+Hold a control: the seat moves while you hold it; let go and it stops, nothing queued runs after. Only the controls a seat has are shown. A half with no controls says why: its seat module did not answer with the car on (seats without memory may have no module of their own), or answered without motors. A seat whose motors have no position sensors (often the passenger's, on cars with memory on the driver's side only) gets the hold controls only: no memories, Easy exit or Make room.
 
 ### Moving
 
@@ -43,7 +43,7 @@ Save, then M1, M2 or M3 keeps the seat as it is. On a car with an electric steer
 
 ![Easy exit](screenshots/seats-exit.png)
 
-Each seat has its own Easy exit: Save, then Easy exit keeps that seat's getting-out position (on the driver's side with an electric steering column too). With the car standing (under 2 km/h, the engine may run), the driver door opening moves the column, then the seat there; the driver door shut with the ignition or the engine on (whichever comes last) puts both back where you sat. The passenger seat moves out when its door opens with a person in it (by the car's seat occupancy sensor; never with a child seat, nor with the seat empty), and back once someone sits in it with the door shut; on a car whose sensor reports nothing, it goes back like the driver's (door shut, car on). Both doors at once: the seats move one after the other. A move that stops short (the module pausing, say while the engine starts) is tried again. Tap Easy exit to go there by hand, or to stop a move. The column moves only while the car stands and stops at its own soft end stops. Settings has an *Easy exit* Off / On switch.
+Each seat has its own Easy exit: Save, then Easy exit keeps that seat's getting-out position (on the driver's side with an electric steering column too). With the car standing (under 2 km/h, the engine may run), the driver door opening moves the column, then the seat there; the driver door shut with the ignition or the engine on (whichever comes last) puts both back where you sat. The passenger seat moves out when its door opens with a person in it (by the car's seat occupancy sensor; never with a child seat, nor with the seat empty), and back once someone sits in it with the door shut; on a car whose sensor reports nothing, it goes back like the driver's (door shut, car on). Both doors at once: the seats move one after the other. A move that stops short (the module pausing, say while the engine starts) is tried again. If you move the seat yourself in between, that new place is what it comes back to. A steering column that can't move doesn't stop the seat. Tap Easy exit to go there by hand, or to stop a move. The column moves only while the car stands and stops at its own soft end stops. Settings has an *Easy exit* Off / On switch.
 
 ### Make room
 

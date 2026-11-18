@@ -1,8 +1,8 @@
 {
  "id": "iteriodev_liveadjust",
- "version": "1.1.1",
+ "version": "1.2.0",
  "title": "Live Adjustments",
- "description": "Live adjustments for an MHD-tuned DME: switch engine maps 1-4 at any time, also while driving, MHD Max Cooling on (engine running) or off, and open or close the exhaust flap (MHD's own flap control, held while driving; without MHD, BMW's DME job, which the DME takes back after about 20 s or when the car moves). Map and cooling show what the DME accepted: MHD has no read-back.",
+ "description": "Live adjustments for an MHD- or MG Flasher-tuned DME, one tab per tune: switch engine maps at any time, also while driving (MHD maps 1-4, MG Flasher maps 1-5), MG Flasher burble slots 0-5, Max Cooling on (engine running) or off, and open or close the exhaust flap (on MHD its own flap control, held while driving; otherwise BMW's DME job, which the DME takes back after about 20 s or when the car moves). Shows what the DME accepted: neither tune has a read-back here. MG Flasher (Custom Code 6.9 or later) is not car-tested yet.",
  "mguHmi": [
   "ID8"
  ],

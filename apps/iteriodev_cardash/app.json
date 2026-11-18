@@ -1,6 +1,6 @@
 {
  "id": "iteriodev_cardash",
- "version": "1.4.0",
+ "version": "1.4.1",
  "title": "Car Data",
  "description": "Live engine data on your iDrive 8 screen: engine speed, boost, power and torque with their peaks, oil, coolant and intake temperatures, battery voltage; fuel and air values with their last 5 minutes; a trip computer with costs; gearbox data (ZF 8HP, read-only, experimental); the engine unit's values in groups; on diesel cars a DPF page (soot load, regenerations, exhaust temperatures, read-only, experimental). Bar ends, fuel price and currency are set on the Settings page.",
  "mguHmi": [
