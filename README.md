@@ -263,7 +263,8 @@ The app asks the car's camera unit for its Drive Recorder mode at every start (S
 the player 1.2.6 the player starts the app at every start of the car while *Start with the car* is on: iDrive 7
 starts it only when you open it, so before 1.2.6 recording began only then (issue #23). It asks the head unit's own
 app start every 10 s for up to 5 minutes, as the head unit takes about a minute after its start to take it; its log
-is `/var/opt/iteriodev-drplay/autostart.log`.
+is `/var/opt/iteriodev-drplay/autostart.log`. From 2.5.1 the app keeps asking for that mode every 15 s until the camera
+unit takes it (it is often not ready that early in a start) and waits while a parking / 360 view is open (issue #23).
 *Save clip* on the Record page writes the 20 s before and the 10 s after (Settings: *Clip length*). The cameras offered
 are the ones the car has: all cameras, front + rear, front or rear. A camera unit that does not take the Drive
 Recorder mode (seen on a retrofitted rear camera) shows *No drive-recorder cameras found*. While a parking view is

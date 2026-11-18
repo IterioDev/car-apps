@@ -2,7 +2,7 @@
 
 Keeps the car's cameras recording and saves a clip when you ask; watch, lock, delete and copy clips to a USB stick while the car stands still. Over 4 GB the oldest unlocked clips are replaced. The Store installs the Drive Recorder player with it.
 
-Version 2.5.0 (player `iteriodev-drplay` 1.2.6) · iDrive 7 and iDrive 8 · package `oap-driverecorder-next` · [all apps and how to install](../../README.md)
+Version 2.5.1 (player `iteriodev-drplay` 1.2.6) · iDrive 7 and iDrive 8 · package `oap-driverecorder-next` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
 > **Car-tested** (2.4.0 with the player 1.2.3, iDrive 8, G82 with the 360 cameras): recording, saving and watching clips with all cameras. Not tested on a car yet: Copy to USB of these clips (player 1.2.4), front + rear only cars, 2.4.0 on iDrive 7, the iDrive controller (2.5.0).
@@ -52,7 +52,7 @@ Clip length, start recording with the car, Diagnostics.
 
 ![Seeking with the iDrive controller](screenshots/viewer-controller-seek.png)
 
-For cars without a touchscreen (2.5.0): turn the controller and a white ring goes from control to control; push it up, down or right to jump that way. Press to tap the ringed control. On the clips the ring goes from clip to clip and the list scrolls along. In a clip, each camera is a stop (press to enlarge it, press again or *All cameras* for all four), then play / pause and the timeline: press it once (the ring turns amber), turn to move 1 s a click, press again when done. The first turn only shows the ring; touching the screen hides it. Push left or BACK leaves the page as usual.
+For cars without a touchscreen (2.5.0; 2.5.1: the ring follows the screen you are on and stays inside an open dialog): turn the controller and a white ring goes from control to control; push it up, down or right to jump that way. Press to tap the ringed control. On the clips the ring goes from clip to clip and the list scrolls along. In a clip, each camera is a stop (press to enlarge it, press again or *All cameras* for all four), then play / pause and the timeline: press it once (the ring turns amber), turn to move 1 s a click, press again when done. The first turn only shows the ring; touching the screen hides it. Push left or BACK leaves the page as usual.
 
 ### iDrive 7
 
