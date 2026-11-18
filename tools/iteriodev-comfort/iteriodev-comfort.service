@@ -13,6 +13,8 @@ ExecStart=/usr/bin/node /var/opt/iteriodev-comfort/current/comfort.js
 StandardOutput=journal
 Restart=always
 RestartSec=5
+# Allow Comfort's 20-second bounded motor/ambient cleanup before systemd kills it.
+TimeoutStopSec=25s
 
 [Install]
 WantedBy=multi-user.target

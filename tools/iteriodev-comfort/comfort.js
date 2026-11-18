@@ -118,12 +118,24 @@ function save(d) {
 function main() {
     mkdir();
     const data = load();
+    let shuttingDown = false, transportClosed = false;
+    const SHUTDOWN_LIMIT_MS = 20000;
     /* hmictl serve: one line out, one line back, in order; "ev" lines are notifications. low: a getter, sent only
      * when no UDS request / subscription waits (hmictl holds a call to a service the car lacks up 3 s) */
     let child = null, out = '', busy = null, busyTimer = null;
     const queue = [], lowQueue = [];
-    const hmi = (line, low) => new Promise((res) => { (low ? lowQueue : queue).push({ line, res }); pump(); });
+    const hmi = (line, low, cleanup) => new Promise((res) => {
+        if (transportClosed || (shuttingDown && (!cleanup || !child))) { res('error service shutting down'); return; }
+        (low ? lowQueue : queue).push({ line, res, cleanup: cleanup === true }); pump();
+    });
     function pump() {
+        if (transportClosed) return;
+        if (shuttingDown) {
+            [queue, lowQueue].forEach(q => {
+                for (let i = q.length - 1; i >= 0; i--) if (!q[i].cleanup) q.splice(i, 1)[0].res('error service shutting down');
+            });
+            if (!child) return; // never respawn a helper while stopping
+        }
         if (busy || !(queue.length || lowQueue.length)) return;
         if (!child) {
             child = /\.js$/.test(HMICTL) ? spawn(process.execPath, [HMICTL, 'serve'], { stdio: ['pipe', 'pipe', 'inherit'] })
@@ -141,7 +153,7 @@ function main() {
                 resetStanding();
                 log('hmictl exited ' + c); child = null; out = '';
                 if (busy) done('error hmictl exited');
-                setTimeout(subscribe, 2000);
+                if (!shuttingDown) setTimeout(subscribe, 2000);
             });
         }
         busy = queue.length ? queue.shift() : lowQueue.shift();
@@ -153,6 +165,7 @@ function main() {
     // minute - piled up behind each other they held every seat control up ~15 s (0.3.3, user 2026-11-09)
     const polls = {};
     function poll(l, fn) {
+        if (shuttingDown) return;
         const p = polls[l] || (polls[l] = { busy: false, until: 0 });
         if (p.busy || Date.now() < p.until) return;
         p.busy = true;
@@ -239,6 +252,7 @@ function main() {
     function onEvent(line) {
         const w = line.split(' '), svc = parseInt(w[1], 16), ev = parseInt(w[2], 16);
         if (svc === uds.SVC) diag.onEvent(svc, ev, w[3]);
+        else if (shuttingDown) return;
         else if (svc === 0xb519 && ev === 0x8008) speed(w[3]);
         else if (svc === 0xb512 && ev === 0x8003) ambientStatus(w[3]);
         else if (svc === 0x1531 && ev === 0x8002) cond(w[3]);
@@ -247,6 +261,7 @@ function main() {
         else if (svc === 0xb50d && ev === 0x8025) driveMode(w[3]);
     }
     function subscribe() {
+        if (shuttingDown) return;
         [uds.SUB, SPEED_SUB, AMB_SUB, VCOND_SUB, DOOR_SUB, OCC_SUB, FES_SUB, FES_POLL].forEach((l) => hmi(l));
         poll(AMB_GET, ambientStatus);
     }
@@ -254,6 +269,7 @@ function main() {
     /* ---- ambient ---- */
     let mods = null, oem = {}, lit = false, writing = false, again = false, litAt = 0;
     async function discover() {
+        if (shuttingDown) return;
         const found = [];
         let missed = 0;
         for (const b of amb.BUSES) {
@@ -278,11 +294,13 @@ function main() {
     const sent = {};                                  // module -> the bytes it got last
     let roundAt = 0, force = false, lightTimer = null, saveTimer = null;
     function lightSoon() {
+        if (shuttingDown) return;
         if (lightTimer) return;                       // the round already waiting reads the newest settings
         lightTimer = setTimeout(() => { lightTimer = null; light(); }, Math.max(0, roundAt + GAP_MS - Date.now()));
     }
     const saveSoon = () => { clearTimeout(saveTimer); saveTimer = setTimeout(() => save(data), SAVE_MS); };
     async function light(renew) {                     // apply the settings; a call while writing runs once more after
+        if (shuttingDown) return;
         if (renew) force = true;
         if (writing) { again = true; return; }
         writing = true;
@@ -316,6 +334,7 @@ function main() {
     const mover = new seat.Mover(diag, parked, log, () => push());
     let busyJob = null, jobSeat = null;               // 'memory' / 'gentleman' / 'exit' / 'back' while one runs, its seat
     async function job(name, fn, s) {
+        if (shuttingDown) return;
         if (busyJob) { mover.halt(); return; }        // a second press stops it
         busyJob = name; jobSeat = s || null; push();
         try { log(`${name}${s ? ' ' + s : ''}: ${JSON.stringify(await fn())}`); } catch (e) { log(`${name}: ${e.message}`); }
@@ -326,6 +345,7 @@ function main() {
     const AUTO = ['exit', 'back'], want = { driver: null, passenger: null };
     let autoRun = false;
     function auto(s, name, fn) {
+        if (shuttingDown) return;
         want[s] = { name, fn };
         if (busyJob && (jobSeat === s || AUTO.indexOf(busyJob) < 0)) mover.halt();
         runAuto();
@@ -432,6 +452,9 @@ function main() {
         pushTimer = setTimeout(() => { pushTimer = null; const l = JSON.stringify(status()) + '\n'; clients.forEach((c) => c.write(l)); }, 100);
     }
     function request(c, q) {
+        if (shuttingDown && q.op !== 'get' && q.op !== 'stop') {
+            c.write(JSON.stringify({ error: 'service shutting down' }) + '\n'); return;
+        }
         const seatOk = q.seat === 'driver' || q.seat === 'passenger';
         if (q.op === 'ambient') { data.ambient = amb.settings(data.ambient, q.settings); saveSoon(); lightSoon(); push(); }
         else if (q.op === 'jog' && seatOk && seat.AXES.indexOf(q.axis) >= 0 && (q.dir === 1 || q.dir === -1)) {
@@ -439,11 +462,11 @@ function main() {
         } else if (q.op === 'stop') mover.halt();
         else if (q.op === 'memory' && seatOk && [0, 1, 2].indexOf(q.slot) >= 0) {
             const m = data.memories[q.seat];          // the driver's: the column too
-            if (q.save) seatPos(q.seat).then((p) => { m[q.slot] = p; save(data); push(); }).catch((e) => log('memory: ' + e.message));
+            if (q.save) seatPos(q.seat).then((p) => { if (shuttingDown) return; m[q.slot] = p; save(data); push(); }).catch((e) => log('memory: ' + e.message));
             else if (m[q.slot]) job('memory', () => seatTo(q.seat, m[q.slot]), q.seat);
         } else if (q.op === 'exit') {                 // no seat: the driver's (Seats 1.4.x)
             const s = q.seat === 'passenger' ? 'passenger' : 'driver';
-            if (q.save) seatPos(s).then((p) => { data.exit[s] = p; save(data); push(); }).catch((e) => log('exit: ' + e.message));
+            if (q.save) seatPos(s).then((p) => { if (shuttingDown) return; data.exit[s] = p; save(data); push(); }).catch((e) => log('exit: ' + e.message));
             else easyExit(s, true);
         } else if (q.op === 'set' && q.settings && typeof q.settings.easyExit === 'boolean') {
             data.settings.easyExit = q.settings.easyExit; save(data); push();
@@ -469,7 +492,7 @@ function main() {
         c.on('close', () => { clients.delete(c); if (!clients.size && AUTO.indexOf(busyJob) < 0) mover.halt(); });
         c.write(JSON.stringify(status()) + '\n');
         // an app opened with a seat still unknown: asked again (at most every 20 s; issue #29: never asked again before)
-        SEATS.filter((s) => !mover.axes(s).length).forEach((s) => mover.probe(s));
+        if (!shuttingDown) SEATS.filter((s) => !mover.axes(s).length).forEach((s) => mover.probe(s));
     });
     srv.on('error', (e) => log('control socket: ' + e.message));
     srv.listen(CTL, () => { try { fs.chmodSync(CTL, 0o666); } catch (e) { log('control socket: ' + e.message); } });
@@ -481,17 +504,45 @@ function main() {
     }, 2000);
     setInterval(() => { if (lit && Date.now() - litAt > amb.RENEW_MS) light(true); }, 10000);
     setTimeout(() => {
+        if (shuttingDown) return;
         SEATS.forEach((s) => mover.probe(s, true));   // where it is (no position at all: its motors, D700)
         mover.probeWheel();
         light(true);
     }, 3000);
-    process.on('SIGTERM', () => {                     // hand the ambient light back, stop any move, then go
-        mover.halt();
-        const end = () => { if (child) child.kill(); process.exit(0); };
-        if (!lit || !mods) return end();
-        Promise.all(mods.map((m) => diag.send(amb.BDC, 0x2e, amb.release(m)).catch(() => {}))).then(end);
-        setTimeout(end, 3000);
-    });
+    function shutdown() {
+        if (shuttingDown) return;
+        shuttingDown = true;
+        log('shutdown: blocking new work; waiting for motor STOP cleanup');
+        SEATS.forEach(s => { want[s] = null; });
+        const failures = mover.stopFailures;
+        mover.halt(); diag.beginShutdown();
+        clearTimeout(lightTimer); clearTimeout(saveTimer);
+        save(data);
+        let ended = false;
+        const end = (reason, code) => {
+            if (ended) return;
+            ended = true; transportClosed = true;
+            clearTimeout(deadline); clearTimeout(busyTimer);
+            log('shutdown: ' + reason);
+            const waiting = (busy ? [busy] : []).concat(queue.splice(0), lowQueue.splice(0));
+            busy = null; waiting.forEach(c => c.res('error service shutting down'));
+            if (child) { const current = child; child = null; try { current.kill(); } catch (e) { log('shutdown helper: ' + e.message); } }
+            process.exit(code);
+        };
+        const deadline = setTimeout(() => end('STOP/cleanup unconfirmed: deadline reached', 1), SHUTDOWN_LIMIT_MS);
+        (async () => {
+            // Mover.busy remains true until its existing STOP sends settle.
+            // Drain active ambient work too before releasing its owned output.
+            while (mover.busy || mover.next || busyJob || autoRun || writing) await new Promise(r => setTimeout(r, 20));
+            const failed = mover.stopFailures > failures;
+            if (lit && mods) await Promise.all(mods.map(m =>
+                diag.send(amb.BDC, 0x2e, amb.release(m), undefined, true).catch(e => {
+                    log('shutdown ambient release: ' + e.message); throw e;
+                })));
+            end(failed ? 'motor STOP response unconfirmed' : 'cleanup complete (not physical stop proof)', failed ? 1 : 0);
+        })().catch(e => end('cleanup unconfirmed: ' + e.message, 1));
+    }
+    process.on('SIGTERM', shutdown);
     log(`comfort: ${JSON.stringify(data.settings)} ambient ${JSON.stringify(data.ambient)}`);
 }
 

@@ -17,7 +17,7 @@ function fixture(options) {
     const car = { mode: 1, ambientOn: true };
     const state = { inside: true, read: options.read };
     const buses = [{ name: 'lin1', read: [1, 1] }, { name: 'lin2', read: [1, 2] }];
-    const context = { module, Date: class extends Date { static now() { return now; } }, data, car,
+    const context = { module, shuttingDown: false, Date: class extends Date { static now() { return now; } }, data, car,
         setTimeout: (fn, ms) => { const t = { fn, at: now + ms, id: ++sequence, active: true }; timers.push(t); return t; },
         clearTimeout: t => { if (t) t.active = false; },
         inCar: () => state.inside, push: () => {}, save: () => {}, log: line => logs.push(line),

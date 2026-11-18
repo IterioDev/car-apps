@@ -94,6 +94,7 @@ class Mover {
         this.hasWheel = null;                        // the car has an electric column: null = not known yet
         this.motion = null;                          // { seat, axis, dir, holder, why }: the move running
         this.next = null;                            // the one move waiting for it to stop (a newer one replaces it)
+        this.stopFailures = 0;                       // failed STOP replies, including shutdown cleanup
         this.blocked = null;                         // { k: 'seat axis dir', at }: a held control that reached its end stop
         this.wake = () => {};                        // ends the running move's nap at once (a stop, a newer move)
         this.found = { driver: null, passenger: null };   // probe(): 'ok', 'no answer', 'no motors' or the refusal
@@ -260,7 +261,7 @@ class Mover {
             if (me.holder && me.why === 'end stop') this.blocked = { k: `${seat} ${axis} ${dir}`, at: Date.now() };
             // handed over to the next move on this seat: one stop, the next one reads anyway; else twice and a reading
             const handover = me.why === 'replaced' && this.next && this.next.seat === seat;
-            for (let i = 0; i < (handover ? 1 : 2); i++) await this.uds.send(UNITS[seat], 0x2e, wheel ? WHEEL_STOP : stop(axis)).catch(() => {});
+            for (let i = 0; i < (handover ? 1 : 2); i++) await this.uds.send(UNITS[seat], 0x2e, wheel ? WHEEL_STOP : stop(axis)).catch(e => { this.stopFailures++; this.log('STOP unconfirmed: ' + e.message); });
             if (this.motion === me) this.motion = null;
             this.busy = false;
             this.log(`${seat} ${axis} ${dir > 0 ? '+' : '-'}: ${me.why}`);
