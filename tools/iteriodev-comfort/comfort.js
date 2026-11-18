@@ -40,6 +40,11 @@
  *             on the car switching on waits ON_SETTLE_MS (the seat module holds its motors then) and a way back that
  *             stood short keeps the place for the next try. Log also in comfort.log beside the data (the journal is
  *             gone within minutes).
+ *   0.6.1 (issue #42; PRs #38 #39 #44 #45 by dino15309): without a fresh speed or rpm the car stands only when
+ *             VehicleCondition said parked / standby / residing with a valid qualifier (it was "not on": true before any
+ *             signal, so Make room / easy exit could run while driving on a car whose head unit sends none); a stop
+ *             (SIGTERM) waits for the seat STOPs and the ambient hand-back (up to 20 s); STOPs go first in the UDS queue;
+ *             each subscription's answer is logged (which signals this car's head unit has).
  * All UDS goes through the head unit's diagnostic gateway on one `hmictl serve` (uds.js).
  * Control socket /run/iteriodev-comfort/ctl.sock, JSON lines in and out; every change is pushed to every client:
  *   {op:'get'}  {op:'ambient', settings:{on, rgb:[r,g,b], bright 5-100, follow, zones:{dash:{rgb}|{off:true}|null},
@@ -262,7 +267,8 @@ function main() {
     }
     function subscribe() {
         if (shuttingDown) return;
-        [uds.SUB, SPEED_SUB, AMB_SUB, VCOND_SUB, DOOR_SUB, OCC_SUB, FES_SUB, FES_POLL].forEach((l) => hmi(l));
+        [uds.SUB, SPEED_SUB, AMB_SUB, VCOND_SUB, DOOR_SUB, OCC_SUB, FES_SUB, FES_POLL].forEach((l) =>
+            hmi(l).then((r) => log(`${l}: ${r}`)));   // 0.6.1 (issue #42): which signals this head unit has
         poll(AMB_GET, ambientStatus);
     }
 

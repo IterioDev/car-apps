@@ -140,7 +140,7 @@ slots are kept in `/var/opt/iteriodev-overlays/slots.json`.
 > **Car-tested** (an M4, BDC_G05, seat modules FAS_G11 / BFS_G11): custom colours on all eight ambient light modules,
 > seat hold-to-move and memory recall, parked. Not car-tested yet: Ambient Light 1.1.1's screen and later, Make room,
 > moving the seats while driving, iDrive 7, Easy exit and the electric steering column (0.3.0), the passenger's Easy
-> exit with the seat sensor and motor-only seats (0.4.0), the colour per drive mode (0.5.0).
+> exit with the seat sensor and motor-only seats (0.4.0), the colour per drive mode (0.5.0), 0.6.x.
 
 The root service behind Ambient Light and Seats (`iteriodev-comfort.service`). It talks to the body controller and
 the seat modules through the head unit's own diagnostic gateway, with the car's workshop jobs: the ambient light's RGB
@@ -153,7 +153,10 @@ stands, only when calibrated, and stops at its own soft end stops. Easy exit fol
 engine and, where the car reports it, the seat occupancy sensor (the passenger seat moves only with a person in it,
 never with a child seat). A seat whose motors have no position sensors (often the passenger's, on cars with memory on
 the driver's side only) gets hold-to-move only. Seat controls go ahead of the speed and engine reads, so they act at
-once also on cars that lack one of those. Every move ends with a stop, and the seat's own switches always win. The apps talk to it over
+once also on cars that lack one of those. Every move ends with a stop, and the seat's own switches always win. From 0.6.1 (issue #42, PRs
+#38 #39 #44 #45 by dino15309) a car whose head unit sends neither speed nor engine speed counts as standing only once
+the car reports itself parked, so Make room and Easy exit never run on missing data; a stop or update of the service
+waits for the seat's stop first; the log names the car signals the head unit answers. The apps talk to it over
 `/run/iteriodev-comfort/ctl.sock`; the zones' colours and the seat memories are kept in
 `/var/opt/iteriodev-comfort/data.json`.
 

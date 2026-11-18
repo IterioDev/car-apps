@@ -2,7 +2,7 @@
 
 Any colour on the interior ambient light, not only the car's own presets, on one screen: your car's zones in a list (dash, doors, footwell, console, seats, roof: the ones it has), a colour bar for any shade, brightness (or follow the car's, dimmer at night), the car's colours as starting points and six presets of your own that keep every zone's colour. Each zone can follow the main colour, have its own, or keep the car's. A zone with two kinds of light (an X6's dash: a line above, decor below) shows as two rows, each with its own colour. Drive modes: a colour for each drive mode (Sport, Comfort, Eco Pro, their Plus and Individual, Adaptive) that the light switches to with the mode. Works while the car's own ambient light is switched on. Needs the Comfort tool (the Store installs it with the app).
 
-Version 1.4.1 · iDrive 7 and 8 · package `iteriodev_ambient` · [all apps and how to install](../../README.md)
+Version 1.4.2 · iDrive 7 and 8 · package `iteriodev_ambient` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
 > The colour route is run on a car (an M4, BDC_G05: custom colours on all eight light modules, Comfort 0.1.3). Comfort 0.1.4 runs on that car and finds its lights and zones. The 1.1.1 screen is not run on a car yet. iDrive 7 (1.2.0): not run on an iDrive 7 car yet. Drive modes (1.3.0): not run on a car yet; Sport Plus is the car's "Sport expert" mode, a guess. The iDrive controller (1.4.0): on an M4 only the first controller states reached the app; 1.4.1 fixes that, not run on a car yet.
@@ -47,7 +47,7 @@ A colour for each drive mode: tap a mode, then set its colour with the bars or t
 
 ![iDrive controller](screenshots/colour-controller.png)
 
-For cars without a touchscreen: turn the controller and a white ring goes from control to control (the zone list, then the middle, then the car's colours and presets); push it up, down or right to jump that way. Press to tap the ringed control. On a colour bar or the brightness slider, press once (the ring turns amber), turn to change it, press again when done. The first turn only shows the ring; touching the screen hides it. Push left or BACK leaves the page as usual.
+For cars without a touchscreen (1.4.2: fixed for iDrive 7, where the controller was given up on too soon; not run on an iDrive 7 car yet): turn the controller and a white ring goes from control to control (the zone list, then the middle, then the car's colours and presets); push it up, down or right to jump that way. Press to tap the ringed control. On a colour bar or the brightness slider, press once (the ring turns amber), turn to change it, press again when done. The first turn only shows the ring; touching the screen hides it. Push left or BACK leaves the page as usual.
 
 ### iDrive 7
 
