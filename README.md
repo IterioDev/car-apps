@@ -16,7 +16,7 @@ app platform and show up in *All apps* like BMW's apps.
 
 | App | Package id | What it does |
 |---|---|---|
-| Ambient Light | `iteriodev_ambient` | **iDrive 7 and iDrive 8.** Any colour on the interior ambient light (a colour bar, brightness, the car's colours), per zone from a list of the car's zones, presets that keep every zone's colour, and a colour per drive mode that the light switches to with the mode. Needs the Comfort tool below (the Store installs it with the app). |
+| Ambient Light | `iteriodev_ambient` | **iDrive 7 and iDrive 8.** Any color on the interior ambient light (a color bar, brightness, the car's colors), per zone from a list of the car's zones, presets that keep every zone's color, and a color per drive mode that the light switches to with the mode. Needs the Comfort tool below (the Store installs it with the app). Bowers & Wilkins speaker and tweeter lights are not controllable: they keep the car's own color (set it in the car's menu, or with the car's colors in the app). |
 | Car Data | `iteriodev_cardash` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep 1.1.10). Live engine data: engine speed, boost, power and torque with their peaks, oil, coolant and intake temperatures, battery voltage; fuel and air values with their last 5 minutes; a trip computer (distance, fuel, cost); gearbox data (ZF 8HP, read-only); the engine unit's values in groups; on diesel cars the particulate filter (DPF). See below. |
 | Drag Timer | `iteriodev_draggy` | **iDrive 8 only** from 1.2.0 (iDrive 7 cars that have 1.1.8 keep it). Acceleration timer: stand still, launch, and it times the run with splits and a speed-over-time chart. Power run: floor it in one gear for power and torque over rpm, with a baseline to compare (from cauliflowermossgrape's idrive7-apps). Keeps your best times; km/h or mph. |
 | Drive Recorder | `oap-driverecorder-next` | **iDrive 7 and iDrive 8** (2.4.0 car-tested on iDrive 8; see below). Keeps the car's cameras recording and saves a clip when you tap *Save clip* (by default the 20 s before and the 10 s after); watch, lock, delete and copy clips to a USB stick while the car stands still. Over 4 GB the oldest unlocked clips are replaced. By touch or, from 2.5.0, the iDrive controller. Records the camera unit's stream itself, so BMW's provisioning does not matter. Needs the Drive Recorder player below (the Store installs it with the app). |
@@ -137,16 +137,19 @@ slots are kept in `/var/opt/iteriodev-overlays/slots.json`.
 ## Comfort (tool `iteriodev-comfort`, iDrive 7 and 8)
 
 > [!NOTE]
-> **Car-tested** (an M4, BDC_G05, seat modules FAS_G11 / BFS_G11): custom colours on all eight ambient light modules,
+> **Car-tested** (an M4, BDC_G05, seat modules FAS_G11 / BFS_G11): custom colors on all eight ambient light modules,
 > seat hold-to-move and memory recall, parked. Not car-tested yet: Ambient Light 1.1.1's screen and later, Make room,
 > moving the seats while driving, iDrive 7, Easy exit and the electric steering column (0.3.0), the passenger's Easy
-> exit with the seat sensor and motor-only seats (0.4.0), the colour per drive mode (0.5.0), 0.6.x.
+> exit with the seat sensor and motor-only seats (0.4.0), the color per drive mode (0.5.0), 0.6.x. 0.6.3 car-tested on an
+> M8 (iDrive 7): all 20 RGB lights of the doors, footwells and console take our color.
+
+Bowers & Wilkins speaker and tweeter lights are not controllable: they keep the car's own color (set it in the car's menu, or with the car's colors in the app). On some cars (an M8 tested) the dash lights are not reachable either.
 
 The root service behind Ambient Light and Seats (`iteriodev-comfort.service`). It talks to the body controller and
 the seat modules through the head unit's own diagnostic gateway, with the car's workshop jobs: the ambient light's RGB
-per module (each write lasts 254 s and is renewed; switched off, the car's own colour returns at once; a zone with two
-kinds of light, such as a line and decor, is split into parts with a colour each; with the drive modes on, the drive
-mode the head unit reports picks the colour), the seat motors and their position
+per module (each write lasts 254 s and is renewed; switched off, the car's own color returns at once; a zone with two
+kinds of light, such as a line and decor, is split into parts with a color each; with the drive modes on, the drive
+mode the head unit reports picks the color), the seat motors and their position
 counters, and an electric steering column (through the body controller). Seats move at any speed (as with their own
 switches) except Make room and Easy exit, which need the car standing; the steering column moves only while the car
 stands, only when calibrated, and stops at its own soft end stops. Easy exit follows each front door, the ignition or
@@ -157,7 +160,7 @@ once also on cars that lack one of those. Every move ends with a stop, and the s
 #38 #39 #44 #45 by dino15309) a car whose head unit sends neither speed nor engine speed counts as standing only once
 the car reports itself parked, so Make room and Easy exit never run on missing data; a stop or update of the service
 waits for the seat's stop first; the log names the car signals the head unit answers. The apps talk to it over
-`/run/iteriodev-comfort/ctl.sock`; the zones' colours and the seat memories are kept in
+`/run/iteriodev-comfort/ctl.sock`; the zones' colors and the seat memories are kept in
 `/var/opt/iteriodev-comfort/data.json`.
 
 ## Tailscale (tool `iteriodev-tailscale`)
@@ -360,7 +363,7 @@ Each release is a tag `x.y.z`. The apps need the Store's deploy tool 0.7.5 or ne
 
 Use at your own risk. These apps are not made or endorsed by BMW. Fault Codes can clear fault memories (only
 when you ask); Live Adjustments switches MHD and MG Flasher maps and burbles and drives the exhaust flap (not affiliated with MHD or MG Flasher); Drive Recorder
-puts the cameras into their Drive Recorder mode; Ambient Light sets the interior light's colours and Seats moves the
+puts the cameras into their Drive Recorder mode; Ambient Light sets the interior light's colors and Seats moves the
 front seats and an electric steering column (through the Comfort tool); Turn View asks the camera unit for its front
 view during a route; the other apps only read from the car.
 

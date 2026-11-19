@@ -17,7 +17,7 @@ function fixture(options) {
     const car = { mode: 1, ambientOn: true };
     const state = { inside: true, read: options.read };
     const buses = [{ name: 'lin1', read: [1, 1] }, { name: 'lin2', read: [1, 2] }];
-    const context = { module, shuttingDown: false, Date: class extends Date { static now() { return now; } }, data, car,
+    const context = { module, shuttingDown: false, READ_MS: 15000, Date: class extends Date { static now() { return now; } }, data, car,
         setTimeout: (fn, ms) => { const t = { fn, at: now + ms, id: ++sequence, active: true }; timers.push(t); return t; },
         clearTimeout: t => { if (t) t.active = false; },
         inCar: () => state.inside, push: () => {}, save: () => {}, log: line => logs.push(line),
@@ -53,13 +53,15 @@ function fixture(options) {
 const modules = payload => [{ bus: 'lin' + payload[1], nad: payload[1], name: 'fixture', zone: 'front', bright: 30 }];
 const cases = [];
 const test = (name, run) => cases.push({ name, run });
-test('disabled startup performs no discovery or retries over one minute', async () => {
+// 0.6.3 (customer M8 2026-11-19: off, the app listed no zones): off, the lights are looked for once (both buses), never
+// again, nothing written
+test('disabled startup discovers once, no retries over one minute', async () => {
     const t = fixture(); await t.apply(true); await t.advance(60000);
-    eq(t.reads().length, 0); eq(t.writes().length, 0); eq(t.logs.length, 0); eq(t.api.state().writing, false);
+    eq(t.reads().length, 2); eq(t.writes().length, 0); eq(t.api.state().writing, false);
 });
-test('repeated disabled renewals and scheduled UI updates do not discover', async () => {
+test('repeated disabled renewals and scheduled UI updates do not discover again', async () => {
     const t = fixture(); for (let i = 0; i < 4; i++) await t.apply(true);
-    t.api.lightSoon(); await t.advance(1000); eq(t.reads().length, 0); eq(t.api.state().force, false);
+    t.api.lightSoon(); await t.advance(1000); eq(t.reads().length, 2); eq(t.api.state().force, false);
 });
 test('enabled override still discovers and retries missing buses', async () => {
     const t = fixture({ on: true }); await t.apply(true); eq(t.reads().length, 2);
@@ -69,9 +71,9 @@ test('disabling override prevents previously scheduled discovery retries', async
     const t = fixture({ on: true }); await t.apply(true); t.data.ambient.on = false;
     await t.advance(60000); eq(t.reads().length, 2); eq(t.writes().length, 0); eq(t.api.state().lit, false);
 });
-test('hardware light OFF and absent cabin readiness suppress unowned discovery', async () => {
-    const a = fixture({ on: true }); a.car.ambientOn = false; await a.apply(true); eq(a.reads().length, 0);
-    const b = fixture({ on: true }); b.state.inside = false; await b.apply(true); eq(b.reads().length, 0);
+test('hardware light OFF and absent cabin readiness: one discovery, no writes, no retries', async () => {
+    const a = fixture({ on: true }); a.car.ambientOn = false; await a.apply(true); await a.advance(60000); eq([a.reads().length, a.writes().length], [2, 0]);
+    const b = fixture({ on: true }); b.state.inside = false; await b.apply(true); await b.advance(60000); eq([b.reads().length, b.writes().length], [2, 0]);
 });
 test('losing hardware/readiness prevents pending rediscovery', async () => {
     for (const reason of ['hardware', 'cabin']) {
@@ -81,7 +83,7 @@ test('losing hardware/readiness prevents pending rediscovery', async () => {
     }
 });
 test('enabling later still discovers and writes normally', async () => {
-    const t = fixture({ read: modules }); await t.apply(true); eq(t.calls.length, 0);
+    const t = fixture({ read: modules }); await t.apply(true); eq([t.reads().length, t.writes().length], [2, 0]);
     t.data.ambient.on = true; await t.apply(true); eq(t.reads().length, 2); eq(t.writes().length, 2); eq(t.api.state().lit, true);
 });
 test('drive-mode override is evaluated before deciding to discover', async () => {

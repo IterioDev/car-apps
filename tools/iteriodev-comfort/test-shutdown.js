@@ -46,9 +46,9 @@ function fixture(){
 async function serviceGates(){
  const f=fixture();f.h.shutdown();f.h.shutdown();eq(f.halted(),1);eq(f.exited(),0);
  for(const q of [{op:'jog',seat:'driver',axis:'SLV',dir:1},{op:'memory',seat:'driver',slot:0},{op:'exit',seat:'driver'},{op:'set',settings:{easyExit:false}},{op:'ambient',settings:{on:true}}])eq(f.request(q).error,'service shutting down');
- f.h.cond('0a000112020a02');f.h.door('000001000000000000000000000000');f.h.subscribe();f.h.poll('call test',()=>{});await ticks();eq(f.commands.length,0);eq(f.children.length,0);eq(await f.h.hmi('sub later'),'error service shutting down');
+ f.h.cond('0a000112020a02');f.h.door('000001000000000000000000000000');f.h.subscribe();f.h.poll('call test',()=>{});await ticks();eq(f.commands.filter(c=>c.sid!==0x22).length,0);eq(f.children.length,0);eq(await f.h.hmi('sub later'),'error service shutting down');
  // A capture already awaiting its read cannot become a new movement after shutdown.
- const capture=fixture();capture.h.cond('0a000112020102');let finish;capture.h.mover.read=()=>new Promise(r=>{finish=r;});capture.request({op:'exit',seat:'driver'});await ticks();ok(finish);capture.h.shutdown();finish({SLV:33000});await ticks();eq(capture.commands.length,0);
+ const capture=fixture();capture.h.cond('0a000112020102');let finish;capture.h.mover.read=()=>new Promise(r=>{finish=r;});capture.request({op:'exit',seat:'driver'});await ticks();ok(finish);capture.h.shutdown();finish({SLV:33000});await ticks();eq(capture.commands.filter(c=>c.sid!==0x22).length,0);
  // An acknowledged deferred save does not change saved memories after shutdown.
  const save=fixture();let finishSave;save.h.mover.read=()=>new Promise(r=>{finishSave=r;});save.request({op:'memory',seat:'driver',slot:1,save:true});save.h.shutdown();finishSave({SLV:33100});await ticks();eq(save.h.data.memories.driver[1],null);
  // Helper remains alive for allowed cleanup, normal queued lines are discarded.
