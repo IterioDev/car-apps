@@ -260,13 +260,15 @@ function pdu(ev, x, y) {
 }
 
 // a renderer binds its touch port while it runs and hands its apps' taps to them, the rest on to Hmi8's 30567:
-// robertnisipeanu's mgu-render 30570, IterioDev's old mgu-renderd 30568. The display's own touches reach it
-// through an nft divert that matches only the display's packets (vlan73), so ours must be sent to it directly.
+// idrive7-apps' idrive7-renderd 30572 (1.0.9: first - where it runs, the display's own touches go to it, and the apps
+// it draws get them only there), robertnisipeanu's mgu-render 30570, IterioDev's old mgu-renderd 30568. The display's own touches reach it through an nft rule that matches only the display's
+// packets (vlan73), so ours must be sent to it directly.
+const TOUCH_PORTS = [30572, 30570, 30568];
 function touchPort() {
     let udp4 = '';
     try { udp4 = fs.readFileSync('/proc/net/udp', 'utf8'); } catch (e) { /* none: Hmi8 */ }
     const bound = (port) => new RegExp(`^\\s*\\d+: [0-9A-F]{8}:${port.toString(16).toUpperCase()} `, 'm').test(udp4);
-    return [30570, 30568].find(bound) || 30567;
+    return TOUCH_PORTS.find(bound) || 30567;
 }
 
 function touch(ev, x, y) {
