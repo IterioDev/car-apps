@@ -5,6 +5,12 @@ The front camera in the instrument cluster, with a turn card (arrow and distance
 straight. Navigation comes from BMW Maps, CarPlay or Android Auto. Without a route the cluster shows the front camera
 alone (1.4.0). No coding needed. The app shows the status and calibrates the camera.
 
+**On the head unit instead (1.6.0, tool 0.9.0):** the app's **Camera** button opens a page with the camera's whole
+picture (kerbs near the bumper show too) at up to 30 pictures a second, with the same turn card and turn sign over it.
+Pick *Picture on: Head unit* there and the cluster gets no picture (iDrive 8's widget says *Turn View is on the head
+unit*, iDrive 7's map area goes back to the map); the camera is used only while the page is open. It works at any
+speed, e.g. for kerbs and tight gaps. Calibrating still shows its marks in the cluster. Not car-tested yet.
+
 **iDrive 8:** pick **Turn View AR** in the cluster's widget menu (from the car's next start after installing).
 
 **iDrive 7:** Turn View is **off at every start of the car** (1.5.0, tool 0.7.0; the last setting is not kept): switch it
@@ -24,7 +30,7 @@ does not give the front camera alone, Turn View asks for front + rear, then all 
 from those. Only a camera unit that gives the rear camera and never the front makes the iDrive 8 widget show *No front
 camera* and nothing else. Turn View does not need Drive Recorder: it receives the camera itself.
 
-Version 1.5.0 (tool `iteriodev-turnview` 0.7.0) · iDrive 7 + iDrive 8 · package `iteriodev_turnview` ·
+Version 1.6.0 (tool `iteriodev-turnview` 0.9.0) · iDrive 7 + iDrive 8 · package `iteriodev_turnview` ·
 [all apps and how to install](../../README.md)
 
 > [!NOTE]

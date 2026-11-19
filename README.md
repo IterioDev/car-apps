@@ -27,7 +27,7 @@ app platform and show up in *All apps* like BMW's apps.
 | Seats | `iteriodev_seats` | **iDrive 7 and iDrive 8.** Move the front seats from the screen, also while driving, both on one page (hold the controls round each seat), three memories per seat, the Make room button (parked only) for the passenger seat, Easy exit for both front seats (the seat, and on the driver's side an electric steering column, out of the way when its door opens, back once the door is shut: the driver's with the car on, the passenger's with someone seated); a right-hand drive setting. Needs the Comfort tool below (the Store installs it with the app). |
 | Service | `iteriodev_service` | **iDrive 8 only.** The car's service requirements as the instrument cluster has them: engine oil, brakes, brake fluid, vehicle check, inspections, each with the distance and date left and whether it is due, and what it is when you tap it. Read-only: a service is reset in the cluster's own menu or at a workshop. Not car-tested yet. |
 | Tailscale | `iteriodev_tailscale` | **iDrive 7 and iDrive 8** (from 1.1.1; on iDrive 7 not run on a car yet). The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`) and Log out. Needs the Tailscale tool below (the Store installs it with the app). |
-| Turn View | `iteriodev_turnview` | **iDrive 7 and iDrive 8** (from 1.4.0; iDrive 7 camera car-tested on a G20). The front camera in the instrument cluster, with a turn card and a blue turn sign (three chevrons pointing the way) near each turn during a route, from BMW Maps, CarPlay or Android Auto; the camera alone without a route. iDrive 8: its own widget "Turn View AR"; iDrive 7: off at every car start, switched on in the app, the cluster's central map area in Map view; not with Waze on cluster on the cluster (set Waze to HUD only). Needs a front camera (360 or front + rear), the Turn View tool and Cluster renderer 0.5.10+ (robertnisipeanu/idrive-apps); not Drive Recorder. See below. |
+| Turn View | `iteriodev_turnview` | **iDrive 7 and iDrive 8** (from 1.4.0; iDrive 7 camera car-tested on a G20). The front camera in the instrument cluster, with a turn card and a blue turn sign (three chevrons pointing the way) near each turn during a route, from BMW Maps, CarPlay or Android Auto; the camera alone without a route. Or on the head unit instead (1.6.0): the app's Camera page shows the camera's whole picture with the same card and sign, at any speed, for kerbs and tight gaps. iDrive 8: its own widget "Turn View AR"; iDrive 7: off at every car start, switched on in the app, the cluster's central map area in Map view; not with Waze on cluster on the cluster (set Waze to HUD only). Needs a front camera (360 or front + rear), the Turn View tool and Cluster renderer 0.5.10+ (robertnisipeanu/idrive-apps); not Drive Recorder. See below. |
 
 All of them draw their screens through the GPU renderer `mgu-render`.
 
@@ -312,6 +312,13 @@ the phone's turns for CarPlay and Android Auto), receives the front camera itsel
 (`mgu-camcluster`), so Drive Recorder is not needed, and draws through Cluster renderer (`cluster-render`,
 robertnisipeanu/idrive-apps, 0.5.10 or newer) at 15 pictures a second. The app shows the status and calibrates the
 camera.
+
+- **On the head unit instead (app 1.6.0, tool 0.9.0):** the app's **Camera** button opens a page with the camera's
+  whole picture (not the cluster's crop, so kerbs near the bumper show) at up to 30 pictures a second, with the same
+  turn card and turn sign over it. *Picture on: Head unit* on that page moves Turn View there: the cluster then gets no
+  picture (iDrive 8's widget says *Turn View is on the head unit*, iDrive 7's map area goes back to the map), and the
+  camera is used only while the page is open. No speed limit: it works while driving, e.g. for kerbs and tight gaps.
+  Calibrating still shows its marks in the cluster. Not car-tested yet.
 
 - **iDrive 8:** Turn View's own widget, **Turn View AR** in the cluster's widget menu (a Cluster renderer drop-in, read
   at its next start), with its own picture in the menu like BMW's widgets (tool 0.7.1). The camera is sent only while

@@ -14,9 +14,11 @@
  *   notice    image z 31   "No front camera" (the car has none: before everything, alone) / "Camera busy" / "No camera",
  *                          centred; "Turn View is off" (switched off, iDrive 8: camcluster keeps the widget in the
  *                          cluster's menu, so picked it would be black - car 2026-11-14). 0.6.0 (user 2026-11-14): no
- *                          route = the camera alone, no notice
+ *                          route = the camera alone, no notice. 0.9.0 (user 2026-11-19): the picture on the head unit
+ *                          instead ("Picture on: Head unit") - the widget says "Turn View is on the head unit" and
+ *                          nothing else; iDrive 7's map area is given back (nothing drawn)
  *   const sc = createScene(cr, { log, now, target });   cr: a ClusterRender (cluster_render_client.js) or a fake with its methods
- *   sc.rect(r); sc.camera(status); sc.camreq(state); sc.noFront(on); sc.disabled(on); sc.setCal(cal); sc.budget(capKb); sc.show(view, t);
+ *   sc.rect(r); sc.camera(status); sc.camreq(state); sc.noFront(on); sc.disabled(on); sc.hu(on); sc.setCal(cal); sc.budget(capKb); sc.show(view, t);
  *   sc.retarget(target) -> changed (the layers made again there by the next show); sc.drop(); sc.restore(); sc.status()
  * Uploads: geometry once; the card when its icon / text changes, at most once a second (every 3 s while the shared
  * budget's cap is under 3000 KB/s); a notice when its text changes. u_travel is animated by the renderer between ticks
@@ -42,7 +44,7 @@ function createScene(cr, o) {
     const log = o.log || (() => {}), now = o.now || Date.now;
     let target = o.target || 'widget';
     let refs = null, rect = null;
-    let camera = 'off', cameraSince = now(), camreq = 'idle', capKb = 5500, noFront = false, disabled = false;
+    let camera = 'off', cameraSince = now(), camreq = 'idle', capKb = 5500, noFront = false, disabled = false, onHu = false;
     let cal = { h: 0.5, pitch: 12, fov: 60, yaw: 0, x: 0 };
     let vis = {}, uni = {}, travelSent = false, animAt = -Infinity, cardKey = '', cardWant = '', cardAt = -Infinity, noticeKey = null, lastNotice = null;
 
@@ -111,6 +113,7 @@ function createScene(cr, o) {
         camreq(s) { camreq = s || 'idle'; },
         noFront(on) { noFront = !!on; },
         disabled(on) { disabled = !!on; },
+        hu(on) { onHu = !!on; },
         budget(kb) { if (typeof kb === 'number') capKb = kb; },
         setCal(c) {
             const was = JSON.stringify(camOf(cal));
@@ -121,11 +124,13 @@ function createScene(cr, o) {
             if (!refs && rect && !o.dropped) make();
             if (!refs) return;
             const st = view.state, drawn = !!DRAWN[st], decoding = camera === 'decoding';
-            const off = st === 'off', self = !!SELF_SHOWN[target];
-            const offNote = off && disabled && !self;       // switched off: said, not black (iDrive 8's picked widget)
-            const gone = self && noFront;                   // iDrive 7, no front camera: the map area given back
-            const shade = !gone && (offNote || (!off && (noFront || (view.video && !decoding))));
-            const n = offNote ? 'off' : shade ? noticeOf(view, t) : null;
+            const self = !!SELF_SHOWN[target], off = st === 'off' || onHu;
+            // the picture on the head unit (0.9.0): said in a picked widget, not black; iDrive 7's map area given back
+            const huNote = onHu && !self;
+            const offNote = !huNote && off && disabled && !self;   // switched off: said, not black (iDrive 8's picked widget)
+            const gone = self && (noFront || onHu);         // iDrive 7, no front camera / on the head unit: the map area given back
+            const shade = !gone && (huNote || offNote || (!off && (noFront || (view.video && !decoding))));
+            const n = huNote ? 'hu' : offNote ? 'off' : shade ? noticeOf(view, t) : null;
             const turn = (st === 'near' || st === 'passed') && view.angle > 0;
             const want = { chevrons: !off && !gone && turn && decoding && !shade, marks: !off && !gone && st === 'calib' && decoding && !shade,
                 card: !off && !gone && drawn && !shade, shade, notice: !!n };
@@ -173,4 +178,34 @@ function createScene(cr, o) {
     return sc;
 }
 
-module.exports = { createScene, camOf, K1, NOCAM_MS, CARD_MS, CARD_SLOW_MS };
+/* 0.9.0 (user 2026-11-19, kerb parking): the head unit's picture - the camera's whole frame (8:3, camcluster --hu) on
+ * the app's Camera page - with the cluster's card and turn sign over it, sized as on the iDrive 8 widget (640 px high:
+ * card 360 x 150 at the top, 16 px down). Fractions of the picture (0..1, y down) for the app's video element:
+ *   huOverlay(view, cal) -> { card: { x, y, w, h } | null, sign: { quads: [[[x, y] x 4] x 6], a } | null } */
+const HU_ASPECT = 8 / 3, HU_H = 640;
+const HU_CARD = { w: C.CARD.w / (HU_H * HU_ASPECT), h: C.CARD.h / HU_H, y: 16 / HU_H };
+const SIGN = SH.signGeometry();
+function huOverlay(view, cal) {
+    const st = view.state, card = !!DRAWN[st] && !!view.icon;
+    const c = card ? { x: (1 - HU_CARD.w) / 2, y: HU_CARD.y, w: HU_CARD.w, h: HU_CARD.h } : null;
+    let sign = null;
+    if ((st === 'near' || st === 'passed') && view.angle > 0) {
+        const top = 1 - 2 * (c ? c.y + c.h + SIGN_GAP / HU_H : 0);
+        const u = { l0: view.l0, travel: view.travel, side: view.side, alpha: view.alpha, top }, P = SIGN.positions, quads = [];
+        let a = 0, ok = true;
+        for (let q = 0; q < P.length / 12 && ok; q++) {
+            const pts = [];
+            for (let v = 0; v < 4; v++) {
+                const j = (q * 4 + v) * 3, p = SH.signPoint(P[j], P[j + 1], u, cal, HU_ASPECT);
+                if (!p) { ok = false; break; }
+                a = p.a;
+                pts.push([+((p.x + 1) / 2).toFixed(4), +((1 - p.y) / 2).toFixed(4)]);
+            }
+            quads.push(pts);
+        }
+        if (ok && a > 0.01) sign = { quads, a: +a.toFixed(3) };
+    }
+    return { card: c, sign };
+}
+
+module.exports = { createScene, camOf, huOverlay, K1, NOCAM_MS, CARD_MS, CARD_SLOW_MS, HU_ASPECT };
