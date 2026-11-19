@@ -322,6 +322,7 @@ camera.
   picture (iDrive 8's widget says *Turn View is on the head unit*, iDrive 7's map area goes back to the map), and the
   camera is used only while the page is open. No speed limit: it works while driving, e.g. for kerbs and tight gaps.
   Calibrating still shows its marks in the cluster. Not car-tested yet.
+- **Tool 0.9.1:** the turn sign shows at every turn again (on iDrive 7 it showed at the first turn of a drive only).
 
 - **iDrive 8:** Turn View's own widget, **Turn View AR** in the cluster's widget menu (a Cluster renderer drop-in, read
   at its next start), with its own picture in the menu like BMW's widgets (tool 0.7.1). The camera is sent only while

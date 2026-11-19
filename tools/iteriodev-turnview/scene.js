@@ -150,11 +150,16 @@ function createScene(cr, o) {
             if (want.chevrons) {
                 uniform('u_side', view.side); uniform('u_alpha', view.alpha); uniform('u_l0', view.l0);
                 uniform('u_k1', K1); uniform('u_aspect', rect.w / rect.h); uniform('u_top', signTop());
-                if (!travelSent) { cr.uniform(refs.chevrons, 'u_travel', [view.travel], { part: 1 }); travelSent = true; }
-                // one animation per ANIM_MS (its keys span that long): each one is a scene change cluster-render
-                // sends to the cluster (car 2026-11-07: the head unit lagged)
-                if (t - animAt >= ANIM_MS) {
-                    animAt = t;
+                // 0.9.1 (customer X3 M, iDrive 7, 2026-11-20: the sign at the first turn only): u_travel itself is sent
+                // again, not only animated - a replaced or refused animation falls back to the value the client set,
+                // which stayed the first turn's travel, so every later turn sat hundreds of metres too far (faded out).
+                // iDrive 7's renderer (RAMSES 19) rebuilds its whole animation system for every replaced animation:
+                // there the uniform alone, every tick; iDrive 8: the uniform + one animation per ANIM_MS (its keys span
+                // that long; each a scene change cluster-render sends to the cluster - car 2026-11-07: the head unit lagged)
+                if (SELF_SHOWN[target]) uniform('u_travel', view.travel);
+                else if (!travelSent || t - animAt >= ANIM_MS) {
+                    animAt = t; travelSent = true;
+                    cr.uniform(refs.chevrons, 'u_travel', [view.travel], { part: 1 });
                     cr.animate(refs.chevrons, { part: 1, property: 'uniform', name: 'u_travel', anim: 1,
                         keys: `0:${view.travel.toFixed(3)} ${ANIM_MS}:${(view.travel + view.speed * ANIM_MS / 1000).toFixed(3)}` });
                 }

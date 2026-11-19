@@ -11,6 +11,8 @@ Pick *Picture on: Head unit* there and the cluster gets no picture (iDrive 8's w
 unit*, iDrive 7's map area goes back to the map); the camera is used only while the page is open. It works at any
 speed, e.g. for kerbs and tight gaps. Calibrating still shows its marks in the cluster. Not car-tested yet.
 
+**Tool 0.9.1:** the turn sign shows at every turn again (on iDrive 7 it showed at the first turn of a drive only).
+
 **iDrive 8:** pick **Turn View AR** in the cluster's widget menu (from the car's next start after installing).
 
 **iDrive 7:** Turn View is **off at every start of the car** (1.5.0, tool 0.7.0; the last setting is not kept): switch it
