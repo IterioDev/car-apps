@@ -223,7 +223,9 @@ already listens on the port, tailscaled starts without the proxy and the journal
 > that part is not car-tested yet. 1.0.8 is one build for both ID7 and ID8: it auto-detects the panel's own
 > resolution (picture shape and touch) with no per-car setting — not car-tested yet. 1.0.9 sends taps to
 > idrive7-apps' renderer (`idrive7-renderd`) first where it runs, as the display itself does, so the apps it draws
-> get them — car-tested on an iDrive 7 with both renderers.
+> get them — car-tested on an iDrive 7 with both renderers. 1.0.10 sends each tap to whichever renderer has the
+> display's touch at that moment (or straight to the HMI), so apps on either renderer get their taps when both are
+> installed — car-tested on an iDrive 7 with both renderers.
 
 The head unit's centre display in a browser on your computer, over your tailnet. Clicks and drags on the picture
 become touches on the screen. Needs the Tailscale tool above (logged in) and a browser: Chrome, Edge, Firefox,
@@ -235,8 +237,10 @@ Safari, or on an iPhone / iPad iOS 17.1 or newer (any browser there).
   page open and stops 5 s after the last one closes. Playback stays about 0.2 s behind the screen, plus the network.
   The status line shows the frame rate, the bit rate and how long frames take to arrive; when the uplink can't carry
   the stream, the server skips frames so the picture stays at most about 1 s behind instead of falling further back.
-- **Touch:** a click is a tap, a drag is a swipe, sent the way the display sends its own touches (to the GPU
-  renderer first while it runs: `idrive7-renderd`, else `mgu-render`, so renderer apps get their taps). A finger left down (closed tab, lost connection)
+- **Touch:** a click is a tap, a drag is a swipe, sent the way the display sends its own touches: to the renderer
+  (`idrive7-renderd` or `mgu-render`) whose app has the touch right now, else to the HMI, so renderer apps get their
+  taps. To see which renderer that is, the service reads the firewall's touch rule (`nft list ruleset ip`), so it
+  runs with the `CAP_NET_ADMIN` capability (still as user `os_7011`). A finger left down (closed tab, lost connection)
   is lifted after 2 s. The HOME/BACK keys and the iDrive controller are not covered.
 - **Who can use it:** it answers only through Tailscale (it listens on the head unit's `127.0.0.1:5880`), and
   **anyone on your tailnet can see the screen and tap it**. If you share the tailnet, limit port 5880 with its

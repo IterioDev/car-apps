@@ -5,6 +5,9 @@ After=winston.service
 [Service]
 # BMW's own grabber user (centerscreengrabber.service): group mgu_wayland (winston's screenshot-group) + video (DRM)
 User=os_7011
+# 1.0.10: read-only use - `nft list ruleset ip` finds which renderer diverts the display's touch right now
+AmbientCapabilities=CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_ADMIN
 Environment=XDG_RUNTIME_DIR=/run/wayland
 # idle until a viewer connects; winston-grabber runs as its child only while someone watches
 ExecStart=/usr/bin/node /var/opt/iteriodev-screencast/current/screencast.js

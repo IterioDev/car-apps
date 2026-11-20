@@ -1,7 +1,7 @@
 {
   "id": "iteriodev-screencast",
   "kind": "tool",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "title": "Screen share",
   "description": "The centre display in a browser (http://<head unit>:5880/ over your tailnet, or an SSH -L tunnel), clicks and drags become touches. Auto-sizes to any panel (ID7/ID8)",
   "optional": true,
