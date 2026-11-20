@@ -293,7 +293,7 @@ function main() {
     }
 
     /* ---- ambient ---- */
-    let mods = null, oem = {}, lit = false, writing = false, again = false, litAt = 0;
+    let mods = null, oem = {}, lit = false, writing = false, again = false, litAt = 0, missedAt = 0;
     async function discover() {
         if (shuttingDown) return;
         const found = [];
@@ -309,6 +309,7 @@ function main() {
         }
         // the car's own brightness, before ours: a module's first reading only (renewals read our own back)
         found.forEach((m) => { if (m.bright && oem[amb.key(m)] === undefined) oem[amb.key(m)] = m.bright; });
+        missedAt = missed ? Date.now() : 0;
         // a bus that did not answer (the BDC busy right after a start, mgu-m4 2026-11-07): asked again in 20 s
         if (missed) setTimeout(() => {
             const set = amb.effective(data.ambient, car.mode);
@@ -347,7 +348,9 @@ function main() {
                 let set = amb.effective(data.ambient, car.mode), want = set.on && car.ambientOn === true && inCar();
                 // 0.6.3: the lights are looked for once also while off (the app lists the zones: 0.6.1 showed none)
                 if (!want && !lit && mods) { force = false; break; }
-                if (!mods) await discover();
+                // 0.6.4 (customer M8 2026-11-20): a bus silent at a start while the light was not wanted (head unit up
+                // at night, car asleep) left 0 modules for the whole boot; once wanted, looked for again (once a minute)
+                if (!mods || (want && missedAt && Date.now() - missedAt >= 60000)) await discover();
                 // Settings may change while discovery waits for the diagnostic gateway.
                 set = amb.effective(data.ambient, car.mode); want = set.on && car.ambientOn === true && inCar();
                 const all = force; force = false;

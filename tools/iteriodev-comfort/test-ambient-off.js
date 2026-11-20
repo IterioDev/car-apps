@@ -117,6 +117,14 @@ test('explicit OFF releases owned modules without new discovery', async () => {
     await t.apply(true); eq(t.reads().length, 2); eq(t.writes().length, 4);
     eq(t.writes().slice(2).every(c => c.payload[1] === 0 && c.payload[2] === 0), true); eq(t.api.state().lit, false);
 });
+// 0.6.4 (customer M8 2026-11-20): the buses silent at a start while off (car asleep) -> 0 modules all boot
+test('buses silent while off: looked for again once wanted', async () => {
+    const t = fixture(); await t.apply(true); eq([t.reads().length, t.api.state().modules.length], [2, 0]);
+    await t.advance(3600000); eq(t.reads().length, 2);                // off: no looking meanwhile
+    t.state.read = modules; t.data.ambient.on = true; await t.apply(true);
+    eq(t.reads().length, 4); eq(t.writes().length, 2); eq(t.api.state().lit, true);
+    await t.advance(120000); await t.apply(true); eq(t.reads().length, 4);  // all buses answered: no more looking
+});
 test('unchanged enabled output stays deduplicated and renew still writes', async () => {
     const t = fixture({ on: true, read: modules }); await t.apply(true); await t.apply(false);
     eq(t.reads().length, 2); eq(t.writes().length, 2);
