@@ -143,7 +143,9 @@ slots are kept in `/var/opt/iteriodev-overlays/slots.json`.
 > exit with the seat sensor and motor-only seats (0.4.0), the color per drive mode (0.5.0), 0.6.x. 0.6.3 car-tested on an
 > M8 (iDrive 7): all 20 RGB lights of the doors, footwells and console take our color. 0.6.4 looks for the lights
 > again once the light is wanted when the body module did not answer at Comfort's start (head unit up while the car
-> slept: no lights found until the next restart) — car-tested on the same M8.
+> slept: no lights found until the next restart) — car-tested on the same M8. 0.6.5 logs which fault a light reports
+> and reads a light flagged faulty at the search once more 30 s after the lights come on, so a fault seen only while
+> the car was off clears — installed on the same M8.
 
 Bowers & Wilkins speaker and tweeter lights are not controllable: they keep the car's own color (set it in the car's menu, or with the car's colors in the app). On some cars (an M8 tested) the dash lights are not reachable either.
 

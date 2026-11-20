@@ -81,15 +81,16 @@ function zoneOf(loc) {
 const nameOf = (loc) => (LOC[loc] ? LOC[loc].split('|')[1] : `Light 0x${loc.toString(16)}`);
 const kindOf = (loc) => (LOC[loc] ? LOC[loc].split('|')[0] : 'other');
 
+const FAULTS = ['short circuit', 'over-temperature', 'open load', 'internal fault'];   // record bytes 6-9
 /** a 22 DA5F / 22 E3D1 reply -> the modules fitted on that bus */
 function parse(uds, bus) {
     const out = [];
     for (let i = 3, nad = 1; i + 10 <= uds.length; i += 10, nad++) {
         const r = uds.slice(i, i + 10);
         if (r[0] === 0xff) continue;
-        const base = zoneOf(r[0]);
+        const base = zoneOf(r[0]), faults = FAULTS.filter((f, k) => r[6 + k]);
         out.push({ bus, nad, loc: r[0], base, kind: kindOf(r[0]), zone: base, name: nameOf(r[0]), rgb: [r[3], r[2], r[1]], bright: r[4],
-            fault: !!(r[6] || r[7] || r[8] || r[9]) });
+            fault: faults.length > 0, faults });
     }
     return out;
 }
@@ -194,6 +195,9 @@ if (require.main === module && process.argv.includes('--test')) {
     assert.strictEqual(mods.length, 7);
     assert.deepStrictEqual(mods.map((m) => m.zone), ['dash', 'dash', 'dash', 'console', 'footwell', 'footwell', 'doors']);
     assert.deepStrictEqual([mods[0].rgb, mods[0].bright, mods[0].fault], [[254, 0, 0], 0x60, false]);
+    // 0.6.5: which fault (record bytes 6-9): a footwell record with open load
+    const f = parse([0x62, 0xda, 0x5f, 0x03, 0x3c, 0x02, 0x00, 0x10, 0x00, 0x00, 0x00, 0x01, 0x00], 'lin1')[0];
+    assert.deepStrictEqual([f.name, f.fault, f.faults], ['Footwell passenger front', true, ['open load']]);
     // the write that turned the dash centre green on the car
     assert.deepStrictEqual(frame(mods[0], [0, 254, 0], 100, 5), [0xe3, 0xd1, 1, 1, 0x64, 0, 0xfe, 0, 5]);
     assert.deepStrictEqual(frame({ bus: 'lin1', nad: 1 }, [255, 300, -1], 150, 999), [0xda, 0x5e, 1, 1, 100, 0xfe, 0xfe, 0, 254]);

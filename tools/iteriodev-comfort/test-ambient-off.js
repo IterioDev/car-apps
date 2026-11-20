@@ -125,6 +125,26 @@ test('buses silent while off: looked for again once wanted', async () => {
     eq(t.reads().length, 4); eq(t.writes().length, 2); eq(t.api.state().lit, true);
     await t.advance(120000); await t.apply(true); eq(t.reads().length, 4);  // all buses answered: no more looking
 });
+// 0.6.5 (customer M8 2026-11-20): front footwells "faulty" from a read while the car was off, clean later
+const faulty = (n) => (payload) => [{ bus: 'lin' + payload[1], nad: payload[1], name: 'fixture', zone: 'front', bright: 30,
+    fault: payload[1] === 1 && n-- > 0, faults: payload[1] === 1 && n >= 0 ? ['open load'] : [] }];
+test('a fault from the search is read again once, 30 s after the lights are on', async () => {
+    const t = fixture({ on: true, read: faulty(1) }); await t.apply(true);
+    eq([t.reads().length, t.writes().length, t.api.state().modules[0].fault], [2, 2, true]);
+    await t.advance(29000); eq(t.reads().length, 2);
+    await t.advance(2000); eq(t.reads().length, 3);                   // only the bus with the faulty light
+    eq(t.api.state().modules.map((m) => m.fault).join(), 'false,false'); eq(t.logs.some((x) => /lin1\.1 fixture: no fault now/.test(x)), true);
+    await t.advance(600000); await t.apply(true); eq(t.reads().length, 3);   // once
+});
+test('no fault, or the lights off: no fault read', async () => {
+    const a = fixture({ on: true, read: modules }); await a.apply(true); await a.advance(120000); eq(a.reads().length, 2);
+    const b = fixture({ read: faulty(1) }); await b.apply(true); await b.advance(120000); eq(b.reads().length, 2);
+    eq(b.api.state().modules[0].fault, true);                         // off: the search's flag stays
+});
+test('a fault still there after the read stays, with its kind logged', async () => {
+    const t = fixture({ on: true, read: faulty(9) }); await t.apply(true); await t.advance(31000);
+    eq([t.reads().length, t.api.state().modules[0].fault], [3, true]); eq(t.logs.some((x) => /fault \(open load\)/.test(x)), true);
+});
 test('unchanged enabled output stays deduplicated and renew still writes', async () => {
     const t = fixture({ on: true, read: modules }); await t.apply(true); await t.apply(false);
     eq(t.reads().length, 2); eq(t.writes().length, 2);

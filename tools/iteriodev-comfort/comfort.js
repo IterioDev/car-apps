@@ -294,6 +294,26 @@ function main() {
 
     /* ---- ambient ---- */
     let mods = null, oem = {}, lit = false, writing = false, again = false, litAt = 0, missedAt = 0;
+    // 0.6.5 (customer M8 2026-11-20): a light can report a fault while the car is off (both front footwells "faulty" all
+    // boot, clean when read later): a fault from the search is read again once, FAULT_MS after the lights are on
+    const FAULT_MS = 30000;
+    let faultChecked = true, faultTimer = null;
+    async function recheckFaults() {
+        faultTimer = null;
+        if (shuttingDown || faultChecked || !mods || !lit) return;
+        faultChecked = true;
+        for (const b of amb.BUSES.filter((x) => mods.some((m) => m.fault && m.bus === x.name))) {
+            let fresh;
+            try { fresh = amb.parse(await diag.send(amb.BDC, 0x22, b.read, READ_MS), b.name); } catch (e) {
+                log(`ambient ${b.name} fault check: ${e.message}`); continue;
+            }
+            fresh.forEach((f) => mods.filter((m) => amb.key(m) === amb.key(f) && (m.fault || f.fault)).forEach((m) => {
+                log(`ambient ${amb.key(m)} ${m.name}: ${f.fault ? `fault (${(f.faults || []).join(', ')})` : 'no fault now'}`);
+                m.fault = f.fault; m.faults = f.faults;
+            }));
+        }
+        push();
+    }
     async function discover() {
         if (shuttingDown) return;
         const found = [];
@@ -319,6 +339,9 @@ function main() {
         }, 20000);
         mods = amb.split(found);                     // a zone with two kinds of light (line above, decor below): two parts
         log(`ambient: ${mods.length} modules: ${mods.map((m) => `${m.bus}.${m.nad} ${m.name} (${m.zone})`).join(', ')}`);
+        const bad = mods.filter((m) => m.fault);
+        if (bad.length) log(`ambient faults: ${bad.map((m) => `${amb.key(m)} ${m.name} (${(m.faults || []).join(', ')})`).join(', ')}`);
+        faultChecked = !bad.length;
         push();
     }
     /* A drag across the colour bars sends a new colour every 250 ms: the BDC gets at most one round per GAP_MS (the
@@ -362,6 +385,7 @@ function main() {
                 }
                 if (all || want !== lit) litAt = Date.now();   // the last round that wrote every module
                 lit = want;
+                if (lit && !faultChecked && !faultTimer) faultTimer = setTimeout(recheckFaults, FAULT_MS);
             } while (again);
         } finally { writing = false; }
     }
