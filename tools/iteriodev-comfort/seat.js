@@ -52,6 +52,8 @@ const POSITION_LOST = 'position feedback lost', NO_PROGRESS = 'no progress', NEV
 const FORE_AFT_PROGRESS_COUNTS = 3, FORE_AFT_STILL_MS = 900, FORE_AFT_START_MS = 1200,
     FORE_AFT_MAX_GAP_MS = 1200, FORE_AFT_MIN_SAMPLES = 3;
 // Candidate confidence rules for a one-command, one-position-read reverse pulse.
+const PULSE_SAMPLE_LIMIT = 6, PULSE_MIN_SAMPLES = 3, PULSE_MAX_AGE_MS = 600000;
+const PULSE_RTT_TOLERANCE = 0.2, PULSE_SETTLED_COUNTS = 1, PULSE_PADDING_COUNTS = 2;
 const PROBE_MS = 1500, REPROBE_MS = 20000;  // a probe's answer time (a unit the car lacks holds the queue), its rate
 const EXT_NRC = [0x7f, 0x7e, 0x31];        // a write refused in the default session: tried once more in the extended one
 
@@ -153,6 +155,7 @@ class Mover {
         this.rtt = 0;                                // a reading's time there and back (ms, averaged)
         this.lagMs = {};                             // per seat: how long a seat moves on after a stop is decided (learned)
         this.speed = {};                             // per 'seat axis': counts per ms at its last stop (learned)
+        this.pulseSamples = Object.create(null); // recent verified pulses keyed by seat, axis and direction
         this.idle = setInterval(() => this.closeIdle(), 1000);
     }
 
@@ -339,6 +342,11 @@ class Mover {
                 const feedback = progress ? progress.sample(v, t, t - firstWriteAt, t - r0) : null;
                 if (feedback === POSITION_LOST) { endOnFeedback(feedback, t, v); break; }
                 if (v === undefined) { me.why = 'no such axis'; break; }
+                if (o.singlePulse) {
+                    attempt.beforeStop = v;
+                    me.why = 'pulse complete';
+                    break;
+                }
                 // Keep the existing history and rate calculation for the braking predictor and legacy move paths.
                 hist.push([t, v, wheel && this.wheel.moving]);
                 while (hist.length > 1 && hist[1][0] <= t - STALL_MS) hist.shift();
@@ -414,6 +422,35 @@ class Mover {
     /** the least a correction from standstill moves this axis (counts): its speed over a reading and the stop's lag */
     pulse(seat, axis) { const v = this.speed[`${seat} ${axis}`]; return v ? v * ((this.rtt || 100) + this.lag(seat)) : 0; }
 
+    pulseKey(seat, axis, dir) { return seat + ' ' + axis + ' ' + dir; }
+
+    rememberPulse(seat, axis, attempt) {
+        if (attempt.writes !== 1 || attempt.reads !== 1 || !attempt.readMs || !attempt.writeMs || !attempt.firstStopMs ||
+            !attempt.stopReplies || attempt.stopFailures ||
+            !Number.isInteger(attempt.firstSettled) || !Number.isInteger(attempt.settled) ||
+            Math.abs(attempt.firstSettled - attempt.settled) > PULSE_SETTLED_COUNTS) return;
+        const travel = (attempt.settled - attempt.start) * attempt.positionDirection;
+        if (travel <= 0) return;
+        const key = this.pulseKey(seat, axis, attempt.direction);
+        const samples = this.pulseSamples[key] || [];
+        samples.push({ travel, readMs: attempt.readMs, writeMs: attempt.writeMs,
+            stopMs: attempt.firstStopMs, at: Date.now() });
+        this.pulseSamples[key] = samples.slice(-PULSE_SAMPLE_LIMIT);
+    }
+
+    reverseRange(seat, axis, dir, previousAttempt) {
+        if (!previousAttempt || !this.rtt || !previousAttempt.writeMs || !previousAttempt.firstStopMs) return null;
+        const similar = (current, recorded) => Math.abs(current - recorded) <= recorded * PULSE_RTT_TOLERANCE;
+        const samples = (this.pulseSamples[this.pulseKey(seat, axis, dir)] || []).filter(sample =>
+            Date.now() - sample.at <= PULSE_MAX_AGE_MS &&
+            similar(this.rtt, sample.readMs) && similar(previousAttempt.writeMs, sample.writeMs) &&
+            similar(previousAttempt.firstStopMs, sample.stopMs));
+        if (samples.length < PULSE_MIN_SAMPLES) return null;
+        const travel = samples.map(sample => sample.travel);
+        return { min: Math.max(0, Math.min(...travel) - PULSE_PADDING_COUNTS),
+            max: Math.max(...travel) + PULSE_PADDING_COUNTS, samples: samples.length };
+    }
+
     reportAttempt(seat, axis, fields) {
         // Diagnostic tracing must not affect the motion path.
         try { if (this.traceAttempt) this.traceAttempt(seat, axis, fields); } catch (e) {}
@@ -454,6 +491,7 @@ class Mover {
             }
         };
         let v = await readPosition(), best = Infinity, pauses = 0;
+        let initialDirection = null, previousAttempt = null;
         if (permission && permission()) return permission();
         if (monitored && !Number.isInteger(v)) {
             this.lastApproachReason = POSITION_LOST;
@@ -465,10 +503,25 @@ class Mover {
             if (permission && permission()) return permission();
             if (error <= tol) { this.lastApproachReason = 'within tolerance'; return 'there'; }
             const s = Math.sign(e), dir = s * (this.inv[seat][axis] ? -1 : 1);
-            // Keep the existing correction threshold for non-stall moves.
-            if (error >= best || (best < Infinity && error <= this.pulse(seat, axis) / 2)) break;
+            const reversal = seat !== 'wheel' && initialDirection !== null && dir !== initialDirection;
+            const range = reversal ? this.reverseRange(seat, axis, dir, previousAttempt) : null;
+            let skip;
+            if (error >= best) skip = 'correction did not improve';
+            else if (reversal && !range) skip = 'reverse pulse estimate unavailable';
+            else if (reversal && (range.min < error - tol || range.max > error + tol))
+                skip = 'reverse pulse may miss tolerance';
+            else if (!reversal && best < Infinity && error <= this.pulse(seat, axis) / 2)
+                skip = 'correction pulse too large';
+            if (skip) {
+                this.lastApproachReason = skip;
+                this.reportAttempt(seat, axis, { phase: 'skipped', target: want, start: v, direction: dir,
+                    reason: skip, range, landing: reversal ? [error - tol, error + tol] : null });
+                break;
+            }
+
+            if (initialDirection === null) initialDirection = dir;
             const attempt = { phase: 'move', target: want, start: v, direction: dir, positionDirection: s,
-                writes: 0, reads: 0, beforeStop: null };
+                reversal, range, writes: 0, reads: 0, beforeStop: null };
             let worse = false, rateAt = 0;
             try {
                 const why = await this.drive(seat, axis, dir, (p, ms, rate) => {
@@ -482,9 +535,10 @@ class Mover {
                         return 'there';
                     }
                     return null;
-                }, { parkedOnly, fast: true, permission, attempt });
+                }, { parkedOnly, fast: true, permission, attempt, singlePulse: reversal });
                 attempt.reason = why;
                 if (why === STOP_UNCONFIRMED) {
+                    delete this.pulseSamples[this.pulseKey(seat, axis, dir)];
                     this.lastApproachReason = why;
                     return why;
                 }
@@ -493,7 +547,7 @@ class Mover {
                     return why;
                 }
                 const stalled = why === NO_PROGRESS || why === NEVER_STARTED;
-                if (!stalled && why !== 'there' && why !== 'end stop' && why !== 'wrong way') return why;
+                if (!stalled && why !== 'there' && why !== 'end stop' && why !== 'wrong way' && why !== 'pulse complete') return why;
                 await sleep(SETTLE_MS);
                 if (this.haltAt >= t0) return 'stopped';
                 if (permission && permission()) return permission();
@@ -520,9 +574,19 @@ class Mover {
                     this.lastApproachReason = reached ? 'within tolerance' : why;
                     return reached ? 'there' : why;
                 }
+                if (seat !== 'wheel' && !worse && (why === 'there' || why === 'pulse complete'))
+                    this.rememberPulse(seat, axis, attempt);
+                if (reversal) {
+                    const reached = Math.abs(want - now) <= tol;
+                    this.lastApproachReason = reached ? 'within tolerance' : 'reverse pulse finished short';
+                    return reached ? 'there' : 'short';
+                }
                 if (worse) {
+                    delete this.pulseSamples[this.pulseKey(seat, axis, -dir)];
+                    delete this.pulseSamples[this.pulseKey(seat, axis, dir)];
                     this.inv[seat][axis] = !this.inv[seat][axis];
                     // The preceding attempt revealed the counter polarity.
+                    initialDirection = null;
                     v = now;
                     continue;
                 }
@@ -539,6 +603,7 @@ class Mover {
                 best = error;
                 v = now;
             } finally {
+                previousAttempt = attempt;
                 this.reportAttempt(seat, axis, attempt);
             }
         }
