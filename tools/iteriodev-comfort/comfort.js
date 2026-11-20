@@ -86,6 +86,7 @@ function diagAllowed(q) {
     return q.sid === 0x2e && q.target === 0x40 && d.length === 9 && ((d[0] === 0xda && d[1] === 0x5e) || (d[0] === 0xe3 && d[1] === 0xd1));
 }
 const amb = require('./ambient');
+const { PassengerOccupancy } = require('./passenger-occupancy');
 const seat = require('./seat');
 
 const DATA = process.env.COMFORT_DATA || '/var/opt/iteriodev-comfort/data.json';
@@ -128,7 +129,10 @@ function load() {
     const bySeat = (o) => (o && ('driver' in o || 'passenger' in o) ? per((s) => obj(o[s])) : { driver: obj(o), passenger: null });
     return { ambient: amb.settings(d.ambient), memories: { driver: mem(d.memories && d.memories.driver),
         passenger: mem(d.memories && d.memories.passenger) }, room: d.room || null, exit: bySeat(d.exit), pre: bySeat(d.pre),
-        out: per((s) => obj(d.out && d.out[s])), settings: { easyExit: !(d.settings && d.settings.easyExit === false) } };
+        out: per((s) => obj(d.out && d.out[s])), settings: {
+            easyExit: !(d.settings && d.settings.easyExit === false),
+            passengerEasyExit: !!(d.settings && d.settings.passengerEasyExit === true)
+        } };
 }
 const mkdir = () => { try { fs.mkdirSync(path.dirname(DATA)); } catch (e) { /* there already (Node 8: no recursive) */ } };
 function save(d) {
@@ -139,6 +143,16 @@ function save(d) {
     } catch (e) { log('save: ' + e.message); }
 }
 
+
+// One bounded retry of an explicitly refused initial read.
+async function initialPosition(read, allowed, wait) {
+    try { return await read(); } catch (err) {
+        if (!allowed() || err.message !== 'refused by the gateway') throw err;
+        await wait(150);
+        if (!allowed()) throw err;
+        return read();
+    }
+}
 
 function main() {
     mkdir();
@@ -208,7 +222,14 @@ function main() {
     // Condition notifications may be change-only: retain it until invalidated,
     // changed explicitly, or the helper connection is lost; no short expiry timer.
     let conditionStanding = false;
-    function resetStanding() { conditionStanding = false; car.speedAt = car.rpmAt = 0; }
+    const passengerOccupancy = new PassengerOccupancy(Date.now, () => { back('passenger'); push(); });
+    const automationEnabled = s => s === 'passenger' ? data.settings.passengerEasyExit : data.settings.easyExit;
+    const passengerPresent = () => {
+        const state = passengerOccupancy.view();
+        return state.ready && state.classification === 'occupied' && !childSeat('passenger');
+    };
+    function resetStanding() {
+        passengerOccupancy.reset('helper connection reset', false); conditionStanding = false; car.speedAt = car.rpmAt = 0; }
     const inCar = () => car.cond === null || IN_CAR.indexOf(car.cond) >= 0;
     const cond = (hex) => {
         const v = parseInt((hex || '').slice(10, 12), 16);
@@ -261,7 +282,8 @@ function main() {
     const ready = { driver: false, passenger: false };
     function back(s, switchedOn) {
         const on = car.on || (fresh(car.rpmAt) && car.rpm >= RUN_RPM);
-        const r = car.door[s] === false && !childSeat(s) && (known(s) ? person(s) && (s === 'passenger' || on) : on);
+        const r = automationEnabled(s) && car.door[s] === false &&
+            (s === 'passenger' ? passengerPresent() : !childSeat(s) && (known(s) ? person(s) && on : on));
         if (r && !ready[s]) { log(`${s} door closed, ${known(s) && s === 'passenger' ? 'seated' : 'car on'}`); easyBack(s, switchedOn ? ON_SETTLE_MS : 0); }
         ready[s] = r;
     }
@@ -283,11 +305,12 @@ function main() {
         else if (svc === 0x1531 && ev === 0x8002) cond(w[3]);
         else if (svc === 0x5530 && (ev === 0x8001 || ev === 0x8006)) door(w[3]);
         else if (svc === 0x1030 && ev === 0x8001) occupancy(w[3]);
+        else if (svc === 0x3530 && ev === 0x8001) passengerOccupancy.event(w[3]);
         else if (svc === 0xb50d && ev === 0x8025) driveMode(w[3]);
     }
     function subscribe() {
         if (shuttingDown) return;
-        [uds.SUB, SPEED_SUB, AMB_SUB, VCOND_SUB, DOOR_SUB, OCC_SUB, FES_SUB, FES_POLL].forEach((l) =>
+        [uds.SUB, SPEED_SUB, AMB_SUB, VCOND_SUB, DOOR_SUB, OCC_SUB, 'sub 0x3530 1 1 1 0x8001', FES_SUB, FES_POLL].forEach((l) =>
             hmi(l).then((r) => log(`${l}: ${r}`)));   // 0.6.1 (issue #42): which signals this head unit has
         poll(AMB_GET, ambientStatus);
     }
@@ -405,15 +428,15 @@ function main() {
     /** to a saved position: the seat, then the driver's column (wheelFirst: the column first, out of the way). A column
      * that cannot move (not calibrated, no answer) leaves the seat to go on (0.6.0: it stopped easy exit, issue #19);
      * 'short' (stood short, blocked) goes on too */
-    async function seatTo(s, p, wheelFirst, parkedOnly) {
-        const steps = [() => mover.recall(s, p, parkedOnly),
-            async () => (s === 'driver' && p.wheel && (await hasWheel()) ? mover.recall('wheel', p.wheel) : 'done')];
+    async function seatTo(s, p, wheelFirst, parkedOnly, permission) {
+        const steps = [() => mover.recall(s, p, parkedOnly, permission),
+            async () => (s === 'driver' && p.wheel && (await hasWheel()) ? mover.recall('wheel', p.wheel, parkedOnly, permission) : 'done')];
         if (wheelFirst) steps.reverse();
         let short = false;
         for (let i = 0; i < steps.length; i++) {
             const r = await steps[i](), column = (i === 0) === !!wheelFirst;
             if (r === 'short') short = true;
-            else if (r !== 'done' && (!column || r === 'stopped' || r === 'not parked')) return r;
+            else if (r !== 'done' && (!column || r === 'STOP unconfirmed' || r === 'stopped' || r === 'not parked')) return r;
             else if (r !== 'done') log(`${s} steering column: ${r} (the seat goes on)`);
         }
         return short ? 'short' : 'done';
@@ -430,26 +453,35 @@ function main() {
     // someone since (its switches, a memory): where it is now (0.6.0: an old place came back). The door alone moves a
     // seat only with someone in it (or the car not telling) and never one with a child seat on it
     function easyExit(s, manual) {
-        if (!data.exit[s] || (!manual && !data.settings.easyExit)) return;
+        if (!data.exit[s] || (!manual && !automationEnabled(s))) return;
         if (!parked()) { log(`easy exit ${s}: the car is not standing`); return; }
-        if (!manual && (childSeat(s) || (known(s) && !person(s)))) { log(`easy exit ${s}: nobody in the seat (${car.occ[s]})`); return; }
+        if (!manual && (s === 'passenger' ? !passengerPresent() : childSeat(s) || (known(s) && !person(s)))) { log(`easy exit ${s}: nobody in the seat (${car.occ[s]})`); return; }
         auto(s, 'exit', async () => {
-            const p = await seatPos(s);
+            const started = Date.now();
+            const allowed = () => !manual && !shuttingDown && mover.haltAt < started &&
+                automationEnabled(s) && car.door[s] === true && parked() &&
+                (s === 'passenger' ? passengerPresent() : !childSeat(s) && (!known(s) || person(s)));
+            const p = await initialPosition(() => seatPos(s), allowed, ms => new Promise(r => setTimeout(r, ms)));
+            if (!manual && !allowed()) return 'cancelled';
             if (!data.pre[s] || !near(p, lastOut(s))) { data.pre[s] = p; save(data); push(); }
-            return outAt(s, await seatTo(s, data.exit[s], true, true));
+            return outAt(s, await seatTo(s, data.exit[s], true, true, manual ? undefined : () => allowed() ? null : 'cancelled'));
         });
     }
     // back where it sat - only while it stands where our move left it: moved since (its switches, a memory), the place is
     // dropped, not driven back to (it came back later, at a car start); stood short: kept for the next try
     function easyBack(s, wait) {
-        if (!data.pre[s]) return;
+        if (!data.pre[s] || !automationEnabled(s)) return;
         if (!parked()) { log(`easy exit ${s} back: the car is not standing`); return; }
         auto(s, 'back', async () => {
             const h0 = Date.now();
             if (wait) await new Promise((r) => setTimeout(r, wait));
             if (mover.haltAt >= h0) return 'stopped';
-            if (!near(await mover.read(s), lastOut(s))) { data.pre[s] = null; save(data); push(); return 'moved since: stays'; }
-            const r = await seatTo(s, data.pre[s], false, true);
+            const allowed = () => !shuttingDown && mover.haltAt < h0 &&
+                automationEnabled(s) && ready[s] && parked() && (s !== 'passenger' || passengerPresent());
+            const current = await initialPosition(() => mover.read(s), allowed, ms => new Promise(r => setTimeout(r, ms)));
+            if (!allowed()) return 'cancelled';
+            if (!near(current, lastOut(s))) { data.pre[s] = null; save(data); push(); return 'moved since: stays'; }
+            const r = await seatTo(s, data.pre[s], false, true, () => allowed() ? null : 'cancelled');
             if (r === 'done') data.pre[s] = null;
             return outAt(s, r);
         });
@@ -513,8 +545,18 @@ function main() {
             const s = q.seat === 'passenger' ? 'passenger' : 'driver';
             if (q.save) seatPos(s).then((p) => { if (shuttingDown) return; data.exit[s] = p; save(data); push(); }).catch((e) => log('exit: ' + e.message));
             else easyExit(s, true);
-        } else if (q.op === 'set' && q.settings && typeof q.settings.easyExit === 'boolean') {
-            data.settings.easyExit = q.settings.easyExit; save(data); push();
+        } else if (q.op === 'set' && q.settings) {
+            const keys = ['easyExit', 'passengerEasyExit'];
+            for (const key of keys) {
+                if (typeof q.settings[key] !== 'boolean') continue;
+                const who = key === 'easyExit' ? 'driver' : 'passenger';
+                if (q.settings[key] === false && data.settings[key] !== false) {
+                    want[who] = null;
+                    ready[who] = false;
+                }
+                data.settings[key] = q.settings[key];
+            }
+            save(data); push();
         } else if (q.op === 'gentleman') gentleman();
         else c.write(JSON.stringify(status()) + '\n');
     }
@@ -543,6 +585,7 @@ function main() {
     srv.listen(CTL, () => { try { fs.chmodSync(CTL, 0o666); } catch (e) { log('control socket: ' + e.message); } });
 
     subscribe();
+    setInterval(() => passengerOccupancy.check(), 100);
     setInterval(() => {                               // HU getters, not the BDC; rpm only while no speed comes
         poll(SPEED_GET, speed);
         if (!fresh(car.speedAt)) poll(RPM_GET, (h) => { rpm(h); SEATS.forEach(back); });

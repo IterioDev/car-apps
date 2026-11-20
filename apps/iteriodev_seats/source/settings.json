@@ -1,0 +1,302 @@
+{
+  "name": "settings",
+  "kind": "gpu",
+  "title": "Settings",
+  "entry": false,
+  "bg": "#000000",
+  "bgArea": "app",
+  "components": [
+    {
+      "name": "settingsMenu",
+      "rtype": "gpu",
+      "gpu": "teleShell",
+      "x": 0,
+      "y": 76,
+      "w": 2880,
+      "h": 172,
+      "opts": {
+        "app": "Seats",
+        "icon": "seat",
+        "tabs": "Seats, Settings",
+        "sel": 1,
+        "chips": "",
+        "title": "Settings",
+        "sub": "Independent driver and passenger automation",
+        "back": false,
+        "credit": "",
+        "hu": "id8"
+      }
+    },
+    {
+      "name": "sideRow",
+      "rtype": "gpu",
+      "gpu": "teleRow",
+      "x": 40,
+      "y": 248,
+      "w": 2800,
+      "h": 90,
+      "opts": {
+        "label": "Steering wheel side",
+        "sub": "Vehicle setup: left- or right-hand drive",
+        "icon": "",
+        "control": "seg",
+        "items": "Left, Right",
+        "sel": 0,
+        "sw": 460,
+        "text": "",
+        "disabled": false
+      }
+    },
+    {
+      "name": "driverSettingsTitle",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 40,
+      "y": 343,
+      "w": 1360,
+      "h": 32,
+      "opts": {
+        "text": "DRIVER SETTINGS",
+        "size": 24,
+        "font": "label",
+        "color": "#8b9099",
+        "align": "left",
+        "wrap": false
+      }
+    },
+    {
+      "name": "passengerSettingsTitle",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 1480,
+      "y": 343,
+      "w": 1360,
+      "h": 32,
+      "opts": {
+        "text": "PASSENGER SETTINGS",
+        "size": 24,
+        "font": "label",
+        "color": "#8b9099",
+        "align": "left",
+        "wrap": false
+      }
+    },
+    {
+      "name": "settingsDivider",
+      "rtype": "gpu",
+      "gpu": "rect",
+      "x": 1439,
+      "y": 374,
+      "w": 2,
+      "h": 430,
+      "opts": {
+        "color": "#30343b",
+        "radius": 0
+      }
+    },
+    {
+      "name": "exitRow",
+      "rtype": "gpu",
+      "gpu": "teleRow",
+      "x": 40,
+      "y": 374,
+      "w": 1360,
+      "h": 104,
+      "opts": {
+        "label": "Driver Easy Exit",
+        "sub": "Automatic driver exit and return",
+        "icon": "",
+        "control": "seg",
+        "items": "Off, On",
+        "sel": 1,
+        "sw": 460,
+        "text": "",
+        "disabled": false
+      }
+    },
+    {
+      "name": "passengerExitRow",
+      "rtype": "gpu",
+      "gpu": "teleRow",
+      "x": 1480,
+      "y": 374,
+      "w": 1360,
+      "h": 104,
+      "opts": {
+        "label": "Passenger Easy Exit",
+        "sub": "Requires fresh occupied passenger status",
+        "icon": "",
+        "control": "seg",
+        "items": "Off, On",
+        "sel": 0,
+        "sw": 460,
+        "text": "",
+        "disabled": false
+      }
+    },
+    {
+      "name": "settingsNoTool",
+      "rtype": "gpu",
+      "gpu": "teleEmpty",
+      "x": 40,
+      "y": 248,
+      "w": 2800,
+      "h": 568,
+      "opts": {
+        "icon": "warning",
+        "head": "Comfort tool not installed",
+        "line": "Install the Comfort tool from the Store",
+        "color": "",
+        "hidden": true
+      }
+    }
+  ],
+  "id7": {
+    "components": [
+      {
+        "name": "settingsMenu",
+        "rtype": "gpu",
+        "gpu": "teleShell",
+        "x": 84,
+        "y": 76,
+        "w": 1836,
+        "h": 154,
+        "opts": {
+          "app": "Seats",
+          "icon": "seat",
+          "tabs": "Seats, Settings",
+          "sel": 1,
+          "chips": "",
+          "title": "Settings",
+          "sub": "Independent driver and passenger automation",
+          "back": false,
+          "credit": "",
+          "hu": "id7"
+        }
+      },
+      {
+        "name": "sideRow",
+        "rtype": "gpu",
+        "gpu": "teleRow",
+        "x": 116,
+        "y": 230,
+        "w": 1772,
+        "h": 72,
+        "opts": {
+          "label": "Steering wheel side",
+          "sub": "Vehicle setup: left- or right-hand drive",
+          "icon": "",
+          "control": "seg",
+          "items": "Left, Right",
+          "sel": 0,
+          "sw": 330,
+          "text": "",
+          "disabled": false
+        }
+      },
+      {
+        "name": "driverSettingsTitle",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 116,
+        "y": 306,
+        "w": 870,
+        "h": 32,
+        "opts": {
+          "text": "DRIVER SETTINGS",
+          "size": 24,
+          "font": "label",
+          "color": "#8b9099",
+          "align": "left",
+          "wrap": false
+        }
+      },
+      {
+        "name": "passengerSettingsTitle",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 1018,
+        "y": 306,
+        "w": 870,
+        "h": 32,
+        "opts": {
+          "text": "PASSENGER SETTINGS",
+          "size": 24,
+          "font": "label",
+          "color": "#8b9099",
+          "align": "left",
+          "wrap": false
+        }
+      },
+      {
+        "name": "settingsDivider",
+        "rtype": "gpu",
+        "gpu": "rect",
+        "x": 1001,
+        "y": 338,
+        "w": 2,
+        "h": 340,
+        "opts": {
+          "color": "#30343b",
+          "radius": 0
+        }
+      },
+      {
+        "name": "exitRow",
+        "rtype": "gpu",
+        "gpu": "teleRow",
+        "x": 116,
+        "y": 338,
+        "w": 870,
+        "h": 82,
+        "opts": {
+          "label": "Driver Easy Exit",
+          "sub": "Automatic driver exit and return",
+          "icon": "",
+          "control": "seg",
+          "items": "Off, On",
+          "sel": 1,
+          "sw": 330,
+          "text": "",
+          "disabled": false
+        }
+      },
+      {
+        "name": "passengerExitRow",
+        "rtype": "gpu",
+        "gpu": "teleRow",
+        "x": 1018,
+        "y": 338,
+        "w": 870,
+        "h": 82,
+        "opts": {
+          "label": "Passenger Easy Exit",
+          "sub": "Requires fresh occupied passenger status",
+          "icon": "",
+          "control": "seg",
+          "items": "Off, On",
+          "sel": 0,
+          "sw": 330,
+          "text": "",
+          "disabled": false
+        }
+      },
+      {
+        "name": "settingsNoTool",
+        "rtype": "gpu",
+        "gpu": "teleEmpty",
+        "x": 116,
+        "y": 230,
+        "w": 1772,
+        "h": 470,
+        "opts": {
+          "icon": "warning",
+          "head": "Comfort tool not installed",
+          "line": "Install the Comfort tool from the Store",
+          "color": "",
+          "hidden": true
+        }
+      }
+    ]
+  }
+}
