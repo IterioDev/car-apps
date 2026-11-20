@@ -7,19 +7,14 @@
  * soon as they are offered: no widget menu. Pure: values in, segments and the shaders out; overlays.js reads the car
  * and talks to cluster-render. analysis/2026-11-03-m-shiftlights.md.
  *
- * What lights them:
- *   - an M car's DME sends the segments itself: MDrive 0xB51F controlShiftligts, notifier 0x8010: byte 0 lit
- *     segments 0-8 (15 invalid), byte 1 flash (1 flash, 2 steady, 0 / 3 none). While that comes, it wins.
- *   - any car: the engine speed, CDS 0xB513 statusEngineSpeed2 (getter 25 every 50 ms, u16 x 0.25 rpm, as Car Data
- *     reads it), against a start and a flash rpm: from the settings, or (auto) from the DME's allowed maximum now,
- *     VehicleInformation 0x1536 DataPowerTrain2CRC 0x8005 byte 13 rPMEngineMaximumAllowed (lower while the engine
- *     is cold; x 50 rpm assumed: values outside 3000-10000 rpm are ignored and the set ones used).
- * 8 segments from start to flash; at the flash rpm all flash.
+ * What lights them (0.6.0, user 2026-11-20: the rpm set in the app only, nothing taken from the car): the engine
+ * speed, CDS 0xB513 statusEngineSpeed2 (getter 25 every 50 ms, u16 x 0.25 rpm, as Car Data reads it), against the
+ * start and flash rpm of the settings. 8 segments from start to flash; at the flash rpm all flash. (0.5.x followed
+ * the DME's allowed maximum, VehicleInformation 0x1536 byte 13, and an M car's own segments, MDrive 0xB51F 0x8010:
+ * both gone; the DME's segments are still read, only to know an M car whose cluster has its own shift lights.)
  */
 
 const SEGMENTS = 8;
-const SPAN = 1500, MARGIN = 300;                 // auto: start = flash - SPAN, flash = the limit - MARGIN
-const DME_FRESH_MS = 500;
 const SHOW_BELOW = 1000, HIDE_BELOW = 1500, HIDE_AFTER_MS = 3000;
 // the targets' canvases and where the bars go in them: 8 a side from the outer edges inward, `top`-`bottom` high,
 // `inset` from the edge, one every `pitch` px, `bar` wide, leaning `slant` px per px of height; `dim` unlit bars drawn
@@ -32,17 +27,16 @@ const TARGETS = {
 const SIZE = TARGETS.guide;
 
 const RPM = { svc: 0xb513, ev: 0x8019, poll: 'poll 0xb513 1 25 1 50 0x8019' };
-const LIMIT = { svc: 0x1536, ev: 0x8005, sub: 'sub 0x1536 1 1 7 0x8005' };
 const DME = { svc: 0xb51f, ev: 0x8010 };
 
-const DEFAULTS = { on: true, auto: true, start: 4500, flash: 6500, hud: true };
+const DEFAULTS = { on: true, start: 4500, flash: 6500, hud: true };
 
 /* settings from the app: known keys of the right kind only */
 function mergeSettings(cur, p) {
     const out = Object.assign({}, DEFAULTS, cur);
+    delete out.auto;                             // 0.5.x's "follow the engine's limit": gone (a saved one is dropped)
     if (!p || typeof p !== 'object') return out;
     if (typeof p.on === 'boolean') out.on = p.on;
-    if (typeof p.auto === 'boolean') out.auto = p.auto;
     if (typeof p.hud === 'boolean') out.hud = p.hud;
     const rpm = (v) => Number.isInteger(v) && v >= 1000 && v <= 10000;
     if (rpm(p.start)) out.start = p.start;
@@ -52,21 +46,13 @@ function mergeSettings(cur, p) {
 }
 /* payloads (hex) -> values; null: not usable */
 const rpmOf = (hex) => (hex && hex.length >= 4 ? parseInt(hex.slice(0, 4), 16) * 0.25 : null);
-function limitOf(hex) {
-    if (!hex || hex.length < 28) return null;
-    const v = parseInt(hex.slice(26, 28), 16) * 50;
-    return v >= 3000 && v <= 10000 ? v : null;
-}
 function dmeOf(hex) {
     if (!hex || hex.length < 4) return null;
     const seg = parseInt(hex.slice(0, 2), 16), fl = parseInt(hex.slice(2, 4), 16);
     return seg <= SEGMENTS ? { seg, flash: fl === 1 } : null;
 }
-/* the start and flash rpm to use now */
-function thresholds(set, limit) {
-    if (set.auto && limit) { const flash = limit - MARGIN; return { start: flash - SPAN, flash }; }
-    return { start: set.start, flash: set.flash };
-}
+/* the start and flash rpm: the settings' */
+const thresholds = (set) => ({ start: set.start, flash: set.flash });
 /* lit segments and flash at rpm */
 function lights(rpm, th) {
     if (!(rpm >= th.start)) return { seg: 0, flash: false };
@@ -120,14 +106,12 @@ function test() {
     const assert = require('assert');
     const set = mergeSettings({}, {});
     assert.deepStrictEqual(set, DEFAULTS);
-    assert.deepStrictEqual(mergeSettings(set, { start: 6400, flash: 6500, on: 'x' }), { on: true, auto: true, start: 6000, flash: 6500, hud: true }, 'start kept 500 below flash');
+    assert.deepStrictEqual(mergeSettings(set, { start: 6400, flash: 6500, on: 'x' }), { on: true, start: 6000, flash: 6500, hud: true }, 'start kept 500 below flash');
+    assert.deepStrictEqual(mergeSettings({ on: true, auto: true, start: 5000, flash: 7000, hud: false }, { auto: false }),
+        { on: true, start: 5000, flash: 7000, hud: false }, 'the auto of 0.5.x dropped, the set rpm kept');
     assert.strictEqual(rpmOf('3840'), 3600);                         // 0x3840 = 14400 * 0.25
-    assert.strictEqual(limitOf('00'.repeat(13) + '8c'), 7000);       // 140 x 50
-    assert.strictEqual(limitOf('00'.repeat(13) + 'ff'), null);       // 12750: out of range
     assert.deepStrictEqual([dmeOf('0502'), dmeOf('0801'), dmeOf('0f03')], [{ seg: 5, flash: false }, { seg: 8, flash: true }, null]);
-    assert.deepStrictEqual(thresholds(set, 7000), { start: 5200, flash: 6700 });
-    assert.deepStrictEqual(thresholds(set, null), { start: 4500, flash: 6500 });
-    assert.deepStrictEqual(thresholds(mergeSettings(set, { auto: false }), 7000), { start: 4500, flash: 6500 });
+    assert.deepStrictEqual(thresholds(mergeSettings(set, { start: 5200, flash: 6800 })), { start: 5200, flash: 6800 }, 'the set rpm, always');
     const th = { start: 4500, flash: 6500 };
     assert.deepStrictEqual([4000, 4500, 4501, 5500, 6499, 6500, 7200].map((r) => lights(r, th).seg), [0, 0, 1, 4, 8, 8, 8]);
     assert.deepStrictEqual([lights(6499, th).flash, lights(6500, th).flash], [false, true]);
@@ -141,5 +125,5 @@ function test() {
     console.log('shiftlights self-check ok');
 }
 
-module.exports = { SEGMENTS, SIZE, TARGETS, fs, RPM, LIMIT, DME, DEFAULTS, DME_FRESH_MS, FS, mergeSettings, rpmOf, limitOf, dmeOf,
+module.exports = { SEGMENTS, SIZE, TARGETS, fs, RPM, DME, DEFAULTS, FS, mergeSettings, rpmOf, dmeOf,
     thresholds, lights, visible, test };

@@ -122,8 +122,8 @@ not over the black start screen or the M start animation, and from then on alway
 - **Shift lights** on the instrument cluster, for cars without their own (not M cars: those show theirs, so the
   tool hides its own there; set *M car* to NO in the app to have them anyway): 8 bars a side at the top centre of
   the cluster, over the map, lit from the outside in and flashing at the shift point, also in the head-up display
-  above the speed. Lit from the engine speed against a start and a flash rpm (set in the app, or following the
-  engine's current limit, lower while it is cold). Needs **Cluster renderer (`cluster-render`) 0.3.6 or newer** from
+  above the speed. Lit from the engine speed against a start and a flash rpm set in the app (1.5.0 / tool 0.6.0:
+  nothing taken from the car any more, the "follow the engine's limit" option is gone). Needs **Cluster renderer (`cluster-render`) 0.3.6 or newer** from
   [robertnisipeanu/idrive-apps](https://github.com/robertnisipeanu/idrive-apps); without it the rest works as before.
 
 The tool runs as the root service `iteriodev-overlays.service` and asks the HMI and the car over SOME/IP through its
