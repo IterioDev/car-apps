@@ -20,6 +20,7 @@ const NOTICES = {
     nofront: ['No front camera', 'Turn View needs the car\'s front camera'],
     hu: ['Turn View is on the head unit', 'Switch it back in the Turn View app'],     // 0.9.0: Picture on: Head unit
     off: ['Turn View is off', 'Switch it on in the Turn View app'],
+    nonv: ['No Night Vision picture', 'Or pick the front camera in the Turn View app'],   // 0.10.0
 };
 
 /* an arrow head at (x, y) pointing along unit (dx, dy) */

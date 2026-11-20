@@ -1,8 +1,8 @@
 {
  "id": "iteriodev_turnview",
- "version": "1.6.0",
+ "version": "1.7.0",
  "title": "Turn View",
- "description": "The front camera in the instrument cluster with a turn card and, near each turn, a blue turn sign (three chevrons pointing the way), from BMW Maps, Apple CarPlay or Android Auto; the camera shows with or without a route. Or on the head unit instead: the Camera button opens the camera's whole picture with the same card and sign, at any speed (Picture on: Head unit), for kerbs and tight gaps. iDrive 8: pick \"Turn View AR\" in the cluster's widget menu (from the car's next start after installing). iDrive 7: off at every start of the car; switch it on in this app and set Instrument cluster > Centra",
+ "description": "The front camera in the instrument cluster with a turn card and, near each turn, a blue turn sign (three chevrons pointing the way), from BMW Maps, Apple CarPlay or Android Auto; the camera shows with or without a route. Or on the head unit instead: the Camera button opens the camera's whole picture with the same card and sign, at any speed (Picture on: Head unit), for kerbs and tight gaps. Cars with BMW Night Vision (1.7.0): Camera Night Vision shows its picture instead, in the cluster or here (read from the head unit's own video input; BMW's Night Vision screen then stays black). iDrive 8: p",
  "mguHmi": [
   "ID7",
   "ID8"
@@ -11,7 +11,7 @@
   "renderer"
  ],
  "requires": {
-  "iteriodev-turnview": "0.9.0",
+  "iteriodev-turnview": "0.10.0",
   "mgu-deploy": "0.7.5"
  }
 }

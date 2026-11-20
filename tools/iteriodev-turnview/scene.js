@@ -18,7 +18,9 @@
  *                          instead ("Picture on: Head unit") - the widget says "Turn View is on the head unit" and
  *                          nothing else; iDrive 7's map area is given back (nothing drawn)
  *   const sc = createScene(cr, { log, now, target });   cr: a ClusterRender (cluster_render_client.js) or a fake with its methods
- *   sc.rect(r); sc.camera(status); sc.camreq(state); sc.noFront(on); sc.disabled(on); sc.hu(on); sc.setCal(cal); sc.budget(capKb); sc.show(view, t);
+ *   sc.rect(r); sc.camera(status); sc.camreq(state); sc.noFront(on); sc.disabled(on); sc.hu(on); sc.nv(on); sc.setCal(cal); sc.budget(capKb); sc.show(view, t);
+ *   0.10.0 nv(on): the picture is Night Vision's - no turn sign or marks (calibrated for the front camera), no front
+ *   camera notices; "No Night Vision picture" when it does not come
  *   sc.retarget(target) -> changed (the layers made again there by the next show); sc.drop(); sc.restore(); sc.status()
  * Uploads: geometry once; the card when its icon / text changes, at most once a second (every 3 s while the shared
  * budget's cap is under 3000 KB/s); a notice when its text changes. u_travel is animated by the renderer between ticks
@@ -44,7 +46,7 @@ function createScene(cr, o) {
     const log = o.log || (() => {}), now = o.now || Date.now;
     let target = o.target || 'widget';
     let refs = null, rect = null;
-    let camera = 'off', cameraSince = now(), camreq = 'idle', capKb = 5500, noFront = false, disabled = false, onHu = false;
+    let camera = 'off', cameraSince = now(), camreq = 'idle', capKb = 5500, noFront = false, disabled = false, onHu = false, nvOn = false;
     let cal = { h: 0.5, pitch: 12, fov: 60, yaw: 0, x: 0 };
     let vis = {}, uni = {}, travelSent = false, animAt = -Infinity, cardKey = '', cardWant = '', cardAt = -Infinity, noticeKey = null, lastNotice = null;
 
@@ -90,10 +92,11 @@ function createScene(cr, o) {
         cr.uniform(refs.chevrons, name, [v], { part: 1 });
     }
     function noticeOf(view, t) {
-        if (noFront) return 'nofront';                  // (user 2026-11-12: such a car gets that and nothing else)
-        if (camera === 'stalled') return 'busy';
+        if (noFront && !nvOn) return 'nofront';         // (user 2026-11-12: such a car gets that and nothing else)
+        if (camera === 'stalled') return nvOn ? 'nonv' : 'busy';
         if (camera === 'refused') return 'full';        // (0.6.1: the cluster's 2 videos are other apps')
-        if (camreq === 'refused' || (camera === 'waiting' && t - cameraSince >= NOCAM_MS)) return 'nocam';
+        if (camera === 'waiting' && t - cameraSince >= NOCAM_MS) return nvOn ? 'nonv' : 'nocam';
+        if (camreq === 'refused' && !nvOn) return 'nocam';
         return null;
     }
 
@@ -114,6 +117,7 @@ function createScene(cr, o) {
         noFront(on) { noFront = !!on; },
         disabled(on) { disabled = !!on; },
         hu(on) { onHu = !!on; },
+        nv(on) { nvOn = !!on; },
         budget(kb) { if (typeof kb === 'number') capKb = kb; },
         setCal(c) {
             const was = JSON.stringify(camOf(cal));
@@ -128,11 +132,13 @@ function createScene(cr, o) {
             // the picture on the head unit (0.9.0): said in a picked widget, not black; iDrive 7's map area given back
             const huNote = onHu && !self;
             const offNote = !huNote && off && disabled && !self;   // switched off: said, not black (iDrive 8's picked widget)
-            const gone = self && (noFront || onHu);         // iDrive 7, no front camera / on the head unit: the map area given back
-            const shade = !gone && (huNote || offNote || (!off && (noFront || (view.video && !decoding))));
+            const nofront = noFront && !nvOn;               // (0.10.0: Night Vision needs no front camera)
+            const gone = self && (nofront || onHu);         // iDrive 7, no front camera / on the head unit: the map area given back
+            const shade = !gone && (huNote || offNote || (!off && (nofront || (view.video && !decoding))));
             const n = huNote ? 'hu' : offNote ? 'off' : shade ? noticeOf(view, t) : null;
             const turn = (st === 'near' || st === 'passed') && view.angle > 0;
-            const want = { chevrons: !off && !gone && turn && decoding && !shade, marks: !off && !gone && st === 'calib' && decoding && !shade,
+            const want = { chevrons: !off && !gone && turn && decoding && !shade && !nvOn,
+                marks: !off && !gone && st === 'calib' && decoding && !shade && !nvOn,
                 card: !off && !gone && drawn && !shade, shade, notice: !!n };
             lastNotice = n;
             // pixels before they show: a layer without content would be stalled
@@ -186,15 +192,16 @@ function createScene(cr, o) {
 /* 0.9.0 (user 2026-11-19, kerb parking): the head unit's picture - the camera's whole frame (8:3, camcluster --hu) on
  * the app's Camera page - with the cluster's card and turn sign over it, sized as on the iDrive 8 widget (640 px high:
  * card 360 x 150 at the top, 16 px down). Fractions of the picture (0..1, y down) for the app's video element:
- *   huOverlay(view, cal) -> { card: { x, y, w, h } | null, sign: { quads: [[[x, y] x 4] x 6], a } | null } */
+ *   huOverlay(view, cal, nv) -> { card: { x, y, w, h } | null, sign: { quads: [[[x, y] x 4] x 6], a } | null }
+ *   (nv, 0.10.0: Night Vision's picture - no sign) */
 const HU_ASPECT = 8 / 3, HU_H = 640;
 const HU_CARD = { w: C.CARD.w / (HU_H * HU_ASPECT), h: C.CARD.h / HU_H, y: 16 / HU_H };
 const SIGN = SH.signGeometry();
-function huOverlay(view, cal) {
+function huOverlay(view, cal, nv) {
     const st = view.state, card = !!DRAWN[st] && !!view.icon;
     const c = card ? { x: (1 - HU_CARD.w) / 2, y: HU_CARD.y, w: HU_CARD.w, h: HU_CARD.h } : null;
     let sign = null;
-    if ((st === 'near' || st === 'passed') && view.angle > 0) {
+    if (!nv && (st === 'near' || st === 'passed') && view.angle > 0) {
         const top = 1 - 2 * (c ? c.y + c.h + SIGN_GAP / HU_H : 0);
         const u = { l0: view.l0, travel: view.travel, side: view.side, alpha: view.alpha, top }, P = SIGN.positions, quads = [];
         let a = 0, ok = true;
