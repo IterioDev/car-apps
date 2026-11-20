@@ -13,13 +13,15 @@ const eq=(a,b)=>assert.deepStrictEqual(JSON.parse(JSON.stringify(a)),JSON.parse(
 eq(api.states,['seats','settings']);
 api.setup(t); api.render();
 eq(display.driverModeRow.disabled,false); eq(display.passengerExitRow.disabled,false);
-eq(display.dMem0.disabled,true); eq(display.dExit.disabled,true);
+eq(display.dMem0.disabled,true);
+eq([display.dMem0.text,display.dMem1.text,display.dMem2.text,display.dExit.text],['Driving','M1','M2','Easy Exit']);
+eq(display.dSave.text,'SET'); eq(display.dExit.disabled,true);
 api.onChange('exitRow',{sel:1}); eq(sent.pop(),{op:'set',settings:{easyExit:true}});
 t.settings.easyExit=true; api.confirm(t);
 api.onChange('driverExitModeRow',{sel:0}); eq(sent.pop(),{op:'set',settings:{driverExitTargetMode:'adaptive'}});
 t.settings.driverExitTargetMode='adaptive';
 api.confirm(t);
-eq(display.driverExitModeRow.sub,'Use SET to save Easy Exit behind M1');
+eq(display.driverExitModeRow.sub,'Use SET to save Easy Exit behind Driving');
 api.onEvent('dExit'); eq(sent.length,0);
 api.onEvent('dSave'); api.onEvent('dMem0'); eq(sent.pop(),{op:'memory',seat:'driver',slot:0,save:true});
 api.onEvent('dSave'); api.onEvent('dExit'); eq(sent.pop(),{op:'exit',seat:'driver',save:true});

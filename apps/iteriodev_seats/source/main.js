@@ -176,7 +176,7 @@ function seatConfig(seat) {
         ? {enable:'passengerEasyExit', drive:'passengerExitMode', exit:'passengerExitTargetMode', level:'passengerExitLevel', policy:'passengerExit'}
         : {enable:'easyExit', drive:'driverExitMode', exit:'driverExitTargetMode', level:'driverExitLevel', policy:'driverExit'};
 }
-function presetLabels() { return ['M1', 'M2', 'M3', 'Easy Exit']; }
+function presetLabels() { return ['Driving', 'M1', 'M2', 'Easy Exit']; }
 function canRecallExit(seat) {
     const k = seatConfig(seat), policy = tool[k.policy];
     return tool.settings && tool.settings[k.exit] === 'adaptive'
@@ -193,8 +193,8 @@ function modeState(seat) {
         disabled: !supported || !hall || moving || settingsPending !== null || modePending !== null,
         sub: !supported ? 'Update Comfort to choose a mode' : !hall ? 'Position feedback required'
             : moving ? 'Available when both seats stop' : modeError
-                || (missingFixed ? 'Use SET, then M1 to save a position'
-                    : cfg[k.drive] === 'fixed' ? 'Returns to the M1 preset' : 'Returns to the prior position')
+                || (missingFixed ? 'Use SET, then Driving to save a position'
+                    : cfg[k.drive] === 'fixed' ? 'Returns to the Driving preset' : 'Returns to the prior position')
     };
 }
 function renderSettings(seat) {
@@ -208,7 +208,7 @@ function renderSettings(seat) {
     });
     screens.set(d ? 'driverModeRow' : 'passengerModeRow', mode);
     const exitHelp = relative
-        ? (policy.relativeConfigured ? 'Moves rearward by the selected distance' : 'Use SET to save Easy Exit behind M1')
+        ? (policy.relativeConfigured ? 'Moves rearward by the selected distance' : 'Use SET to save Easy Exit behind Driving')
         : (tool.seats.exit[seat] ? 'Uses the saved Easy Exit pose' : 'Use SET, then Easy Exit to save a position');
     screens.set(d ? 'driverExitModeRow' : 'passengerExitModeRow', {sel: relative ? 0 : 1, disabled: mode.disabled, sub: exitHelp});
     const p = d ? 'exitLevel' : 'passengerLevel';
@@ -240,7 +240,7 @@ function render() {
     }
     const decision = t.driverExit && t.driverExit.last;
     const held = decision && decision.target === 'exit' && decision.result === 'no progress';
-    const decisionSummary = held ? 'Easy Exit on hold · recall M1 to reset' : decision ? (t.settings && t.settings.driverExitMode === 'fixed' ? 'Fixed' : 'Adaptive') + ' ' + (decision.target === 'exit' ? 'exit' : 'return') + ' (' + (decision.reason === 'driver door' ? 'door' : 'readiness') + '): ' + decision.result : null;
+    const decisionSummary = held ? 'Easy Exit on hold · recall Driving to reset' : decision ? (t.settings && t.settings.driverExitMode === 'fixed' ? 'Fixed' : 'Adaptive') + ' ' + (decision.target === 'exit' ? 'exit' : 'return') + ' (' + (decision.reason === 'driver door' ? 'door' : 'readiness') + '): ' + decision.result : null;
     Object.keys(MENUS).forEach((pg) => screens.set(MENUS[pg], { chips: [], sub: decisionSummary || SUBS[pg] }));
     screens.set('sideRow',{sel:side==='right'?1:0,disabled:!!t.seats.job||!!t.seats.moving||!!t.seats.controlBusy});
     ['driver','passenger'].forEach(renderSettings);
@@ -279,12 +279,12 @@ function renderSeat(seat) {
     const driver = seat === 'driver';
     const status = going >= 0 ? [`Moving to ${labels[going]} · tap ${labels[going]} to stop`, COL.accent]
             : job === 'gentleman' && !driver ? [s.roomOut ? 'Moving back · tap Stop to stop' : 'Making room · tap Stop to stop', COL.accent]
-                : out ? [job === 'exit' ? 'Moving out of the way · tap '+labels[3]+' to stop' : (driver && tool.settings && tool.settings.driverExitMode === 'fixed' ? 'Back to M1 · tap '+labels[3]+' to stop' : 'Back to where you sat · tap '+labels[3]+' to stop'), COL.accent]
+                : out ? [job === 'exit' ? 'Moving out of the way · tap '+labels[3]+' to stop' : (driver && tool.settings && tool.settings.driverExitMode === 'fixed' ? 'Back to Driving · tap '+labels[3]+' to stop' : 'Back to where you sat · tap '+labels[3]+' to stop'), COL.accent]
                     : job === 'memory' && !recall ? ['Moving to a memory · tap a seat control to stop', COL.accent]
                         : h ? [`${NAME[h.axis]}: ${VERB[h.axis][h.dir > 0 ? 1 : 0]}`, COL.accent]
                             : axis ? [`${NAME[axis]}: moving`, COL.accent]
                                 : save ? ['Tap '+labels.join(', ')+' to save the current pose', COL.accent]
-                                    : s.pre[seat] ? [driver ? (tool.settings && tool.settings.driverExitMode === 'fixed' ? labels[3]+' · returns to M1' : labels[3]+' · returns to the prior position') : 'Manual Exit · use an app memory to return', COL.dim]
+                                    : s.pre[seat] ? [driver ? (tool.settings && tool.settings.driverExitMode === 'fixed' ? labels[3]+' · returns to Driving' : labels[3]+' · returns to the prior position') : 'Manual Exit · use an app memory to return', COL.dim]
                                         : !driver && !parked && hallOf(seat) ? ['Hold a control · Make room: parked only', COL.dim]
                                             : ['Hold a control to move the seat', COL.dim];
     screens.set(`${p}Status`, { text: status[0], color: status[1] });
