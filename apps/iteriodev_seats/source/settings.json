@@ -103,16 +103,132 @@
       "w": 1360,
       "h": 104,
       "opts": {
-        "label": "Driver Easy Exit",
-        "sub": "Automatic driver exit and return",
+        "label": "Seat automation",
+        "sub": "Requires calibration",
         "icon": "",
         "control": "seg",
         "items": "Off, On",
-        "sel": 1,
+        "sel": 0,
         "sw": 460,
         "text": "",
         "disabled": false
       }
+    },
+    {
+      "name": "driverModeRow",
+      "rtype": "gpu",
+      "gpu": "teleRow",
+      "x": 40,
+      "y": 478,
+      "w": 1360,
+      "h": 104,
+      "opts": {
+        "label": "Drive position",
+        "sub": "Returns to the prior position",
+        "icon": "",
+        "control": "seg",
+        "items": "Adaptive, Fixed",
+        "sel": 0,
+        "sw": 460,
+        "text": "",
+        "disabled": true
+      }
+    },
+    {
+      "name": "driverExitModeRow",
+      "rtype": "gpu",
+      "gpu": "teleRow",
+      "x": 40,
+      "y": 582,
+      "w": 1360,
+      "h": 104,
+      "opts": {
+        "label": "Exit position",
+        "sub": "Uses the saved Easy exit position",
+        "icon": "",
+        "control": "seg",
+        "items": "Adaptive, Fixed",
+        "sel": 1,
+        "sw": 460,
+        "text": "",
+        "disabled": true
+      }
+    },
+    {
+      "name": "exitLevelLabel",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 40,
+      "y": 720,
+      "w": 1024,
+      "h": 36,
+      "opts": {
+        "text": "Exit distance",
+        "size": 26,
+        "font": "label",
+        "color": "#8b9099",
+        "align": "left",
+        "wrap": false
+      }
+    },
+    {
+      "name": "exitLevelMinus",
+      "rtype": "gpu",
+      "gpu": "teleButton",
+      "x": 1076,
+      "y": 702,
+      "w": 100,
+      "h": 72,
+      "opts": {
+        "text": "-",
+        "kind": "outline",
+        "disabled": true
+      },
+      "onTap": "event:exitLevelMinus"
+    },
+    {
+      "name": "exitLevelBackground",
+      "rtype": "gpu",
+      "gpu": "rect",
+      "x": 1188,
+      "y": 702,
+      "w": 100,
+      "h": 72,
+      "opts": {
+        "color": "#252525",
+        "radius": 3
+      }
+    },
+    {
+      "name": "exitLevelValue",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 1188,
+      "y": 718,
+      "w": 100,
+      "h": 44,
+      "opts": {
+        "text": "2",
+        "size": 34,
+        "align": "center",
+        "color": "#8b9099",
+        "font": "bold"
+      }
+    },
+    {
+      "name": "exitLevelPlus",
+      "rtype": "gpu",
+      "gpu": "teleButton",
+      "x": 1300,
+      "y": 702,
+      "w": 100,
+      "h": 72,
+      "opts": {
+        "text": "+",
+        "kind": "outline",
+        "disabled": true
+      },
+      "onTap": "event:exitLevelPlus"
     },
     {
       "name": "passengerExitRow",
@@ -123,8 +239,8 @@
       "w": 1360,
       "h": 104,
       "opts": {
-        "label": "Passenger Easy Exit",
-        "sub": "Requires fresh occupied passenger status",
+        "label": "Seat automation",
+        "sub": "Requires calibration",
         "icon": "",
         "control": "seg",
         "items": "Off, On",
@@ -133,6 +249,122 @@
         "text": "",
         "disabled": false
       }
+    },
+    {
+      "name": "passengerModeRow",
+      "rtype": "gpu",
+      "gpu": "teleRow",
+      "x": 1480,
+      "y": 478,
+      "w": 1360,
+      "h": 104,
+      "opts": {
+        "label": "Drive position",
+        "sub": "Returns to the prior position",
+        "icon": "",
+        "control": "seg",
+        "items": "Adaptive, Fixed",
+        "sel": 0,
+        "sw": 460,
+        "text": "",
+        "disabled": true
+      }
+    },
+    {
+      "name": "passengerExitModeRow",
+      "rtype": "gpu",
+      "gpu": "teleRow",
+      "x": 1480,
+      "y": 582,
+      "w": 1360,
+      "h": 104,
+      "opts": {
+        "label": "Exit position",
+        "sub": "Uses the saved Easy exit position",
+        "icon": "",
+        "control": "seg",
+        "items": "Adaptive, Fixed",
+        "sel": 1,
+        "sw": 460,
+        "text": "",
+        "disabled": true
+      }
+    },
+    {
+      "name": "passengerLevelLabel",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 1480,
+      "y": 720,
+      "w": 1024,
+      "h": 36,
+      "opts": {
+        "text": "Exit distance",
+        "size": 26,
+        "font": "label",
+        "color": "#8b9099",
+        "align": "left",
+        "wrap": false
+      }
+    },
+    {
+      "name": "passengerLevelMinus",
+      "rtype": "gpu",
+      "gpu": "teleButton",
+      "x": 2516,
+      "y": 702,
+      "w": 100,
+      "h": 72,
+      "opts": {
+        "text": "-",
+        "kind": "outline",
+        "disabled": true
+      },
+      "onTap": "event:passengerLevelMinus"
+    },
+    {
+      "name": "passengerLevelBackground",
+      "rtype": "gpu",
+      "gpu": "rect",
+      "x": 2628,
+      "y": 702,
+      "w": 100,
+      "h": 72,
+      "opts": {
+        "color": "#252525",
+        "radius": 3
+      }
+    },
+    {
+      "name": "passengerLevelValue",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 2628,
+      "y": 718,
+      "w": 100,
+      "h": 44,
+      "opts": {
+        "text": "2",
+        "size": 34,
+        "align": "center",
+        "color": "#8b9099",
+        "font": "bold"
+      }
+    },
+    {
+      "name": "passengerLevelPlus",
+      "rtype": "gpu",
+      "gpu": "teleButton",
+      "x": 2740,
+      "y": 702,
+      "w": 100,
+      "h": 72,
+      "opts": {
+        "text": "+",
+        "kind": "outline",
+        "disabled": true
+      },
+      "onTap": "event:passengerLevelPlus"
     },
     {
       "name": "settingsNoTool",
@@ -250,16 +482,132 @@
         "w": 870,
         "h": 82,
         "opts": {
-          "label": "Driver Easy Exit",
-          "sub": "Automatic driver exit and return",
+          "label": "Seat automation",
+          "sub": "Requires calibration",
           "icon": "",
           "control": "seg",
           "items": "Off, On",
-          "sel": 1,
+          "sel": 0,
           "sw": 330,
           "text": "",
           "disabled": false
         }
+      },
+      {
+        "name": "driverModeRow",
+        "rtype": "gpu",
+        "gpu": "teleRow",
+        "x": 116,
+        "y": 420,
+        "w": 870,
+        "h": 82,
+        "opts": {
+          "label": "Drive position",
+          "sub": "Returns to the prior position",
+          "icon": "",
+          "control": "seg",
+          "items": "Adaptive, Fixed",
+          "sel": 0,
+          "sw": 330,
+          "text": "",
+          "disabled": true
+        }
+      },
+      {
+        "name": "driverExitModeRow",
+        "rtype": "gpu",
+        "gpu": "teleRow",
+        "x": 116,
+        "y": 502,
+        "w": 870,
+        "h": 82,
+        "opts": {
+          "label": "Exit position",
+          "sub": "Uses the saved Easy exit position",
+          "icon": "",
+          "control": "seg",
+          "items": "Adaptive, Fixed",
+          "sel": 1,
+          "sw": 330,
+          "text": "",
+          "disabled": true
+        }
+      },
+      {
+        "name": "exitLevelLabel",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 116,
+        "y": 620,
+        "w": 594,
+        "h": 36,
+        "opts": {
+          "text": "Exit distance",
+          "size": 26,
+          "font": "label",
+          "color": "#8b9099",
+          "align": "left",
+          "wrap": false
+        }
+      },
+      {
+        "name": "exitLevelMinus",
+        "rtype": "gpu",
+        "gpu": "teleButton",
+        "x": 722,
+        "y": 602,
+        "w": 80,
+        "h": 72,
+        "opts": {
+          "text": "-",
+          "kind": "outline",
+          "disabled": true
+        },
+        "onTap": "event:exitLevelMinus"
+      },
+      {
+        "name": "exitLevelBackground",
+        "rtype": "gpu",
+        "gpu": "rect",
+        "x": 814,
+        "y": 602,
+        "w": 80,
+        "h": 72,
+        "opts": {
+          "color": "#252525",
+          "radius": 3
+        }
+      },
+      {
+        "name": "exitLevelValue",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 814,
+        "y": 618,
+        "w": 80,
+        "h": 44,
+        "opts": {
+          "text": "2",
+          "size": 34,
+          "align": "center",
+          "color": "#8b9099",
+          "font": "bold"
+        }
+      },
+      {
+        "name": "exitLevelPlus",
+        "rtype": "gpu",
+        "gpu": "teleButton",
+        "x": 906,
+        "y": 602,
+        "w": 80,
+        "h": 72,
+        "opts": {
+          "text": "+",
+          "kind": "outline",
+          "disabled": true
+        },
+        "onTap": "event:exitLevelPlus"
       },
       {
         "name": "passengerExitRow",
@@ -270,8 +618,8 @@
         "w": 870,
         "h": 82,
         "opts": {
-          "label": "Passenger Easy Exit",
-          "sub": "Requires fresh occupied passenger status",
+          "label": "Seat automation",
+          "sub": "Requires calibration",
           "icon": "",
           "control": "seg",
           "items": "Off, On",
@@ -280,6 +628,122 @@
           "text": "",
           "disabled": false
         }
+      },
+      {
+        "name": "passengerModeRow",
+        "rtype": "gpu",
+        "gpu": "teleRow",
+        "x": 1018,
+        "y": 420,
+        "w": 870,
+        "h": 82,
+        "opts": {
+          "label": "Drive position",
+          "sub": "Returns to the prior position",
+          "icon": "",
+          "control": "seg",
+          "items": "Adaptive, Fixed",
+          "sel": 0,
+          "sw": 330,
+          "text": "",
+          "disabled": true
+        }
+      },
+      {
+        "name": "passengerExitModeRow",
+        "rtype": "gpu",
+        "gpu": "teleRow",
+        "x": 1018,
+        "y": 502,
+        "w": 870,
+        "h": 82,
+        "opts": {
+          "label": "Exit position",
+          "sub": "Uses the saved Easy exit position",
+          "icon": "",
+          "control": "seg",
+          "items": "Adaptive, Fixed",
+          "sel": 1,
+          "sw": 330,
+          "text": "",
+          "disabled": true
+        }
+      },
+      {
+        "name": "passengerLevelLabel",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 1018,
+        "y": 620,
+        "w": 594,
+        "h": 36,
+        "opts": {
+          "text": "Exit distance",
+          "size": 26,
+          "font": "label",
+          "color": "#8b9099",
+          "align": "left",
+          "wrap": false
+        }
+      },
+      {
+        "name": "passengerLevelMinus",
+        "rtype": "gpu",
+        "gpu": "teleButton",
+        "x": 1624,
+        "y": 602,
+        "w": 80,
+        "h": 72,
+        "opts": {
+          "text": "-",
+          "kind": "outline",
+          "disabled": true
+        },
+        "onTap": "event:passengerLevelMinus"
+      },
+      {
+        "name": "passengerLevelBackground",
+        "rtype": "gpu",
+        "gpu": "rect",
+        "x": 1716,
+        "y": 602,
+        "w": 80,
+        "h": 72,
+        "opts": {
+          "color": "#252525",
+          "radius": 3
+        }
+      },
+      {
+        "name": "passengerLevelValue",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 1716,
+        "y": 618,
+        "w": 80,
+        "h": 44,
+        "opts": {
+          "text": "2",
+          "size": 34,
+          "align": "center",
+          "color": "#8b9099",
+          "font": "bold"
+        }
+      },
+      {
+        "name": "passengerLevelPlus",
+        "rtype": "gpu",
+        "gpu": "teleButton",
+        "x": 1808,
+        "y": 602,
+        "w": 80,
+        "h": 72,
+        "opts": {
+          "text": "+",
+          "kind": "outline",
+          "disabled": true
+        },
+        "onTap": "event:passengerLevelPlus"
       },
       {
         "name": "settingsNoTool",

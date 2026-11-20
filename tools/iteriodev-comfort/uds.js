@@ -46,9 +46,10 @@ class Uds {
     constructor(hmi, log) { this.hmi = hmi; this.log = log || (() => {}); this.q = []; this.cur = null; }
 
     /** ms: how long to wait for the answer (a probe of a unit the car may lack: shorter, the queue waits behind it) */
-    send(target, sid, data, ms, cleanup) {
+    send(target, sid, data, ms, cleanup, permission) {
+        if (typeof ms === 'function') { permission = ms; ms = undefined; }
         return new Promise((res, rej) => {
-            const c = { target, sid, data: Array.from(data || []), ms, res, rej, cleanup: cleanup === true };
+            const c = { target, sid, data: Array.from(data || []), ms, permission, res, rej, cleanup: cleanup === true };
             if (this.shuttingDown && !isStop(target, sid, c.data) && !c.cleanup) {
                 rej(new Error('service shutting down')); return;
             }
@@ -75,8 +76,9 @@ class Uds {
     pump() {
         if (this.cur || !this.q.length) return;
         const c = this.cur = this.q.shift();
+        if (c.permission) { const denied = c.permission(); if (denied) { this.finish(null, new Error(denied)); return; } }
         // the answer's time counts from the request's going out, not from its waiting behind hmictl's line before it
-        this.hmi(line(c.target, c.sid, c.data), false, isStop(c.target, c.sid, c.data) || c.cleanup).then((r) => {
+        this.hmi(line(c.target, c.sid, c.data), false, isStop(c.target, c.sid, c.data) || c.cleanup, c.permission).then((r) => {
             if (this.cur !== c) return;
             // A response-pending event can arrive before this method ACK.
             if (/^ok/.test(r)) { if (!c.pending) this.arm(c.ms || TIMEOUT_MS); }

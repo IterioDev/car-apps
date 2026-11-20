@@ -32,10 +32,8 @@
  * then its memories), press = tap; a hold control moves the seat while the knob stays pressed down.
  * 1.6.1: the controller on the car (mgu-m4): only the first states came, the FrontCCU proxy was not kept (collected).
  * 1.6.2 (issue #29): a half without controls says what its seat module answered (<- seats.found, Comfort 0.6.0).
- * 1.6.3 (issue #37, iDrive 7): FrontCCU waited for with a plain timeout (oap-shared/frontccu.js: iDrive 7's SDK timed
- * { timeoutMs } out at once); the builder's newer controller runtime (the ring follows the screen). Needs Comfort 0.6.1
- * (issue #42: Make room / easy exit only on a known standing car).
  *
+ * Driver return mode: service-confirmed Adaptive / Fixed setting (Fixed uses app Memory 1).
  * Screens: drawn by the GPU renderer, designed in the HMI UI builder: apps/hmi-ui-builder/projects/seats.json
  * (scripts/oap-tools/make_seats_project.js), exported into this folder (rhmiData/ = one empty RHMI host state per
  * screen, renderer/ = screens.json + the builder's runtime). Start, tile and shutdown: the shared OnlineApp host
@@ -98,6 +96,8 @@ function setSide(s) {
 
 // ---- the tool ---------------------------------------------------------------------------------------------
 let tool = null;                  // its last state, null = no connection
+let settingsPending=null;
+let modePending = null, modeRejected = null, modeError = ''; // selection is confirmed by Comfort's state stream
 let sock = null;
 let busy = false;                 // a connection being made
 let held = null;                  // the control held: { seat, axis, dir, timer, limit }
@@ -116,13 +116,28 @@ function connect() {
         for (let n; (n = buf.indexOf('\n')) >= 0; buf = buf.slice(n + 1)) {
             let m;
             try { m = JSON.parse(buf.slice(0, n)); } catch (e) { continue; }
-            if (m.state) { tool = m.state; render(); }
+            if (m.state) {
+                tool = m.state;
+                if(settingsPending && tool.settings && tool.settings[settingsPending.key]===settingsPending.value)settingsPending=null;
+                const selected = tool.settings && tool.settings.driverExitMode;
+                const confirms = (choice) => choice !== null && selected === (choice === 1 ? 'fixed' : 'adaptive');
+                if (confirms(modePending) || confirms(modeRejected)) {
+                    modePending = modeRejected = null; modeError = '';
+                }
+                render();
+            } else if(m.error && settingsPending) {settingsPending=null;modeError=String(m.error).slice(0,90);render();
+            } else if (m.error && modePending !== null) {
+                modeRejected = modePending; modePending = null;
+                modeError = 'Return mode was not changed'; render();
+            }
         }
     });
     s.on('error', (e) => { if (!/ENOENT|ECONNREFUSED/.test(e.code)) log('tool:', e.message); });
-    s.on('close', () => { busy = false; sock = null; tool = null; jogEnd(false); render(); setTimeout(connect, RETRY_MS); });
+    s.on('close', () => { busy = false; sock = null; tool = null;settingsPending=null; modePending = modeRejected = null; modeError = ''; jogEnd(false); render(); setTimeout(connect, RETRY_MS); });
 }
-const send = (q) => { if (sock) sock.write(`${JSON.stringify(q)}\n`); };
+const send = (q) => {
+    if (sock) sock.write(`${JSON.stringify(q)}\n`);
+};
 
 function jogStart(seat, axis, dir) {
     jogEnd(false);
@@ -148,13 +163,61 @@ const runtime = (f) => require(path.join(RENDERER, f));
 let screens = null;
 let content = [];                 // every element but the frames and the no-tool notes: hidden without the tool
 const MENUS = { seats: 'seatsMenu', settings: 'settingsMenu' };
-const SUBS = { seats: 'Hold a control: the seat moves while you hold it', settings: 'Where the steering wheel is, easy exit, and how the Seats app works' };
+const SUBS = { seats: 'Hold a control: the seat moves while you hold it', settings: 'Independent driver and passenger automation' };
 // what each seat has: the tool's axes (its motors), and whether they tell their position (memories, Easy exit, Make room)
 const axesOf = (seat) => {
     const s = tool && tool.seats, pos = (s && s.pos[seat]) || {};
     return AXES.filter((a) => (s && s.axes ? s.axes[seat].indexOf(a) >= 0 : typeof pos[a] === 'number'));
 };
 const hallOf = (seat) => !!(tool && (tool.seats.hall ? tool.seats.hall[seat] : axesOf(seat).length));
+
+function seatConfig(seat) {
+    return seat === 'passenger'
+        ? {enable:'passengerEasyExit', drive:'passengerExitMode', exit:'passengerExitTargetMode', level:'passengerExitLevel', policy:'passengerExit'}
+        : {enable:'easyExit', drive:'driverExitMode', exit:'driverExitTargetMode', level:'driverExitLevel', policy:'driverExit'};
+}
+function presetLabels() { return ['M1', 'M2', 'M3', 'Easy Exit']; }
+function canRecallExit(seat) {
+    const k = seatConfig(seat), policy = tool[k.policy];
+    return tool.settings && tool.settings[k.exit] === 'adaptive'
+        ? !!(policy && policy.relativeConfigured) : !!tool.seats.exit[seat];
+}
+function modeState(seat) {
+    const k = seatConfig(seat), policy = tool[k.policy], cfg = tool.settings || {};
+    const supported = !!(policy && policy.modeSupported), hall = hallOf(seat);
+    const moving = !!(tool.seats.job || tool.seats.moving || tool.seats.controlBusy);
+    const missingFixed = cfg[k.drive] === 'fixed' && !tool.seats.memories[seat][0];
+    return {
+        items: supported ? 'Adaptive, Fixed' : 'Unavailable',
+        sel: cfg[k.drive] === 'fixed' ? 1 : 0,
+        disabled: !supported || !hall || moving || settingsPending !== null || modePending !== null,
+        sub: !supported ? 'Update Comfort to choose a mode' : !hall ? 'Position feedback required'
+            : moving ? 'Available when both seats stop' : modeError
+                || (missingFixed ? 'Use SET, then M1 to save a position'
+                    : cfg[k.drive] === 'fixed' ? 'Returns to the M1 preset' : 'Returns to the prior position')
+    };
+}
+function renderSettings(seat) {
+    const k = seatConfig(seat), cfg = tool.settings || {}, policy = tool[k.policy] || {}, d = seat === 'driver';
+    const mode = modeState(seat), relative = cfg[k.exit] === 'adaptive', level = cfg[k.level] || 2;
+    const off = mode.disabled || !relative;
+    screens.set(d ? 'exitRow' : 'passengerExitRow', {
+        sel: cfg[k.enable] === true ? 1 : 0,
+        disabled: !policy.modeSupported || settingsPending !== null,
+        sub: d ? 'Driver automation' : 'Requires fresh occupied passenger status'
+    });
+    screens.set(d ? 'driverModeRow' : 'passengerModeRow', mode);
+    const exitHelp = relative
+        ? (policy.relativeConfigured ? 'Moves rearward by the selected distance' : 'Use SET to save Easy Exit behind M1')
+        : (tool.seats.exit[seat] ? 'Uses the saved Easy Exit pose' : 'Use SET, then Easy Exit to save a position');
+    screens.set(d ? 'driverExitModeRow' : 'passengerExitModeRow', {sel: relative ? 0 : 1, disabled: mode.disabled, sub: exitHelp});
+    const p = d ? 'exitLevel' : 'passengerLevel';
+    screens.set(p+'Minus',{disabled:off||level<=1});
+    screens.set(p+'Plus',{disabled:off||level>=3});
+    screens.set(p+'Value',{text:String(level),color:off?COL.dim:'#000000'});
+    screens.set(p+'Background',{color:off?'#252525':COL.accent});
+    screens.set(p+'Label',{color:off?COL.dim:'#f2f2f2'});
+}
 
 function render() {
     if (!screens) return;
@@ -175,15 +238,16 @@ function render() {
         Object.keys(MENUS).forEach((pg) => screens.set(MENUS[pg], { chips: [['Comfort tool not running', 'crit']], sub: 'Install the Comfort tool from the Store' }));
         return;
     }
-    Object.keys(MENUS).forEach((pg) => screens.set(MENUS[pg], { chips: [], sub: SUBS[pg] }));
-    screens.set('sideRow', { sel: side === 'right' ? 1 : 0, sub: side === 'right' ? 'The driver\'s seat in the right half' : 'Right: the driver\'s seat in the right half' });
-    screens.set('exitRow', { sel: t.settings && t.settings.easyExit === false ? 0 : 1,
-        sub: t.seats.exit.driver || t.seats.exit.passenger ? 'Door open: out of the way · door shut: back' : 'Seats: Save, then Easy exit, first' });
-    screens.set('passengerExitRow', { sel: t.settings && t.settings.passengerEasyExit === true ? 1 : 0 });
+    const decision = t.driverExit && t.driverExit.last;
+    const held = decision && decision.target === 'exit' && decision.result === 'no progress';
+    const decisionSummary = held ? 'Easy Exit on hold · recall M1 to reset' : decision ? (t.settings && t.settings.driverExitMode === 'fixed' ? 'Fixed' : 'Adaptive') + ' ' + (decision.target === 'exit' ? 'exit' : 'return') + ' (' + (decision.reason === 'driver door' ? 'door' : 'readiness') + '): ' + decision.result : null;
+    Object.keys(MENUS).forEach((pg) => screens.set(MENUS[pg], { chips: [], sub: decisionSummary || SUBS[pg] }));
+    screens.set('sideRow',{sel:side==='right'?1:0,disabled:!!t.seats.job||!!t.seats.moving||!!t.seats.controlBusy});
+    ['driver','passenger'].forEach(renderSettings);
     ['driver', 'passenger'].forEach((seat) => renderSeat(seat));
 }
 function renderSeat(seat) {
-    const p = PFX(seat), s = tool.seats, mv = s.moving, job = s.job, parked = !!tool.parked;   // moves at any speed but Make room
+    const p = PFX(seat), s = tool.seats, mv = s.moving, job = s.job, parked = !!tool.parked, labels=presetLabels(seat);   // moves at any speed but Make room
     screens.set(`${p}Title`, { text: seat === 'driver' ? 'DRIVER SEAT' : 'PASSENGER SEAT' });
     // no controls: what its seat module said (1.6.2, issue #29: the same note whether it was asleep or not there at all)
     const found = s.found && s.found[seat];
@@ -202,24 +266,25 @@ function renderSeat(seat) {
     screens.set(`${p}BackLbl`, { color: axis === 'LNV' ? COL.accent : COL.dim });
     // the memories: set ones white; Save on: every slot ringed (tap = keep the seat there); the one moving to: amber
     const save = saveMode[seat], going = job === 'memory' && recall && recall.seat === seat ? recall.slot : -1;
-    s.memories[seat].forEach((m, j) => screens.set(`${p}Mem${j}`, { set: !!m, lit: save, moving: j === going,
+    s.memories[seat].forEach((m, j) => screens.set(`${p}Mem${j}`, { text:labels[j],set: !!m, lit: save, moving: j === going,
         disabled: !save && !m && !job }));
-    screens.set(`${p}Save`, { lit: save, disabled: false });
+    screens.set(`${p}Save`, { text:'SET',lit: save, disabled: false });
     // Easy exit: set white, ringed in Save mode, amber while the seat goes there or back; moves only standing
     const out = (job === 'exit' || job === 'back') && s.jobSeat === seat;
-    screens.set(`${p}Exit`, { set: !!s.exit[seat], lit: save, moving: out, disabled: !save && !out && (!s.exit[seat] || !parked) });
+    const exitReady = canRecallExit(seat);
+    screens.set(`${p}Exit`, { text:labels[3],set:exitReady,lit:save,moving:out,disabled:!save && !out && (!exitReady || !parked) });
     // Make room / Move back: parked only (a mistaken tap while driving with a front passenger); its Stop always works
     if (seat === 'passenger') screens.set(`${p}Gentleman`, { text: job === 'gentleman' ? 'Stop' : s.roomOut ? 'Move back' : 'Make room', disabled: !parked && job !== 'gentleman' });
     // what moves on this seat
     const driver = seat === 'driver';
-    const status = going >= 0 ? [`Moving to M${going + 1} · tap M${going + 1} to stop`, COL.accent]
+    const status = going >= 0 ? [`Moving to ${labels[going]} · tap ${labels[going]} to stop`, COL.accent]
             : job === 'gentleman' && !driver ? [s.roomOut ? 'Moving back · tap Stop to stop' : 'Making room · tap Stop to stop', COL.accent]
-                : out ? [job === 'exit' ? 'Moving out of the way · tap Easy exit to stop' : 'Back to where you sat · tap Easy exit to stop', COL.accent]
-                    : job === 'memory' && !recall ? ['Moving to a memory · tap any control to stop', COL.accent]
+                : out ? [job === 'exit' ? 'Moving out of the way · tap '+labels[3]+' to stop' : (driver && tool.settings && tool.settings.driverExitMode === 'fixed' ? 'Back to M1 · tap '+labels[3]+' to stop' : 'Back to where you sat · tap '+labels[3]+' to stop'), COL.accent]
+                    : job === 'memory' && !recall ? ['Moving to a memory · tap a seat control to stop', COL.accent]
                         : h ? [`${NAME[h.axis]}: ${VERB[h.axis][h.dir > 0 ? 1 : 0]}`, COL.accent]
                             : axis ? [`${NAME[axis]}: moving`, COL.accent]
-                                : save ? ['Tap M1 - M3 or Easy exit to keep the seat here', COL.accent]
-                                    : s.pre[seat] ? [driver ? 'Easy exit · door shut, car on: moves back' : 'Easy exit · seated, door shut: moves back', COL.dim]
+                                : save ? ['Tap '+labels.join(', ')+' to save the current pose', COL.accent]
+                                    : s.pre[seat] ? [driver ? (tool.settings && tool.settings.driverExitMode === 'fixed' ? labels[3]+' · returns to M1' : labels[3]+' · returns to the prior position') : 'Manual Exit · use an app memory to return', COL.dim]
                                         : !driver && !parked && hallOf(seat) ? ['Hold a control · Make room: parked only', COL.dim]
                                             : ['Hold a control to move the seat', COL.dim];
     screens.set(`${p}Status`, { text: status[0], color: status[1] });
@@ -229,6 +294,11 @@ function renderSeat(seat) {
 function onEvent(name) {
     let m;
     if (!tool) return;
+    const step=/^(exitLevel|passengerLevel)(Minus|Plus)$/.exec(name);
+    if(step){const seat=step[1]==='exitLevel'?'driver':'passenger',k=seatConfig(seat),level=tool.settings[k.level]||2;
+        if(!modeState(seat).disabled&&tool.settings[k.exit]==='adaptive'){const value=Math.max(1,Math.min(3,level+(step[2]==='Plus'?1:-1)));if(value!==level){settingsPending={key:k.level,value};modeError='';send({op:'set',settings:{[k.level]:value}});}}
+        render();return;
+    }
     if ((m = /^([dp])Mem(\d)$/.exec(name))) {
         const seat = SEAT(m[1]), slot = +m[2];
         if (busyJob()) return stopJob();                                // the lit one (or any): stop
@@ -241,7 +311,7 @@ function onEvent(name) {
         const seat = SEAT(m[1]);
         if (busyJob()) return stopJob();
         if (saveMode[seat]) { send({ op: 'exit', seat, save: true }); saveMode[seat] = false; return render(); }
-        if (tool.seats.exit[seat] && tool.parked) send({ op: 'exit', seat });
+        if (canRecallExit(seat) && tool.parked) send({ op: 'exit', seat });
         return;
     }
     if (name === 'gentleman') { if (busyJob()) stopJob(); else send({ op: 'gentleman' }); }
@@ -254,10 +324,13 @@ function onChange(name, o) {
         screens.set(name, { sel: STATES.indexOf(page) });
         return goTo(to);
     }
-    if (name === 'sideRow') return setSide(o.sel === 1 ? 'right' : 'left');   // Settings: works without the tool too
-    if (!tool) return null;
-    if (name === 'passengerExitRow') { send({ op: 'set', settings: { passengerEasyExit: o.sel === 1 } }); return null; }
-    if (name === 'exitRow') { send({ op: 'set', settings: { easyExit: o.sel === 1 } }); return null; }   // the tool pushes it back
+    if(name==='sideRow'){if(tool&&!busyJob()&&!tool.seats.moving&&!tool.seats.controlBusy)return setSide(o.sel===1?'right':'left');return;}
+    const rows={exitRow:['driver','enable'],driverModeRow:['driver','drive'],driverExitModeRow:['driver','exit'],passengerExitRow:['passenger','enable'],passengerModeRow:['passenger','drive'],passengerExitModeRow:['passenger','exit']};
+    if(rows[name]){const seat=rows[name][0],kind=rows[name][1],k=seatConfig(seat),key=k[kind],value=kind==='enable'?o.sel===1:o.sel===1?'fixed':'adaptive';
+        if(kind==='enable'&&value===false){settingsPending={key,value};send({op:'set',settings:{[key]:value}});render();return;}
+        if(kind!=='enable'&&modeState(seat).disabled){render();return;}
+        if(tool[k.policy]&&tool[k.policy].modeSupported&&value!==tool.settings[key]){settingsPending={key,value};modeError='';send({op:'set',settings:{[key]:value}});}render();return;
+    }
     let seat = null, axis = null, dir = 0, on = false;
     if ((m = /^([dp])(Fore|Height|Tilt|Head)$/.exec(name))) { seat = SEAT(m[1]); axis = PILL[m[2]]; on = o.pressed === 'a' || o.pressed === 'b'; dir = o.pressed === 'a' ? 1 : -1; }
     else if ((m = /^([dp])(BackUp|BackDown)$/.exec(name))) { seat = SEAT(m[1]); axis = ROUND[m[2]][0]; dir = ROUND[m[2]][1]; on = !!o.pressed; }
@@ -319,5 +392,5 @@ createHost({
     states: STATES,
     log,
     onReady: (rhmiApp) => { startScreens(rhmiApp); log('screens ready'); },
-    onShutdown: () => jogEnd(true),
+    onShutdown: () => {jogEnd(true);},
 });
