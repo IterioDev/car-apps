@@ -1,0 +1,766 @@
+{
+  "name": "settings",
+  "kind": "gpu",
+  "title": "Settings",
+  "entry": false,
+  "bg": "#000000",
+  "bgArea": "app",
+  "components": [
+    {
+      "name": "settingsMenu",
+      "rtype": "gpu",
+      "gpu": "teleShell",
+      "x": 0,
+      "y": 76,
+      "w": 2880,
+      "h": 172,
+      "opts": {
+        "app": "Seats",
+        "icon": "seat",
+        "tabs": "Seats, Settings",
+        "sel": 1,
+        "chips": "",
+        "title": "Settings",
+        "sub": "Independent driver and passenger automation",
+        "back": false,
+        "credit": "",
+        "hu": "id8"
+      }
+    },
+    {
+      "name": "sideRow",
+      "rtype": "gpu",
+      "gpu": "teleRow",
+      "x": 40,
+      "y": 248,
+      "w": 2800,
+      "h": 90,
+      "opts": {
+        "label": "Steering wheel side",
+        "sub": "Vehicle setup: left- or right-hand drive",
+        "icon": "",
+        "control": "seg",
+        "items": "Left, Right",
+        "sel": 0,
+        "sw": 460,
+        "text": "",
+        "disabled": false
+      }
+    },
+    {
+      "name": "driverSettingsTitle",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 40,
+      "y": 343,
+      "w": 1360,
+      "h": 32,
+      "opts": {
+        "text": "DRIVER SETTINGS",
+        "size": 24,
+        "font": "label",
+        "color": "#8b9099",
+        "align": "left",
+        "wrap": false
+      }
+    },
+    {
+      "name": "passengerSettingsTitle",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 1480,
+      "y": 343,
+      "w": 1360,
+      "h": 32,
+      "opts": {
+        "text": "PASSENGER SETTINGS",
+        "size": 24,
+        "font": "label",
+        "color": "#8b9099",
+        "align": "left",
+        "wrap": false
+      }
+    },
+    {
+      "name": "settingsDivider",
+      "rtype": "gpu",
+      "gpu": "rect",
+      "x": 1439,
+      "y": 374,
+      "w": 2,
+      "h": 430,
+      "opts": {
+        "color": "#30343b",
+        "radius": 0
+      }
+    },
+    {
+      "name": "exitRow",
+      "rtype": "gpu",
+      "gpu": "teleRow",
+      "x": 40,
+      "y": 374,
+      "w": 1360,
+      "h": 104,
+      "opts": {
+        "label": "Seat automation",
+        "sub": "Requires calibration",
+        "icon": "",
+        "control": "seg",
+        "items": "Off, On",
+        "sel": 0,
+        "sw": 460,
+        "text": "",
+        "disabled": false
+      }
+    },
+    {
+      "name": "driverModeRow",
+      "rtype": "gpu",
+      "gpu": "teleRow",
+      "x": 40,
+      "y": 478,
+      "w": 1360,
+      "h": 104,
+      "opts": {
+        "label": "Drive position",
+        "sub": "Returns to the prior position",
+        "icon": "",
+        "control": "seg",
+        "items": "Adaptive, Fixed",
+        "sel": 0,
+        "sw": 460,
+        "text": "",
+        "disabled": true
+      }
+    },
+    {
+      "name": "driverExitModeRow",
+      "rtype": "gpu",
+      "gpu": "teleRow",
+      "x": 40,
+      "y": 582,
+      "w": 1360,
+      "h": 104,
+      "opts": {
+        "label": "Exit position",
+        "sub": "Uses the saved Easy exit position",
+        "icon": "",
+        "control": "seg",
+        "items": "Adaptive, Fixed",
+        "sel": 1,
+        "sw": 460,
+        "text": "",
+        "disabled": true
+      }
+    },
+    {
+      "name": "exitLevelLabel",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 40,
+      "y": 720,
+      "w": 1024,
+      "h": 36,
+      "opts": {
+        "text": "Exit distance",
+        "size": 26,
+        "font": "label",
+        "color": "#8b9099",
+        "align": "left",
+        "wrap": false
+      }
+    },
+    {
+      "name": "exitLevelMinus",
+      "rtype": "gpu",
+      "gpu": "teleButton",
+      "x": 1076,
+      "y": 702,
+      "w": 100,
+      "h": 72,
+      "opts": {
+        "text": "-",
+        "kind": "outline",
+        "disabled": true
+      },
+      "onTap": "event:exitLevelMinus"
+    },
+    {
+      "name": "exitLevelBackground",
+      "rtype": "gpu",
+      "gpu": "rect",
+      "x": 1188,
+      "y": 702,
+      "w": 100,
+      "h": 72,
+      "opts": {
+        "color": "#252525",
+        "radius": 3
+      }
+    },
+    {
+      "name": "exitLevelValue",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 1188,
+      "y": 718,
+      "w": 100,
+      "h": 44,
+      "opts": {
+        "text": "2",
+        "size": 34,
+        "align": "center",
+        "color": "#8b9099",
+        "font": "bold"
+      }
+    },
+    {
+      "name": "exitLevelPlus",
+      "rtype": "gpu",
+      "gpu": "teleButton",
+      "x": 1300,
+      "y": 702,
+      "w": 100,
+      "h": 72,
+      "opts": {
+        "text": "+",
+        "kind": "outline",
+        "disabled": true
+      },
+      "onTap": "event:exitLevelPlus"
+    },
+    {
+      "name": "passengerExitRow",
+      "rtype": "gpu",
+      "gpu": "teleRow",
+      "x": 1480,
+      "y": 374,
+      "w": 1360,
+      "h": 104,
+      "opts": {
+        "label": "Seat automation",
+        "sub": "Requires calibration",
+        "icon": "",
+        "control": "seg",
+        "items": "Off, On",
+        "sel": 0,
+        "sw": 460,
+        "text": "",
+        "disabled": false
+      }
+    },
+    {
+      "name": "passengerModeRow",
+      "rtype": "gpu",
+      "gpu": "teleRow",
+      "x": 1480,
+      "y": 478,
+      "w": 1360,
+      "h": 104,
+      "opts": {
+        "label": "Drive position",
+        "sub": "Returns to the prior position",
+        "icon": "",
+        "control": "seg",
+        "items": "Adaptive, Fixed",
+        "sel": 0,
+        "sw": 460,
+        "text": "",
+        "disabled": true
+      }
+    },
+    {
+      "name": "passengerExitModeRow",
+      "rtype": "gpu",
+      "gpu": "teleRow",
+      "x": 1480,
+      "y": 582,
+      "w": 1360,
+      "h": 104,
+      "opts": {
+        "label": "Exit position",
+        "sub": "Uses the saved Easy exit position",
+        "icon": "",
+        "control": "seg",
+        "items": "Adaptive, Fixed",
+        "sel": 1,
+        "sw": 460,
+        "text": "",
+        "disabled": true
+      }
+    },
+    {
+      "name": "passengerLevelLabel",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 1480,
+      "y": 720,
+      "w": 1024,
+      "h": 36,
+      "opts": {
+        "text": "Exit distance",
+        "size": 26,
+        "font": "label",
+        "color": "#8b9099",
+        "align": "left",
+        "wrap": false
+      }
+    },
+    {
+      "name": "passengerLevelMinus",
+      "rtype": "gpu",
+      "gpu": "teleButton",
+      "x": 2516,
+      "y": 702,
+      "w": 100,
+      "h": 72,
+      "opts": {
+        "text": "-",
+        "kind": "outline",
+        "disabled": true
+      },
+      "onTap": "event:passengerLevelMinus"
+    },
+    {
+      "name": "passengerLevelBackground",
+      "rtype": "gpu",
+      "gpu": "rect",
+      "x": 2628,
+      "y": 702,
+      "w": 100,
+      "h": 72,
+      "opts": {
+        "color": "#252525",
+        "radius": 3
+      }
+    },
+    {
+      "name": "passengerLevelValue",
+      "rtype": "gpu",
+      "gpu": "text",
+      "x": 2628,
+      "y": 718,
+      "w": 100,
+      "h": 44,
+      "opts": {
+        "text": "2",
+        "size": 34,
+        "align": "center",
+        "color": "#8b9099",
+        "font": "bold"
+      }
+    },
+    {
+      "name": "passengerLevelPlus",
+      "rtype": "gpu",
+      "gpu": "teleButton",
+      "x": 2740,
+      "y": 702,
+      "w": 100,
+      "h": 72,
+      "opts": {
+        "text": "+",
+        "kind": "outline",
+        "disabled": true
+      },
+      "onTap": "event:passengerLevelPlus"
+    },
+    {
+      "name": "settingsNoTool",
+      "rtype": "gpu",
+      "gpu": "teleEmpty",
+      "x": 40,
+      "y": 248,
+      "w": 2800,
+      "h": 568,
+      "opts": {
+        "icon": "warning",
+        "head": "Comfort tool not installed",
+        "line": "Install the Comfort tool from the Store",
+        "color": "",
+        "hidden": true
+      }
+    }
+  ],
+  "id7": {
+    "components": [
+      {
+        "name": "settingsMenu",
+        "rtype": "gpu",
+        "gpu": "teleShell",
+        "x": 84,
+        "y": 76,
+        "w": 1836,
+        "h": 154,
+        "opts": {
+          "app": "Seats",
+          "icon": "seat",
+          "tabs": "Seats, Settings",
+          "sel": 1,
+          "chips": "",
+          "title": "Settings",
+          "sub": "Independent driver and passenger automation",
+          "back": false,
+          "credit": "",
+          "hu": "id7"
+        }
+      },
+      {
+        "name": "sideRow",
+        "rtype": "gpu",
+        "gpu": "teleRow",
+        "x": 116,
+        "y": 230,
+        "w": 1772,
+        "h": 72,
+        "opts": {
+          "label": "Steering wheel side",
+          "sub": "Vehicle setup: left- or right-hand drive",
+          "icon": "",
+          "control": "seg",
+          "items": "Left, Right",
+          "sel": 0,
+          "sw": 330,
+          "text": "",
+          "disabled": false
+        }
+      },
+      {
+        "name": "driverSettingsTitle",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 116,
+        "y": 306,
+        "w": 870,
+        "h": 32,
+        "opts": {
+          "text": "DRIVER SETTINGS",
+          "size": 24,
+          "font": "label",
+          "color": "#8b9099",
+          "align": "left",
+          "wrap": false
+        }
+      },
+      {
+        "name": "passengerSettingsTitle",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 1018,
+        "y": 306,
+        "w": 870,
+        "h": 32,
+        "opts": {
+          "text": "PASSENGER SETTINGS",
+          "size": 24,
+          "font": "label",
+          "color": "#8b9099",
+          "align": "left",
+          "wrap": false
+        }
+      },
+      {
+        "name": "settingsDivider",
+        "rtype": "gpu",
+        "gpu": "rect",
+        "x": 1001,
+        "y": 338,
+        "w": 2,
+        "h": 340,
+        "opts": {
+          "color": "#30343b",
+          "radius": 0
+        }
+      },
+      {
+        "name": "exitRow",
+        "rtype": "gpu",
+        "gpu": "teleRow",
+        "x": 116,
+        "y": 338,
+        "w": 870,
+        "h": 82,
+        "opts": {
+          "label": "Seat automation",
+          "sub": "Requires calibration",
+          "icon": "",
+          "control": "seg",
+          "items": "Off, On",
+          "sel": 0,
+          "sw": 330,
+          "text": "",
+          "disabled": false
+        }
+      },
+      {
+        "name": "driverModeRow",
+        "rtype": "gpu",
+        "gpu": "teleRow",
+        "x": 116,
+        "y": 420,
+        "w": 870,
+        "h": 82,
+        "opts": {
+          "label": "Drive position",
+          "sub": "Returns to the prior position",
+          "icon": "",
+          "control": "seg",
+          "items": "Adaptive, Fixed",
+          "sel": 0,
+          "sw": 330,
+          "text": "",
+          "disabled": true
+        }
+      },
+      {
+        "name": "driverExitModeRow",
+        "rtype": "gpu",
+        "gpu": "teleRow",
+        "x": 116,
+        "y": 502,
+        "w": 870,
+        "h": 82,
+        "opts": {
+          "label": "Exit position",
+          "sub": "Uses the saved Easy exit position",
+          "icon": "",
+          "control": "seg",
+          "items": "Adaptive, Fixed",
+          "sel": 1,
+          "sw": 330,
+          "text": "",
+          "disabled": true
+        }
+      },
+      {
+        "name": "exitLevelLabel",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 116,
+        "y": 620,
+        "w": 594,
+        "h": 36,
+        "opts": {
+          "text": "Exit distance",
+          "size": 26,
+          "font": "label",
+          "color": "#8b9099",
+          "align": "left",
+          "wrap": false
+        }
+      },
+      {
+        "name": "exitLevelMinus",
+        "rtype": "gpu",
+        "gpu": "teleButton",
+        "x": 722,
+        "y": 602,
+        "w": 80,
+        "h": 72,
+        "opts": {
+          "text": "-",
+          "kind": "outline",
+          "disabled": true
+        },
+        "onTap": "event:exitLevelMinus"
+      },
+      {
+        "name": "exitLevelBackground",
+        "rtype": "gpu",
+        "gpu": "rect",
+        "x": 814,
+        "y": 602,
+        "w": 80,
+        "h": 72,
+        "opts": {
+          "color": "#252525",
+          "radius": 3
+        }
+      },
+      {
+        "name": "exitLevelValue",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 814,
+        "y": 618,
+        "w": 80,
+        "h": 44,
+        "opts": {
+          "text": "2",
+          "size": 34,
+          "align": "center",
+          "color": "#8b9099",
+          "font": "bold"
+        }
+      },
+      {
+        "name": "exitLevelPlus",
+        "rtype": "gpu",
+        "gpu": "teleButton",
+        "x": 906,
+        "y": 602,
+        "w": 80,
+        "h": 72,
+        "opts": {
+          "text": "+",
+          "kind": "outline",
+          "disabled": true
+        },
+        "onTap": "event:exitLevelPlus"
+      },
+      {
+        "name": "passengerExitRow",
+        "rtype": "gpu",
+        "gpu": "teleRow",
+        "x": 1018,
+        "y": 338,
+        "w": 870,
+        "h": 82,
+        "opts": {
+          "label": "Seat automation",
+          "sub": "Requires calibration",
+          "icon": "",
+          "control": "seg",
+          "items": "Off, On",
+          "sel": 0,
+          "sw": 330,
+          "text": "",
+          "disabled": false
+        }
+      },
+      {
+        "name": "passengerModeRow",
+        "rtype": "gpu",
+        "gpu": "teleRow",
+        "x": 1018,
+        "y": 420,
+        "w": 870,
+        "h": 82,
+        "opts": {
+          "label": "Drive position",
+          "sub": "Returns to the prior position",
+          "icon": "",
+          "control": "seg",
+          "items": "Adaptive, Fixed",
+          "sel": 0,
+          "sw": 330,
+          "text": "",
+          "disabled": true
+        }
+      },
+      {
+        "name": "passengerExitModeRow",
+        "rtype": "gpu",
+        "gpu": "teleRow",
+        "x": 1018,
+        "y": 502,
+        "w": 870,
+        "h": 82,
+        "opts": {
+          "label": "Exit position",
+          "sub": "Uses the saved Easy exit position",
+          "icon": "",
+          "control": "seg",
+          "items": "Adaptive, Fixed",
+          "sel": 1,
+          "sw": 330,
+          "text": "",
+          "disabled": true
+        }
+      },
+      {
+        "name": "passengerLevelLabel",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 1018,
+        "y": 620,
+        "w": 594,
+        "h": 36,
+        "opts": {
+          "text": "Exit distance",
+          "size": 26,
+          "font": "label",
+          "color": "#8b9099",
+          "align": "left",
+          "wrap": false
+        }
+      },
+      {
+        "name": "passengerLevelMinus",
+        "rtype": "gpu",
+        "gpu": "teleButton",
+        "x": 1624,
+        "y": 602,
+        "w": 80,
+        "h": 72,
+        "opts": {
+          "text": "-",
+          "kind": "outline",
+          "disabled": true
+        },
+        "onTap": "event:passengerLevelMinus"
+      },
+      {
+        "name": "passengerLevelBackground",
+        "rtype": "gpu",
+        "gpu": "rect",
+        "x": 1716,
+        "y": 602,
+        "w": 80,
+        "h": 72,
+        "opts": {
+          "color": "#252525",
+          "radius": 3
+        }
+      },
+      {
+        "name": "passengerLevelValue",
+        "rtype": "gpu",
+        "gpu": "text",
+        "x": 1716,
+        "y": 618,
+        "w": 80,
+        "h": 44,
+        "opts": {
+          "text": "2",
+          "size": 34,
+          "align": "center",
+          "color": "#8b9099",
+          "font": "bold"
+        }
+      },
+      {
+        "name": "passengerLevelPlus",
+        "rtype": "gpu",
+        "gpu": "teleButton",
+        "x": 1808,
+        "y": 602,
+        "w": 80,
+        "h": 72,
+        "opts": {
+          "text": "+",
+          "kind": "outline",
+          "disabled": true
+        },
+        "onTap": "event:passengerLevelPlus"
+      },
+      {
+        "name": "settingsNoTool",
+        "rtype": "gpu",
+        "gpu": "teleEmpty",
+        "x": 116,
+        "y": 230,
+        "w": 1772,
+        "h": 470,
+        "opts": {
+          "icon": "warning",
+          "head": "Comfort tool not installed",
+          "line": "Install the Comfort tool from the Store",
+          "color": "",
+          "hidden": true
+        }
+      }
+    ]
+  }
+}
