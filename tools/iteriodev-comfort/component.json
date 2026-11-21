@@ -38,6 +38,21 @@
       "path": "hmictl",
       "from": "hmictl",
       "mode": "0755"
+    },
+    {
+      "path": "passenger-occupancy.js",
+      "from": "passenger-occupancy.js",
+      "mode": "0644"
+    },
+    {
+      "path": "driver-access.js",
+      "from": "driver-access.js",
+      "mode": "0644"
+    },
+    {
+      "path": "passenger-access.js",
+      "from": "passenger-access.js",
+      "mode": "0644"
     }
   ],
   "units": [
