@@ -25,7 +25,7 @@ function fixture(options) {
             calls.push({ unit, sid, payload: Array.from(payload), at: now });
             if (sid !== 0x22) return [];
             if (state.read) return state.read(payload);
-            throw Error('no answer');
+            throw Object.assign(Error('no answer'), { code: 'timeout' });   // as uds.js's timeout
         } },
         amb: { BUSES: buses, BDC: 64,
             effective: ambient.effective, settings: ambient.settings,

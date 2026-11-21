@@ -146,7 +146,8 @@ slots are kept in `/var/opt/iteriodev-overlays/slots.json`.
 > again once the light is wanted when the body module did not answer at Comfort's start (head unit up while the car
 > slept: no lights found until the next restart) — car-tested on the same M8. 0.6.5 logs which fault a light reports
 > and reads a light flagged faulty at the search once more 30 s after the lights come on, so a fault seen only while
-> the car was off clears — installed on the same M8. 0.6.6 (reads for other tools, below) is not car-tested yet.
+> the car was off clears — installed on the same M8. 0.6.6 (reads for other tools, below) is not car-tested yet. 0.6.7 fixes 0.6.4: a body module
+that did not answer at all at Comfort's start was taken for one without lights, so they were not looked for again.
 
 Bowers & Wilkins speaker and tweeter lights are not controllable: they keep the car's own color (set it in the car's menu, or with the car's colors in the app). On some cars (an M8 tested) the dash lights are not reachable either.
 

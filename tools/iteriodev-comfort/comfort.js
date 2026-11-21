@@ -324,9 +324,12 @@ function main() {
             // 0.6.3 (customer M8 2026-11-19): a bus read can take ~9 s (pending) and end in a refusal (7F 22 10: no
             // layering lights on that bus) - waited for, so the BDC is free for the writes after it (the 3 s timeout
             // left it busy: the first writes went unanswered, every 20 s); a refusal is an answer, not asked again
+            // 0.6.7 (customer M8 2026-11-21): uds.js's timeout carries code 'timeout' - it is no answer, not a refusal
+            // (0.6.4-0.6.6 counted it as "none": 0 modules for the whole boot, never looked for again)
             try { found.push.apply(found, amb.parse(await diag.send(amb.BDC, 0x22, b.read, READ_MS), b.name)); } catch (e) {
-                if (e.code === undefined) missed++;
-                log(`ambient ${b.name}: ${e.code === undefined ? e.message : `none (${e.message})`}`);
+                const silent = e.code === undefined || e.code === 'timeout';
+                if (silent) missed++;
+                log(`ambient ${b.name}: ${silent ? e.message : `none (${e.message})`}`);
             }
         }
         // the car's own brightness, before ours: a module's first reading only (renewals read our own back)
