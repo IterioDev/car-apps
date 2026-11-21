@@ -146,7 +146,7 @@ slots are kept in `/var/opt/iteriodev-overlays/slots.json`.
 > again once the light is wanted when the body module did not answer at Comfort's start (head unit up while the car
 > slept: no lights found until the next restart) — car-tested on the same M8. 0.6.5 logs which fault a light reports
 > and reads a light flagged faulty at the search once more 30 s after the lights come on, so a fault seen only while
-> the car was off clears — installed on the same M8.
+> the car was off clears — installed on the same M8. 0.6.6 (reads for other tools, below) is not car-tested yet.
 
 Bowers & Wilkins speaker and tweeter lights are not controllable: they keep the car's own color (set it in the car's menu, or with the car's colors in the app). On some cars (an M8 tested) the dash lights are not reachable either.
 
@@ -166,7 +166,9 @@ once also on cars that lack one of those. Every move ends with a stop, and the s
 the car reports itself parked, so Make room and Easy exit never run on missing data; a stop or update of the service
 waits for the seat's stop first; the log names the car signals the head unit answers. The apps talk to it over
 `/run/iteriodev-comfort/ctl.sock`; the zones' colors and the seat memories are kept in
-`/var/opt/iteriodev-comfort/data.json`.
+`/var/opt/iteriodev-comfort/data.json`. From 0.6.6 the socket also answers other tools' reads (UDS 22 with a two-byte
+identifier, any unit), so a tool on the same head unit uses Comfort's one diagnostic session instead of opening a
+second one beside it; the only writes stay the ambient light's.
 
 ## Tailscale (tool `iteriodev-tailscale`)
 

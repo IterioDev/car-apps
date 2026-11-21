@@ -82,7 +82,9 @@ const READ_MS = 15000;          // 0.6.3: an ambient bus read (the BDC polls its
 function diagAllowed(q) {
     const d = q && q.data;
     if (!q || !Array.isArray(d) || !d.every((b) => Number.isInteger(b) && b >= 0 && b <= 255)) return false;
-    if (q.sid === 0x22) return [0x40, 0x6d, 0x6e].indexOf(q.target) >= 0 && d.length === 2;
+    // 0.6.6: any read (22 + a 2-byte DID, any unit) - another tool's reads (boost, battery %, the VIN) go through
+    // this one session instead of a second TASU client beside ours; writes stay the ambient light's only
+    if (q.sid === 0x22) return Number.isInteger(q.target) && q.target > 0 && q.target <= 0xff && d.length === 2;
     return q.sid === 0x2e && q.target === 0x40 && d.length === 9 && ((d[0] === 0xda && d[1] === 0x5e) || (d[0] === 0xe3 && d[1] === 0xd1));
 }
 const amb = require('./ambient');
@@ -520,7 +522,7 @@ function main() {
             if (!diagAllowed(q)) { c.write(JSON.stringify({ diag: { id: q.id, ok: false, error: 'not allowed' } }) + '\n'); return; }
             const ms = Math.min(20000, Math.max(1000, q.ms | 0 || 5000)), what = `${q.target.toString(16)} ${q.sid.toString(16)} ${Buffer.from(q.data).toString('hex')}`;
             diag.send(q.target, q.sid, q.data, ms).then((u) => {
-                log(`diag ${what}: ${Buffer.from(u).toString('hex')}`);
+                if (q.sid !== 0x22) log(`diag ${what}: ${Buffer.from(u).toString('hex')}`);   // 0.6.6: reads (boost: 1-2 a second) not logged
                 c.write(JSON.stringify({ diag: { id: q.id, ok: true, uds: Buffer.from(u).toString('hex') } }) + '\n');
             }, (e) => {
                 log(`diag ${what}: ${e.message}`);
