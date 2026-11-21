@@ -140,6 +140,16 @@ function save(d) {
 }
 
 
+// One bounded retry of an explicitly refused initial read.
+async function initialPosition(read, allowed, wait) {
+    try { return await read(); } catch (err) {
+        if (!allowed() || err.message !== 'refused by the gateway') throw err;
+        await wait(150);
+        if (!allowed()) throw err;
+        return read();
+    }
+}
+
 function main() {
     mkdir();
     const data = load();
@@ -440,7 +450,7 @@ function main() {
         for (let i = 0; i < steps.length; i++) {
             const r = await steps[i](), column = (i === 0) === !!wheelFirst;
             if (r === 'short') short = true;
-            else if (r !== 'done' && (!column || r === 'stopped' || r === 'not parked')) return r;
+            else if (r !== 'done' && (!column || r === 'STOP unconfirmed' || r === 'stopped' || r === 'not parked')) return r;
             else if (r !== 'done') log(`${s} steering column: ${r} (the seat goes on)`);
         }
         return short ? 'short' : 'done';
@@ -461,7 +471,12 @@ function main() {
         if (!parked()) { log(`easy exit ${s}: the car is not standing`); return; }
         if (!manual && (childSeat(s) || (known(s) && !person(s)))) { log(`easy exit ${s}: nobody in the seat (${car.occ[s]})`); return; }
         auto(s, 'exit', async () => {
-            const p = await seatPos(s);
+            const started = Date.now();
+            const allowed = () => !manual && !shuttingDown && mover.haltAt < started &&
+                data.settings.easyExit && car.door[s] === true && parked() &&
+                !childSeat(s) && (!known(s) || person(s));
+            const p = await initialPosition(() => seatPos(s), allowed, ms => new Promise(r => setTimeout(r, ms)));
+            if (!manual && !allowed()) return 'cancelled';
             if (!data.pre[s] || !near(p, lastOut(s))) { data.pre[s] = p; save(data); push(); }
             return outAt(s, await seatTo(s, data.exit[s], true, true));
         });
@@ -475,7 +490,11 @@ function main() {
             const h0 = Date.now();
             if (wait) await new Promise((r) => setTimeout(r, wait));
             if (mover.haltAt >= h0) return 'stopped';
-            if (!near(await mover.read(s), lastOut(s))) { data.pre[s] = null; save(data); push(); return 'moved since: stays'; }
+            const allowed = () => !shuttingDown && mover.haltAt < h0 &&
+                data.settings.easyExit && ready[s] && parked();
+            const current = await initialPosition(() => mover.read(s), allowed, ms => new Promise(r => setTimeout(r, ms)));
+            if (!allowed()) return 'cancelled';
+            if (!near(current, lastOut(s))) { data.pre[s] = null; save(data); push(); return 'moved since: stays'; }
             const r = await seatTo(s, data.pre[s], false, true);
             if (r === 'done') data.pre[s] = null;
             return outAt(s, r);
