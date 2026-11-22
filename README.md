@@ -16,7 +16,7 @@ app platform and show up in *All apps* like BMW's apps.
 
 | App | Package id | What it does |
 |---|---|---|
-| Ambient Light | `iteriodev_ambient` | **iDrive 7 and iDrive 8.** Any colour on the interior ambient light (a colour bar, brightness, the car's colours), per zone from a list of the car's zones, presets that keep every zone's colour, and a colour per drive mode that the light switches to with the mode. Needs the Comfort tool below (the Store installs it with the app). |
+| Ambient Light | `iteriodev_ambient` | **iDrive 7 and iDrive 8.** Any color on the interior ambient light (a color bar, brightness, the car's colors), per zone from a list of the car's zones, presets that keep every zone's color, and a color per drive mode that the light switches to with the mode. Needs the Comfort tool below (the Store installs it with the app). Bowers & Wilkins speaker and tweeter lights are not controllable: they keep the car's own color (set it in the car's menu, or with the car's colors in the app). |
 | Car Data | `iteriodev_cardash` | **iDrive 8 only** (from 1.2.0; iDrive 7 cars keep 1.1.10). Live engine data: engine speed, boost, power and torque with their peaks, oil, coolant and intake temperatures, battery voltage; fuel and air values with their last 5 minutes; a trip computer (distance, fuel, cost); gearbox data (ZF 8HP, read-only); the engine unit's values in groups; on diesel cars the particulate filter (DPF). See below. |
 | Drag Timer | `iteriodev_draggy` | **iDrive 8 only** from 1.2.0 (iDrive 7 cars that have 1.1.8 keep it). Acceleration timer: stand still, launch, and it times the run with splits and a speed-over-time chart. Power run: floor it in one gear for power and torque over rpm, with a baseline to compare (from cauliflowermossgrape's idrive7-apps). Keeps your best times; km/h or mph. |
 | Drive Recorder | `oap-driverecorder-next` | **iDrive 7 and iDrive 8** (2.4.0 car-tested on iDrive 8; see below). Keeps the car's cameras recording and saves a clip when you tap *Save clip* (by default the 20 s before and the 10 s after); watch, lock, delete and copy clips to a USB stick while the car stands still. Over 4 GB the oldest unlocked clips are replaced. By touch or, from 2.5.0, the iDrive controller. Records the camera unit's stream itself, so BMW's provisioning does not matter. Needs the Drive Recorder player below (the Store installs it with the app). |
@@ -26,8 +26,9 @@ app platform and show up in *All apps* like BMW's apps.
 | Overlays | `iteriodev_overlays` | **iDrive 8 only.** Sets up the Overlays strip in the climate bar: four shortcuts to BMW screens or apps, seat heating / ventilation and steering wheel heating buttons, shift lights on the cluster (cars without their own), and on M cars the M Mode that M1 / M2 switch to. Needs the Overlays tool below (the Store installs it with the app). |
 | Seats | `iteriodev_seats` | **iDrive 7 and iDrive 8.** Move the front seats from the screen, also while driving, both on one page (hold the controls round each seat), three memories per seat, the Make room button (parked only) for the passenger seat, Easy exit for both front seats (the seat, and on the driver's side an electric steering column, out of the way when its door opens, back once the door is shut: the driver's with the car on, the passenger's with someone seated); a right-hand drive setting. Needs the Comfort tool below (the Store installs it with the app). |
 | Service | `iteriodev_service` | **iDrive 8 only.** The car's service requirements as the instrument cluster has them: engine oil, brakes, brake fluid, vehicle check, inspections, each with the distance and date left and whether it is due, and what it is when you tap it. Read-only: a service is reset in the cluster's own menu or at a workshop. Not car-tested yet. |
-| Tailscale | `iteriodev_tailscale` | **iDrive 7 and iDrive 8** (from 1.1.1; on iDrive 7 not run on a car yet). The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`) and Log out. Needs the Tailscale tool below (the Store installs it with the app). |
-| Turn View | `iteriodev_turnview` | **iDrive 7 and iDrive 8** (from 1.4.0; iDrive 7 camera car-tested on a G20). The front camera in the instrument cluster, with a turn card and a blue turn sign (three chevrons pointing the way) near each turn during a route, from BMW Maps, CarPlay or Android Auto; the camera alone without a route. iDrive 8: its own widget "Turn View AR"; iDrive 7: off at every car start, switched on in the app, the cluster's central map area in Map view; not with Waze on cluster on the cluster (set Waze to HUD only). Needs a front camera (360 or front + rear), the Turn View tool and Cluster renderer 0.5.10+ (robertnisipeanu/idrive-apps); not Drive Recorder. See below. |
+| System Monitor | `iteriodev_sysmonitor` | **iDrive 8 only.** What uses the head unit's memory and processor: every app and program with its own memory and its growth over the last 3 minutes (leaks stand out), the processor per core, load, temperature and clock; tap a heading to sort, a row for details. Read-only, no car signals or internet. Original app by hexlay - ID8 Variant by IterioDev. Not car-tested yet. |
+| Tailscale | `iteriodev_tailscale` | **iDrive 7 and iDrive 8** (from 1.1.1; on iDrive 7 not run on a car yet). The head unit's Tailscale state and login: the login link as a QR code to scan with your phone, then the head unit's tailnet name, address and account, Rename (default `mgu`), Disconnect / Connect (1.2.0: switched off, still logged in) and Log out; the iDrive controller (1.2.0). Needs the Tailscale tool below (the Store installs it with the app). |
+| Turn View | `iteriodev_turnview` | **iDrive 7 and iDrive 8** (from 1.4.0; iDrive 7 camera car-tested on a G20). The front camera in the instrument cluster, with a turn card and a blue turn sign (three chevrons pointing the way) near each turn during a route, from BMW Maps, CarPlay or Android Auto; the camera alone without a route. Or on the head unit instead (1.6.0): the app's Camera page shows the camera's whole picture with the same card and sign, at any speed, for kerbs and tight gaps. Cars with BMW Night Vision (1.7.0): its picture instead (BMW's own Night Vision screen then stays black). iDrive 8: its own widget "Turn View AR"; iDrive 7: off at every car start, switched on in the app, the cluster's central map area in Map view; not with Waze on cluster on the cluster (set Waze to HUD only). Needs a front camera (360 or front + rear), the Turn View tool and Cluster renderer 0.5.10+ (robertnisipeanu/idrive-apps); not Drive Recorder. See below. |
 
 All of them draw their screens through the GPU renderer `mgu-render`.
 
@@ -122,8 +123,8 @@ not over the black start screen or the M start animation, and from then on alway
 - **Shift lights** on the instrument cluster, for cars without their own (not M cars: those show theirs, so the
   tool hides its own there; set *M car* to NO in the app to have them anyway): 8 bars a side at the top centre of
   the cluster, over the map, lit from the outside in and flashing at the shift point, also in the head-up display
-  above the speed. Lit from the engine speed against a start and a flash rpm (set in the app, or following the
-  engine's current limit, lower while it is cold). Needs **Cluster renderer (`cluster-render`) 0.3.6 or newer** from
+  above the speed. Lit from the engine speed against a start and a flash rpm set in the app (1.5.0 / tool 0.6.0:
+  nothing taken from the car any more, the "follow the engine's limit" option is gone). Needs **Cluster renderer (`cluster-render`) 0.3.6 or newer** from
   [robertnisipeanu/idrive-apps](https://github.com/robertnisipeanu/idrive-apps); without it the rest works as before.
 
 The tool runs as the root service `iteriodev-overlays.service` and asks the HMI and the car over SOME/IP through its
@@ -137,25 +138,38 @@ slots are kept in `/var/opt/iteriodev-overlays/slots.json`.
 ## Comfort (tool `iteriodev-comfort`, iDrive 7 and 8)
 
 > [!NOTE]
-> **Car-tested** (an M4, BDC_G05, seat modules FAS_G11 / BFS_G11): custom colours on all eight ambient light modules,
+> **Car-tested** (an M4, BDC_G05, seat modules FAS_G11 / BFS_G11): custom colors on all eight ambient light modules,
 > seat hold-to-move and memory recall, parked. Not car-tested yet: Ambient Light 1.1.1's screen and later, Make room,
 > moving the seats while driving, iDrive 7, Easy exit and the electric steering column (0.3.0), the passenger's Easy
-> exit with the seat sensor and motor-only seats (0.4.0), the colour per drive mode (0.5.0).
+> exit with the seat sensor and motor-only seats (0.4.0), the color per drive mode (0.5.0), 0.6.x. 0.6.3 car-tested on an
+> M8 (iDrive 7): all 20 RGB lights of the doors, footwells and console take our color. 0.6.4 looks for the lights
+> again once the light is wanted when the body module did not answer at Comfort's start (head unit up while the car
+> slept: no lights found until the next restart) — car-tested on the same M8. 0.6.5 logs which fault a light reports
+> and reads a light flagged faulty at the search once more 30 s after the lights come on, so a fault seen only while
+> the car was off clears — installed on the same M8. 0.6.6 (reads for other tools, below) is not car-tested yet. 0.6.7 fixes 0.6.4: a body module
+that did not answer at all at Comfort's start was taken for one without lights, so they were not looked for again.
+
+Bowers & Wilkins speaker and tweeter lights are not controllable: they keep the car's own color (set it in the car's menu, or with the car's colors in the app). On some cars (an M8 tested) the dash lights are not reachable either.
 
 The root service behind Ambient Light and Seats (`iteriodev-comfort.service`). It talks to the body controller and
 the seat modules through the head unit's own diagnostic gateway, with the car's workshop jobs: the ambient light's RGB
-per module (each write lasts 254 s and is renewed; switched off, the car's own colour returns at once; a zone with two
-kinds of light, such as a line and decor, is split into parts with a colour each; with the drive modes on, the drive
-mode the head unit reports picks the colour), the seat motors and their position
+per module (each write lasts 254 s and is renewed; switched off, the car's own color returns at once; a zone with two
+kinds of light, such as a line and decor, is split into parts with a color each; with the drive modes on, the drive
+mode the head unit reports picks the color), the seat motors and their position
 counters, and an electric steering column (through the body controller). Seats move at any speed (as with their own
 switches) except Make room and Easy exit, which need the car standing; the steering column moves only while the car
 stands, only when calibrated, and stops at its own soft end stops. Easy exit follows each front door, the ignition or
 engine and, where the car reports it, the seat occupancy sensor (the passenger seat moves only with a person in it,
 never with a child seat). A seat whose motors have no position sensors (often the passenger's, on cars with memory on
 the driver's side only) gets hold-to-move only. Seat controls go ahead of the speed and engine reads, so they act at
-once also on cars that lack one of those. Every move ends with a stop, and the seat's own switches always win. The apps talk to it over
-`/run/iteriodev-comfort/ctl.sock`; the zones' colours and the seat memories are kept in
-`/var/opt/iteriodev-comfort/data.json`.
+once also on cars that lack one of those. Every move ends with a stop, and the seat's own switches always win. From 0.6.1 (issue #42, PRs
+#38 #39 #44 #45 by dino15309) a car whose head unit sends neither speed nor engine speed counts as standing only once
+the car reports itself parked, so Make room and Easy exit never run on missing data; a stop or update of the service
+waits for the seat's stop first; the log names the car signals the head unit answers. The apps talk to it over
+`/run/iteriodev-comfort/ctl.sock`; the zones' colors and the seat memories are kept in
+`/var/opt/iteriodev-comfort/data.json`. From 0.6.6 the socket also answers other tools' reads (UDS 22 with a two-byte
+identifier, any unit), so a tool on the same head unit uses Comfort's one diagnostic session instead of opening a
+second one beside it; the only writes stay the ambient light's.
 
 ## Tailscale (tool `iteriodev-tailscale`)
 
@@ -215,7 +229,11 @@ already listens on the port, tailscaled starts without the proxy and the journal
 > [!NOTE]
 > **Car-tested** (1.0.6): picture and taps on the HMI work. 1.0.7 also hands taps to apps drawn by `mgu-render`;
 > that part is not car-tested yet. 1.0.8 is one build for both ID7 and ID8: it auto-detects the panel's own
-> resolution (picture shape and touch) with no per-car setting — not car-tested yet.
+> resolution (picture shape and touch) with no per-car setting — not car-tested yet. 1.0.9 sends taps to
+> idrive7-apps' renderer (`idrive7-renderd`) first where it runs, as the display itself does, so the apps it draws
+> get them — car-tested on an iDrive 7 with both renderers. 1.0.10 sends each tap to whichever renderer has the
+> display's touch at that moment (or straight to the HMI), so apps on either renderer get their taps when both are
+> installed — car-tested on an iDrive 7 with both renderers.
 
 The head unit's centre display in a browser on your computer, over your tailnet. Clicks and drags on the picture
 become touches on the screen. Needs the Tailscale tool above (logged in) and a browser: Chrome, Edge, Firefox,
@@ -227,8 +245,10 @@ Safari, or on an iPhone / iPad iOS 17.1 or newer (any browser there).
   page open and stops 5 s after the last one closes. Playback stays about 0.2 s behind the screen, plus the network.
   The status line shows the frame rate, the bit rate and how long frames take to arrive; when the uplink can't carry
   the stream, the server skips frames so the picture stays at most about 1 s behind instead of falling further back.
-- **Touch:** a click is a tap, a drag is a swipe, sent the way the display sends its own touches (to the GPU
-  renderer first while it runs, so renderer apps get their taps). A finger left down (closed tab, lost connection)
+- **Touch:** a click is a tap, a drag is a swipe, sent the way the display sends its own touches: to the renderer
+  (`idrive7-renderd` or `mgu-render`) whose app has the touch right now, else to the HMI, so renderer apps get their
+  taps. To see which renderer that is, the service reads the firewall's touch rule (`nft list ruleset ip`), so it
+  runs with the `CAP_NET_ADMIN` capability (still as user `os_7011`). A finger left down (closed tab, lost connection)
   is lifted after 2 s. The HOME/BACK keys and the iDrive controller are not covered.
 - **Who can use it:** it answers only through Tailscale (it listens on the head unit's `127.0.0.1:5880`), and
   **anyone on your tailnet can see the screen and tap it**. If you share the tailnet, limit port 5880 with its
@@ -263,7 +283,8 @@ The app asks the car's camera unit for its Drive Recorder mode at every start (S
 the player 1.2.6 the player starts the app at every start of the car while *Start with the car* is on: iDrive 7
 starts it only when you open it, so before 1.2.6 recording began only then (issue #23). It asks the head unit's own
 app start every 10 s for up to 5 minutes, as the head unit takes about a minute after its start to take it; its log
-is `/var/opt/iteriodev-drplay/autostart.log`.
+is `/var/opt/iteriodev-drplay/autostart.log`. From 2.5.1 the app keeps asking for that mode every 15 s until the camera
+unit takes it (it is often not ready that early in a start) and waits while a parking / 360 view is open (issue #23).
 *Save clip* on the Record page writes the 20 s before and the 10 s after (Settings: *Clip length*). The cameras offered
 are the ones the car has: all cameras, front + rear, front or rear. A camera unit that does not take the Drive
 Recorder mode (seen on a retrofitted rear camera) shows *No drive-recorder cameras found*. While a parking view is
@@ -307,6 +328,21 @@ the phone's turns for CarPlay and Android Auto), receives the front camera itsel
 robertnisipeanu/idrive-apps, 0.5.10 or newer) at 15 pictures a second. The app shows the status and calibrates the
 camera.
 
+- **On the head unit instead (app 1.6.0, tool 0.9.0):** the app's **Camera** button opens a page with the camera's
+  whole picture (not the cluster's crop, so kerbs near the bumper show) at up to 30 pictures a second, with the same
+  turn card and turn sign over it. *Picture on: Head unit* on that page moves Turn View there: the cluster then gets no
+  picture (iDrive 8's widget says *Turn View is on the head unit*, iDrive 7's map area goes back to the map), and the
+  camera is used only while the page is open. No speed limit: it works while driving, e.g. for kerbs and tight gaps.
+  Calibrating still shows its marks in the cluster. Not car-tested yet.
+- **Tool 0.9.1:** the turn sign shows at every turn again (on iDrive 7 it showed at the first turn of a drive only).
+- **BMW Night Vision (app 1.7.0, tool 0.10.0):** on a car with Night Vision, the Camera page also offers **Camera:
+  Front | Night Vision**. Night Vision shows the Night Vision camera's picture instead of the front camera, in the
+  cluster or on the head unit, with the turn card (no turn sign: it is lined up for the front camera). The tool reads it
+  straight from the head unit's own video input (`mgu-nvcap`), which it takes at every start and keeps: **BMW's own Night
+  Vision screen then stays black** (and may store a video-input fault code each time the Night Vision button is pressed);
+  uninstall the tool to get it back. The picture is read only while Turn View shows it. On a car without Night Vision
+  the choice is not shown. Car-tested on iDrive 7 (G12: the picture at 30 a second); not on iDrive 8 yet.
+
 - **iDrive 8:** Turn View's own widget, **Turn View AR** in the cluster's widget menu (a Cluster renderer drop-in, read
   at its next start), with its own picture in the menu like BMW's widgets (tool 0.7.1). The camera is sent only while
   the widget is shown.
@@ -347,7 +383,7 @@ Each release is a tag `x.y.z`. The apps need the Store's deploy tool 0.7.5 or ne
 
 Use at your own risk. These apps are not made or endorsed by BMW. Fault Codes can clear fault memories (only
 when you ask); Live Adjustments switches MHD and MG Flasher maps and burbles and drives the exhaust flap (not affiliated with MHD or MG Flasher); Drive Recorder
-puts the cameras into their Drive Recorder mode; Ambient Light sets the interior light's colours and Seats moves the
+puts the cameras into their Drive Recorder mode; Ambient Light sets the interior light's colors and Seats moves the
 front seats and an electric steering column (through the Comfort tool); Turn View asks the camera unit for its front
 view during a route; the other apps only read from the car.
 

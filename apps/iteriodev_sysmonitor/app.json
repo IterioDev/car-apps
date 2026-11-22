@@ -1,0 +1,15 @@
+{
+ "id": "iteriodev_sysmonitor",
+ "version": "1.0.0",
+ "title": "System Monitor",
+ "description": "What uses your head unit's memory and processor, like a computer's activity monitor: memory in use, every app and program with its own memory and how much it grew in the last 3 minutes (leaks stand out), processor use per core, load, temperature and clock. Tap a heading to sort, a row for its details. Read-only, only while it is on screen; no car signals, no internet. iDrive 8. Original app by hexlay - ID8 Variant by IterioDev.",
+ "mguHmi": [
+  "ID8"
+ ],
+ "needs": [
+  "renderer"
+ ],
+ "requires": {
+  "mgu-deploy": "0.7.5"
+ }
+}

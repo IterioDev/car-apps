@@ -40,6 +40,16 @@
  *             on the car switching on waits ON_SETTLE_MS (the seat module holds its motors then) and a way back that
  *             stood short keeps the place for the next try. Log also in comfort.log beside the data (the journal is
  *             gone within minutes).
+ *   0.6.1 (issue #42; PRs #38 #39 #44 #45 by dino15309): without a fresh speed or rpm the car stands only when
+ *             VehicleCondition said parked / standby / residing with a valid qualifier (it was "not on": true before any
+ *             signal, so Make room / easy exit could run while driving on a car whose head unit sends none); a stop
+ *             (SIGTERM) waits for the seat STOPs and the ambient hand-back (up to 20 s); STOPs go first in the UDS queue;
+ *             each subscription's answer is logged (which signals this car's head unit has).
+ *   0.6.2 (2026-11-19, customer M8: the ambient light's writes unanswered, lin 2 silent): {op:'diag'} - support reads
+ *             and test writes through this service's own TASU session (diagAllowed).
+ *   0.6.3 (same car): the lights looked for once at the start also with our colour off (zones listed again); a bus
+ *             read waited for up to 15 s and a refused one (no lights on it) not asked again - the 3 s timeout left the
+ *             BDC busy and the first writes after it unanswered, every 20 s (car read: writes work once it is free).
  * All UDS goes through the head unit's diagnostic gateway on one `hmictl serve` (uds.js).
  * Control socket /run/iteriodev-comfort/ctl.sock, JSON lines in and out; every change is pushed to every client:
  *   {op:'get'}  {op:'ambient', settings:{on, rgb:[r,g,b], bright 5-100, follow, zones:{dash:{rgb}|{off:true}|null},
@@ -49,6 +59,10 @@
  *   {op:'exit', seat, save:true|false}  (save: the seat (+ the driver's column) as it is = its Exit; else: there now;
  *               no seat: the driver's)
  *   {op:'set', settings:{easyExit:true|false}}
+ *   {op:'diag', id, target, sid, data:[bytes], ms}  (0.6.2, support: a UDS request through this service's own TASU
+ *               session - a second session beside it restarted a head unit, 2026-11-19; diagAllowed(): any read
+ *               22 to the BDC, the seats and the column, and only the self-reverting ambient writes 2E DA5E / E3D1)
+ *               -> {diag:{id, ok, uds:'hex'} | {id, ok:false, error, code}}
  * Data /var/opt/iteriodev-comfort/data.json { ambient, memories:{driver:[3], passenger:[3]}, room, exit:{driver, passenger},
  * pre:{driver, passenger}, out:{driver, passenger} (where our last easy exit move left it), settings } (0.3.x: exit / pre
  * the driver's alone, read as the driver's).
@@ -60,6 +74,19 @@ const net = require('net');
 const path = require('path');
 const { spawn } = require('child_process');
 const uds = require('./uds');
+const READ_MS = 15000;          // 0.6.3: an ambient bus read (the BDC polls its LIN lights first)
+
+/* 0.6.2 {op:'diag'}: reads (22 + a 2-byte DID) to the BDC 0x40 and the seat modules 0x6D / 0x6E; writes only the
+ * ambient light's per-module colour (2E DA5E / E3D1 + 7 bytes: NAD, on, brightness, R, G, B, seconds <= 254 - the
+ * module returns to the car's colour by itself) */
+function diagAllowed(q) {
+    const d = q && q.data;
+    if (!q || !Array.isArray(d) || !d.every((b) => Number.isInteger(b) && b >= 0 && b <= 255)) return false;
+    // 0.6.6: any read (22 + a 2-byte DID, any unit) - another tool's reads (boost, battery %, the VIN) go through
+    // this one session instead of a second TASU client beside ours; writes stay the ambient light's only
+    if (q.sid === 0x22) return Number.isInteger(q.target) && q.target > 0 && q.target <= 0xff && d.length === 2;
+    return q.sid === 0x2e && q.target === 0x40 && d.length === 9 && ((d[0] === 0xda && d[1] === 0x5e) || (d[0] === 0xe3 && d[1] === 0xd1));
+}
 const amb = require('./ambient');
 const seat = require('./seat');
 
@@ -262,21 +289,52 @@ function main() {
     }
     function subscribe() {
         if (shuttingDown) return;
-        [uds.SUB, SPEED_SUB, AMB_SUB, VCOND_SUB, DOOR_SUB, OCC_SUB, FES_SUB, FES_POLL].forEach((l) => hmi(l));
+        [uds.SUB, SPEED_SUB, AMB_SUB, VCOND_SUB, DOOR_SUB, OCC_SUB, FES_SUB, FES_POLL].forEach((l) =>
+            hmi(l).then((r) => log(`${l}: ${r}`)));   // 0.6.1 (issue #42): which signals this head unit has
         poll(AMB_GET, ambientStatus);
     }
 
     /* ---- ambient ---- */
-    let mods = null, oem = {}, lit = false, writing = false, again = false, litAt = 0;
+    let mods = null, oem = {}, lit = false, writing = false, again = false, litAt = 0, missedAt = 0;
+    // 0.6.5 (customer M8 2026-11-20): a light can report a fault while the car is off (both front footwells "faulty" all
+    // boot, clean when read later): a fault from the search is read again once, FAULT_MS after the lights are on
+    const FAULT_MS = 30000;
+    let faultChecked = true, faultTimer = null;
+    async function recheckFaults() {
+        faultTimer = null;
+        if (shuttingDown || faultChecked || !mods || !lit) return;
+        faultChecked = true;
+        for (const b of amb.BUSES.filter((x) => mods.some((m) => m.fault && m.bus === x.name))) {
+            let fresh;
+            try { fresh = amb.parse(await diag.send(amb.BDC, 0x22, b.read, READ_MS), b.name); } catch (e) {
+                log(`ambient ${b.name} fault check: ${e.message}`); continue;
+            }
+            fresh.forEach((f) => mods.filter((m) => amb.key(m) === amb.key(f) && (m.fault || f.fault)).forEach((m) => {
+                log(`ambient ${amb.key(m)} ${m.name}: ${f.fault ? `fault (${(f.faults || []).join(', ')})` : 'no fault now'}`);
+                m.fault = f.fault; m.faults = f.faults;
+            }));
+        }
+        push();
+    }
     async function discover() {
         if (shuttingDown) return;
         const found = [];
         let missed = 0;
         for (const b of amb.BUSES) {
-            try { found.push.apply(found, amb.parse(await diag.send(amb.BDC, 0x22, b.read), b.name)); } catch (e) { missed++; log(`ambient ${b.name}: ${e.message}`); }
+            // 0.6.3 (customer M8 2026-11-19): a bus read can take ~9 s (pending) and end in a refusal (7F 22 10: no
+            // layering lights on that bus) - waited for, so the BDC is free for the writes after it (the 3 s timeout
+            // left it busy: the first writes went unanswered, every 20 s); a refusal is an answer, not asked again
+            // 0.6.7 (customer M8 2026-11-21): uds.js's timeout carries code 'timeout' - it is no answer, not a refusal
+            // (0.6.4-0.6.6 counted it as "none": 0 modules for the whole boot, never looked for again)
+            try { found.push.apply(found, amb.parse(await diag.send(amb.BDC, 0x22, b.read, READ_MS), b.name)); } catch (e) {
+                const silent = e.code === undefined || e.code === 'timeout';
+                if (silent) missed++;
+                log(`ambient ${b.name}: ${silent ? e.message : `none (${e.message})`}`);
+            }
         }
         // the car's own brightness, before ours: a module's first reading only (renewals read our own back)
         found.forEach((m) => { if (m.bright && oem[amb.key(m)] === undefined) oem[amb.key(m)] = m.bright; });
+        missedAt = missed ? Date.now() : 0;
         // a bus that did not answer (the BDC busy right after a start, mgu-m4 2026-11-07): asked again in 20 s
         if (missed) setTimeout(() => {
             const set = amb.effective(data.ambient, car.mode);
@@ -286,6 +344,9 @@ function main() {
         }, 20000);
         mods = amb.split(found);                     // a zone with two kinds of light (line above, decor below): two parts
         log(`ambient: ${mods.length} modules: ${mods.map((m) => `${m.bus}.${m.nad} ${m.name} (${m.zone})`).join(', ')}`);
+        const bad = mods.filter((m) => m.fault);
+        if (bad.length) log(`ambient faults: ${bad.map((m) => `${amb.key(m)} ${m.name} (${(m.faults || []).join(', ')})`).join(', ')}`);
+        faultChecked = !bad.length;
         push();
     }
     /* A drag across the colour bars sends a new colour every 250 ms: the BDC gets at most one round per GAP_MS (the
@@ -313,8 +374,11 @@ function main() {
                 // OFF with no owned output needs no discovery or discovery retry.
                 // Previously lit modules must still reach the OEM release path below.
                 let set = amb.effective(data.ambient, car.mode), want = set.on && car.ambientOn === true && inCar();
-                if (!want && !lit) { force = false; break; }
-                if (!mods) await discover();
+                // 0.6.3: the lights are looked for once also while off (the app lists the zones: 0.6.1 showed none)
+                if (!want && !lit && mods) { force = false; break; }
+                // 0.6.4 (customer M8 2026-11-20): a bus silent at a start while the light was not wanted (head unit up
+                // at night, car asleep) left 0 modules for the whole boot; once wanted, looked for again (once a minute)
+                if (!mods || (want && missedAt && Date.now() - missedAt >= 60000)) await discover();
                 // Settings may change while discovery waits for the diagnostic gateway.
                 set = amb.effective(data.ambient, car.mode); want = set.on && car.ambientOn === true && inCar();
                 const all = force; force = false;
@@ -326,6 +390,7 @@ function main() {
                 }
                 if (all || want !== lit) litAt = Date.now();   // the last round that wrote every module
                 lit = want;
+                if (lit && !faultChecked && !faultTimer) faultTimer = setTimeout(recheckFaults, FAULT_MS);
             } while (again);
         } finally { writing = false; }
     }
@@ -456,6 +521,18 @@ function main() {
             c.write(JSON.stringify({ error: 'service shutting down' }) + '\n'); return;
         }
         const seatOk = q.seat === 'driver' || q.seat === 'passenger';
+        if (q.op === 'diag') {
+            if (!diagAllowed(q)) { c.write(JSON.stringify({ diag: { id: q.id, ok: false, error: 'not allowed' } }) + '\n'); return; }
+            const ms = Math.min(20000, Math.max(1000, q.ms | 0 || 5000)), what = `${q.target.toString(16)} ${q.sid.toString(16)} ${Buffer.from(q.data).toString('hex')}`;
+            diag.send(q.target, q.sid, q.data, ms).then((u) => {
+                if (q.sid !== 0x22) log(`diag ${what}: ${Buffer.from(u).toString('hex')}`);   // 0.6.6: reads (boost: 1-2 a second) not logged
+                c.write(JSON.stringify({ diag: { id: q.id, ok: true, uds: Buffer.from(u).toString('hex') } }) + '\n');
+            }, (e) => {
+                log(`diag ${what}: ${e.message}`);
+                c.write(JSON.stringify({ diag: { id: q.id, ok: false, error: e.message, code: e.code } }) + '\n');
+            });
+            return;
+        }
         if (q.op === 'ambient') { data.ambient = amb.settings(data.ambient, q.settings); saveSoon(); lightSoon(); push(); }
         else if (q.op === 'jog' && seatOk && seat.AXES.indexOf(q.axis) >= 0 && (q.dir === 1 || q.dir === -1)) {
             if (!busyJob) mover.jog(q.seat, q.axis, q.dir);
@@ -549,5 +626,11 @@ function main() {
 if (process.argv.includes('--test')) {
     const { execFileSync } = require('child_process');
     ['uds.js', 'ambient.js', 'seat.js'].forEach((f) => process.stdout.write(execFileSync(process.execPath, [path.join(__dirname, f), '--test'])));
+    const assert = require('assert'), ok = (target, sid, data) => diagAllowed({ target, sid, data });
+    assert(ok(0x40, 0x22, [0xda, 0x5f]) && ok(0x40, 0x22, [0xe3, 0xd1]) && ok(0x6e, 0x22, [0xd7, 0x02]), 'diag: reads');
+    assert(ok(0x40, 0x2e, [0xda, 0x5e, 15, 1, 100, 254, 0, 0, 10]) && ok(0x40, 0x2e, [0xe3, 0xd1, 1, 0, 0, 0, 0, 0, 0]), 'diag: ambient writes');
+    assert(!ok(0x40, 0x2e, [0xd3, 0x5d, 1]) && !ok(0x6e, 0x2e, [0xd7, 0x08, 0, 1, 0]) && !ok(0x40, 0x31, [1, 0xa5, 0xf1]) && !ok(0x12, 0x22, [0xf1, 0x50]),
+        'diag: no other writes, routines or units');
+    assert(!ok(0x40, 0x22, [0xda]) && !ok(0x40, 0x22, [0xda, 256]) && !diagAllowed({ target: 0x40, sid: 0x22, data: 'da5f' }), 'diag: bad data');
     console.log('comfort ok');
 } else main();

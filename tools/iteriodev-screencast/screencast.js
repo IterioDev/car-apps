@@ -17,7 +17,7 @@ const path = require('path');
 const os = require('os');
 const net = require('net');
 const dgram = require('dgram');
-const { spawn, spawnSync } = require('child_process');
+const { spawn, spawnSync, execFileSync } = require('child_process');
 
 const env = (n, d) => process.env[n] || d;
 const size = (s) => { const m = /^(\d+)x(\d+)$/.exec(s); if (!m) throw new Error(`bad size ${s}`); return [+m[1], +m[2]]; };
@@ -259,14 +259,16 @@ function pdu(ev, x, y) {
     return b;
 }
 
-// a renderer binds its touch port while it runs and hands its apps' taps to them, the rest on to Hmi8's 30567:
-// robertnisipeanu's mgu-render 30570, IterioDev's old mgu-renderd 30568. The display's own touches reach it
-// through an nft divert that matches only the display's packets (vlan73), so ours must be sent to it directly.
+// 1.0.10: our taps take the display's own path. A renderer whose app claims touch diverts the display's PDUs (HMI
+// port 30567) to its own port with an nft rule (robertnisipeanu's mgu-render 30570, idrive7-apps' idrive7-renderd
+// 30572, IterioDev's old mgu-renderd 30568), present only while it claims; it hands its apps' taps to them, the rest on
+// to the HMI. That rule matches only the display's packets (vlan73), so we read it and send to its port, else to the
+// HMI. No renderer order: with two renderers on a car, a fixed one missed the other's apps (1.0.9).
+// Reading the ruleset needs CAP_NET_ADMIN (the unit's AmbientCapabilities); without it, the HMI.
+const DIVERT = /saddr 160\.48\.199\.115 udp dport 30567 notrack udp dport set (\d+)/;
 function touchPort() {
-    let udp4 = '';
-    try { udp4 = fs.readFileSync('/proc/net/udp', 'utf8'); } catch (e) { /* none: Hmi8 */ }
-    const bound = (port) => new RegExp(`^\\s*\\d+: [0-9A-F]{8}:${port.toString(16).toUpperCase()} `, 'm').test(udp4);
-    return [30570, 30568].find(bound) || 30567;
+    try { return +DIVERT.exec(execFileSync('/usr/sbin/nft', ['list', 'ruleset', 'ip'], { encoding: 'utf8', timeout: 1000 }))[1]; }
+    catch (e) { return 30567; }   // no divert (or no nft): the HMI
 }
 
 function touch(ev, x, y) {

@@ -473,8 +473,8 @@ function main() {
         ops.reduce((at, o) => { all.set(o, at); return at + o.length; }, 0);
         gpu.frameWords(all);
     }
-    function claims() {                               // the shortcuts and the buttons shown (none while booting)
-        if (!boot.up) return gpu.claim([]);
+    function claims() {                               // the shortcuts and the buttons shown (none while booting / hidden)
+        if (!boot.up || hidden) return gpu.claim([]);
         gpu.claim(shownSlots().map((x) => ({ x, y: 0, w: SW, h: H })).concat(shownButtons().map((b) => ({ x: b.x, y: 0, w: BW, h: H }))));
     }
     function targetAt(x) {
@@ -534,7 +534,6 @@ function main() {
         else if (svc === VEHICLE2 && ev === KOMBI_EV) kombi(w[3]);
         else if (svc === VCOND && ev === VCOND_EV) { if (carOff(w[3]) && (m.sp18 || m.setup)) { log(`car off (${w[3]}): no M setup`); mReset(m); } }
         else if (svc === shift.RPM.svc && ev === shift.RPM.ev) sl.rpm(w[3]);
-        else if (svc === shift.LIMIT.svc && ev === shift.LIMIT.ev) sl.limit(w[3]);
         else {
             const before = levels(), changed = seats.apply(st, svc, ev, w[3]), k = flashKind(KEYS, before, levels());
             if (k && settings.ambient && Date.now() > flashFrom) {
@@ -565,7 +564,7 @@ function main() {
      * M car (an M setup seen, the DME's shift-light signal seen, or the user's choice) has its own in the cluster and the
      * HUD (a client's M2, 2026-11-05: ours over the map). Off or an M car: no rpm polling, no layer shown */
     const sl = (() => {
-        const v = { rpm: 0, limit: null, dme: null, dmeAt: 0, seg: -1, flash: null, shown: {}, vis: { shown: false, lowSince: 0 },
+        const v = { rpm: 0, dmeAt: 0, seg: -1, flash: null, shown: {}, vis: { shown: false, lowSince: 0 },
             renderer: 'missing', layer: '', own: null };
         const own = () => mcarOf(mcar || v.dmeAt > 0, settings);
         const poll = () => hmi(settings.shift.on && !v.own ? shift.RPM.poll : shift.RPM.poll.replace(/ 50 /, ' 0 '));
@@ -593,9 +592,9 @@ function main() {
             } catch (e) { log('shift lights: cluster-render client: ' + e.message); }
         } else log('shift lights: cluster-render is not installed');
         function update() {
-            const s = settings.shift, now = Date.now(), th = shift.thresholds(s, v.limit);
+            const s = settings.shift, now = Date.now(), th = shift.thresholds(s);
             if (own() !== v.own) { v.own = own(); poll(); push(); }
-            const l = v.dme && now - v.dmeAt < shift.DME_FRESH_MS ? v.dme : shift.lights(v.rpm, th);
+            const l = shift.lights(v.rpm, th);            // 0.6.0: the set rpm only (no DME segments, no engine limit)
             const near = s.on && !v.own && shift.visible(v.vis, v.rpm, th, l.seg, now);
             const shown = { guide: near, hud: near && s.hud };
             if (!cr) return;
@@ -608,10 +607,10 @@ function main() {
         }
         return {
             rpm(hex) { const r = shift.rpmOf(hex); if (r !== null) { v.rpm = r; update(); } },
-            limit(hex) { const l = shift.limitOf(hex); if (l !== v.limit) { v.limit = l; update(); push(); } },
-            dme(hex) { const d = shift.dmeOf(hex); if (d) { v.dme = d; v.dmeAt = Date.now(); update(); } },
+            // the DME's own segments: only to know an M car (its cluster has its own shift lights: ours stay hidden)
+            dme(hex) { if (shift.dmeOf(hex) && !v.dmeAt) { v.dmeAt = Date.now(); update(); } },
             settings() { v.own = own(); poll(); update(); },
-            status: () => ({ renderer: v.renderer, layer: v.layer, limit: v.limit, dme: v.dmeAt > 0, own: own(), th: shift.thresholds(settings.shift, v.limit) }),
+            status: () => ({ renderer: v.renderer, layer: v.layer, dme: v.dmeAt > 0, own: own(), th: shift.thresholds(settings.shift) }),
             tick: update,                             // the hysteresis' timeout
             close() { if (cr) cr.close(); },
         };
@@ -638,7 +637,6 @@ function main() {
         hmi(MDRIVE_SUB);
         hmi(KOMBI_SUB);
         hmi(VCOND_SUB);
-        hmi(shift.LIMIT.sub);
         sl.settings();                                // the rpm poll (hmictl's own thread), when the shift lights are on
     }
     async function reread() {                         // the notifications keep it current; this is the safety net
@@ -722,6 +720,17 @@ function main() {
 
     /* the control panel (the Overlays app): JSON lines; every change is pushed to every client */
     const clients = new Set();
+    /* an app showing full screen (Remote Play's picture, 2026-11-12) hides the strip: { op: 'hide', on } on its own
+     * connection, for as long as that connection is open (the app gone = the strip back) */
+    let hidden = false;
+    function applyHide() {
+        const h = [...clients].some((c) => c.hideStrip);
+        if (h === hidden) return;
+        hidden = h;
+        log(`strip ${h ? 'hidden: an app is full screen' : 'shown again'}`);
+        if (boot.up) gpu.show(!h);
+        claims();
+    }
     const has = (s) => ({ heat: s.heat.have, cool: s.cool.have });
     const status = () => ({ state: { settings, slots: slots.map((s) => describe(s, apps)),
         car: { backend: st.backend, seats: { driver: has(st.seats.driver), passenger: has(st.seats.passenger) }, wheel: st.wheel.have,
@@ -762,6 +771,9 @@ function main() {
                 p.items = hmiIcons.withPics(p.items);
                 c.write(JSON.stringify({ icons: p }) + '\n');
             }
+        } else if (q.op === 'hide') {
+            c.hideStrip = q.on === true;
+            applyHide();
         } else if (q.op === 'reset') {
             slots = defaults();
             save(); redrawAll(); push();
@@ -785,7 +797,7 @@ function main() {
                 }
             });
             c.on('error', () => {});
-            c.on('close', () => clients.delete(c));
+            c.on('close', () => { clients.delete(c); if (c.hideStrip) applyHide(); });
             c.write(JSON.stringify(status()) + '\n');
         });
         srv.on('error', (e) => log('control socket: ' + e.message));
@@ -810,7 +822,7 @@ function main() {
         if (!why) return;
         boot.up = true;
         log(`boot: strip shown ${Math.round((Date.now() - boot.since) / 1000)} s after the start (${why})`);
-        gpu.show(true);
+        gpu.show(!hidden);
         redrawAll();
     }
     gpu.on('ready', () => { log('renderer ready'); frame(); });
@@ -819,7 +831,7 @@ function main() {
         gestures.touch(phase, x);
         if (gestures.pressed() !== before) [before, gestures.pressed()].forEach(draw);
     });
-    gpu.on('closed', () => { if (boot.up) gpu.show(true); });   // a renderer without overlay_apps for us closes it on HMI touches
+    gpu.on('closed', () => { if (boot.up && !hidden) gpu.show(true); });   // a renderer without overlay_apps for us closes it on HMI touches
     redrawAll();
     subscribe();
     serve();
@@ -917,7 +929,7 @@ function test() {
     assert.deepStrictEqual(defaults()[1], { state: 7, applet: 91 });
     learned = {};
     assert.deepStrictEqual(defaults(), [{ state: 2, applet: 23 }, { state: 1, applet: 32 }, { state: 24, applet: 34 }, { state: 20, applet: 4 }]);
-    assert.deepStrictEqual(mergeSettings(SETTINGS, { shift: { on: false, flash: 7000 } }).shift, { on: false, auto: true, start: 4500, flash: 7000, hud: true });
+    assert.deepStrictEqual(mergeSettings(SETTINGS, { shift: { on: false, flash: 7000 } }).shift, { on: false, start: 4500, flash: 7000, hud: true });
     assert.strictEqual(SETTINGS.order, 'up', 'defaults untouched');
     // taps: up 1 -> 2 -> 3 -> off, down 3 -> 2 -> 1 -> off
     assert.deepStrictEqual([0, 1, 2, 3].map((l) => nextLevel(l, 3, 'up')), [1, 2, 3, 0]);

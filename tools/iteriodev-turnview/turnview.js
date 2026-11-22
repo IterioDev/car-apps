@@ -24,11 +24,25 @@
  *       <- { state: { settings, status } }   (pushed on every change, at most 4 a second)
  *   The app asks the camera ECU for the front view (its CameraProxy / ICAM2Proxy grants); the tool starts it in the
  *   background (`hmictl start iteriodev_turnview`) when the camera is wanted and the app is not connected.
- * Data: /var/opt/iteriodev-turnview/settings.json { enabled, cal { h, pitch, fov, yaw, x } }, rear-only (0.2.1: the
+ *   head unit 0.9.0 (user 2026-11-19: a kerb-parking aid, at any speed): settings.picture 'hu' = the picture on the head
+ *                             unit instead of the cluster. The cluster gets no video (iDrive 8's widget says "Turn View
+ *                             is on the head unit", iDrive 7's map area is given back); while the app's Camera page is
+ *                             open ({ op: 'view', on }) camcluster writes the camera's whole frames for the renderer
+ *                             (`hu on`, --hu HU_FILE) and the page's clients get { view: { hu, card, cardKey, sign } }
+ *                             every tick it changes (scene.js huOverlay: the card's place + the turn sign's quads as
+ *                             fractions of the picture; the card's pixels in CARD_FILE, premultiplied RGBA). No speed
+ *                             limit of ours: the camera's drive-recorder stream runs at any speed
+ *   night vision 0.10.0 (user 2026-11-20): settings.camera 'nv' = BMW Night Vision's picture instead of the front
+ *                             camera, read from the head unit's analog video chip by mgu-nvcap (nv.js: held from the
+ *                             start, BMW's own Night Vision screen black; read only while camcluster wants frames) and
+ *                             shown by camcluster --nv as the camera's, in the cluster or on the head unit. No turn sign
+ *                             on it (calibrated for the front camera), the card stays; no camera request (Drive
+ *                             Recorder keeps the front camera). status.nv: nv.js's state ('none': no chip in this car)
+ * Data: /var/opt/iteriodev-turnview/settings.json { enabled, picture, camera, cal { h, pitch, fov, yaw, x } }, rear-only (0.2.1: the
  * car has the rear camera alone, the widget says "No front camera" only until the front view works), turnview.log (1 MB, one
  * old file kept). Never stops a system service; the native parts are children, restarted with a growing delay when
  * they die young. Times are monotonic (the MGU sets its clock after boot).
- * Env (tests): TURNVIEW_DATA, TURNVIEW_CTL, TURNVIEW_HMICTL, TURNVIEW_CAMCLUSTER, TURNVIEW_CR_SOCKET, TURNVIEW_TICK_MS,
+ * Env (tests): TURNVIEW_DATA, TURNVIEW_CTL, TURNVIEW_HMICTL, TURNVIEW_CAMCLUSTER, TURNVIEW_NVCAP, TURNVIEW_NV_FILE, TURNVIEW_HU_FILE, TURNVIEW_CARD_FILE, TURNVIEW_CR_SOCKET, TURNVIEW_TICK_MS,
  * TURNVIEW_START_MS (app start retry), TURNVIEW_PASSED_MS, TURNVIEW_GEN (7 | 8; else by MainApp's folder, as
  * cluster-render's generation.cpp).
  */
@@ -38,12 +52,21 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { createNav, speedKmh, queryHex } = require('./nav');
 const { createTrack } = require('./track');
-const { createScene } = require('./scene');
+const { createScene, huOverlay } = require('./scene');
+const C = require('./card');
+const { createNv } = require('./nv');
 
 const DATA = process.env.TURNVIEW_DATA || '/var/opt/iteriodev-turnview';
 const CTL = process.env.TURNVIEW_CTL || '/run/iteriodev-turnview/ctl.sock';
+// the head unit's picture (0.9.0): camcluster's frame file (the renderer reads /dev/shm/mgu-video-* only) and the card
+const HU_FILE = process.env.TURNVIEW_HU_FILE || '/dev/shm/mgu-video-turnview';
+const CARD_FILE = process.env.TURNVIEW_CARD_FILE || '/run/iteriodev-turnview/card.rgba';
 const HMICTL = process.env.TURNVIEW_HMICTL || path.join(__dirname, 'hmictl');
 const CAMCLUSTER = process.env.TURNVIEW_CAMCLUSTER || path.join(__dirname, 'mgu-camcluster');
+const NVCAP = process.env.TURNVIEW_NVCAP || path.join(__dirname, 'mgu-nvcap');
+const NV_FILE = process.env.TURNVIEW_NV_FILE || '/dev/shm/mgu-video-turnview-nv';   // mgu-nvcap -> camcluster --nv
+const NV_NO = { none: true, missing: true, disabled: true };                         // no Night Vision to show
+const WANTS = { waiting: true, decoding: true, stalled: true };                      // camcluster wants frames
 const CR_SOCKET = process.env.TURNVIEW_CR_SOCKET || '/dev/shm/cluster-render/render.sock';
 const TICK_MS = +process.env.TURNVIEW_TICK_MS || 100;
 const START_MS = +process.env.TURNVIEW_START_MS || 30000;
@@ -108,10 +131,16 @@ function clampCal(cur, p) {
     });
     return out;
 }
+const PICTURES = ['cluster', 'hu'];                      // 0.9.0: where the picture goes
+const CAMERAS = ['front', 'nv'];                         // 0.10.0: which picture
 function mergeSettings(cur, p) {
-    const out = { enabled: cur && typeof cur.enabled === 'boolean' ? cur.enabled : true, cal: clampCal(cur && cur.cal) };
+    const out = { enabled: cur && typeof cur.enabled === 'boolean' ? cur.enabled : true,
+        picture: cur && PICTURES.indexOf(cur.picture) >= 0 ? cur.picture : 'cluster',
+        camera: cur && CAMERAS.indexOf(cur.camera) >= 0 ? cur.camera : 'front', cal: clampCal(cur && cur.cal) };
     if (!p || typeof p !== 'object') return out;
     if (typeof p.enabled === 'boolean') out.enabled = p.enabled;
+    if (PICTURES.indexOf(p.picture) >= 0) out.picture = p.picture;
+    if (CAMERAS.indexOf(p.camera) >= 0) out.camera = p.camera;
     if (p.cal) out.cal = clampCal(out.cal, p.cal);
     return out;
 }
@@ -146,7 +175,14 @@ function main() {
     log(`start: enabled ${settings.enabled}${GEN === 7 ? ' (iDrive 7: off at every start)' : ''}, cal ${JSON.stringify(settings.cal)}${noFront ? ', no front camera (saved)' : ''}`);
 
     const status = { camera: 'off', rect: null, route: 'none', provider: null, maneuver: null, cr: 'connecting', backend: null,
-        nav: 'waiting', state: 'none', camreq: 'idle', noFront, widget: WIDGETS.widget };
+        nav: 'waiting', state: 'none', camreq: 'idle', noFront, widget: WIDGETS.widget, hu: 'off', nv: 'starting' };
+    const onHu = () => settings.picture === 'hu';
+    // 0.10.0: Night Vision - held from the start (before BMW's screen can take the chip), read while camcluster wants it
+    const nv = createNv({ log, child, backoff, now: mono, bin: NVCAP, file: NV_FILE, data: DATA });
+    nv.on('change', (s) => { status.nv = s; push(); });   // (started at the end of main: push() is defined by then)
+    const camSrc = () => (settings.camera === 'nv' && !NV_NO[status.nv] ? 'nv' : 'front');
+    // the turns are followed while Turn View is on or the picture is the head unit's (its page works switched off too)
+    const tracking = () => settings.enabled || onHu();
     let crTarget = null;                                // the target, from cluster-render's hello (null: none yet)
     function setNoFront(on) {
         if (on === noFront) return;
@@ -156,13 +192,13 @@ function main() {
     }
     const nav = createNav({ log, now: mono, gen: GEN }), track = createTrack({ passedMs: +process.env.TURNVIEW_PASSED_MS || 0 });
     let calibBy = null, lastNavAt = 0;
-    track.enabled(settings.enabled);
+    track.enabled(tracking());
 
     // ---- cluster-render: the client keeps trying (also while the service is not installed yet) and makes every layer
     // again on each connection ----
     const { ClusterRender } = require('./cluster_render_client');
     const cr = new ClusterRender('iteriodev-turnview', CR_SOCKET), scene = createScene(cr, { log, now: mono });
-    scene.setCal(settings.cal); scene.noFront(noFront); scene.disabled(!settings.enabled);
+    scene.setCal(settings.cal); scene.noFront(noFront); scene.disabled(!settings.enabled); scene.hu(onHu());   // (each tick after)
     cr.on('ready', () => {
         status.backend = cr.backend;
         status.cr = cr.backend === 'id8' || cr.backend === 'id7' ? 'connected' : 'unsupported';
@@ -174,7 +210,7 @@ function main() {
             crTarget = t; status.widget = WIDGETS[t];
             scene.retarget(t);
             log(t === 'map' ? 'target map: the cluster\'s central map area (Map view)' : `target ${t}: "${status.widget}" in the cluster's widget menu`);
-            if (cam) { try { cam.stdin.end(); } catch (e) { /* gone */ } } else camStart();
+            if (cam) { camEnding = true; try { cam.stdin.end(); } catch (e) { /* gone */ } } else camStart();
         }
         push();
     });
@@ -273,12 +309,12 @@ function main() {
     subscribe();
 
     // ---- mgu-camcluster: the video, as its status lines say ----
-    let cam = null, camOut = '', videoOn = false, camTarget = null;
+    let cam = null, camOut = '', videoOn = false, huOn = false, camTarget = null, camSource = null, camEnding = false;
     const camSt = { startedAt: 0, delay: 0 };
     function camState(s) {
         if (status.camera === s) return;
         log(`camera: ${s}`); status.camera = s; scene.camera(s);
-        if (s === 'decoding') setNoFront(false);
+        if (s === 'decoding' && camSource === 'front') setNoFront(false);
         push();
     }
     function camStart() {
@@ -287,13 +323,15 @@ function main() {
         if (!fs.existsSync(CAMCLUSTER)) { camState('missing'); setTimeout(camStart, backoff(camSt, mono())); return; }
         // the widget picked in the cluster's widget menu (user 2026-11-06: only where it is picked)
         // 0.3.1 (user 2026-11-13): 15 pictures a second, not camcluster's 20: room for the head unit (~3 MB/s upload)
-        camTarget = crTarget;
+        camTarget = crTarget; camSource = camSrc(); camEnding = false;
         // iDrive 7's map: the whole target, its size from the hello (map:WxH)
         const m = /(?:^|,)map:(\d+)x(\d+)/.exec(cr.targets || ''), rect = camTarget !== 'map' ? CAM_RECT : m ? `${m[1]}x${m[2]}@0,0` : '1088x480@0,0';
-        const c = child(CAMCLUSTER, ['--control', 'stdin', '--target', camTarget, '--rect', rect, '--fps', String(CAM_FPS)], log, (why) => {
+        const args = ['--control', 'stdin', '--target', camTarget, '--rect', rect, '--fps', String(CAM_FPS), '--hu', HU_FILE];
+        const c = child(CAMCLUSTER, camSource === 'nv' ? args.concat(['--nv', NV_FILE]) : args, log, (why) => {
             log(`mgu-camcluster ended (${why})`);
-            if (cam === c) { cam = null; camOut = ''; }
-            if (camTarget !== crTarget) { camStart(); return; }   // stopped for the other widget: on it at once
+            if (cam === c) { cam = null; camOut = ''; huState('off'); }
+            // stopped for the other widget or the other picture (0.10.0): on it at once
+            if (camTarget !== crTarget || camSource !== camSrc()) { camStart(); return; }
             camState('restarting');
             setTimeout(camStart, backoff(camSt, mono()));
         });
@@ -304,7 +342,12 @@ function main() {
             if (camOut.length > LINE_MAX && camOut.indexOf('\n') < 0) camOut = '';
             for (let n; (n = camOut.indexOf('\n')) >= 0; camOut = camOut.slice(n + 1)) camLine(camOut.slice(0, n).replace(/\r$/, ''));
         });
-        c.stdin.write(`video ${videoOn ? 'on' : 'off'}\n`);
+        c.stdin.write(`video ${videoOn ? 'on' : 'off'}\nhu ${huOn ? 'on' : 'off'}\n`);
+    }
+    function huState(s) {
+        if (status.hu === s) return;
+        log(`head unit picture: ${s}`); status.hu = s;
+        push();
     }
     function camLine(line) {                                // anything else on its stdout (a library's print) is ignored
         let m;
@@ -313,12 +356,22 @@ function main() {
             scene.rect({ w: +m[1], h: +m[2], x: +m[3], y: +m[4] });
             push();
         } else if ((m = /^video (idle|waiting|decoding|stalled|off|refused)$/.exec(line))) camState(m[1]);   // 0.6.1: refused
+        else if ((m = /^hu (off|waiting|decoding|stalled)$/.exec(line))) {                 // 0.9.0: the head unit's frames
+            huState(m[1]);
+            if (m[1] === 'decoding' && camSource === 'front') setNoFront(false);
+        }
     }
     function video(on) {
         if (on === videoOn) return;
         videoOn = on;
         log(`video ${on ? 'on' : 'off'}`);
-        if (cam) cam.stdin.write(`video ${on ? 'on' : 'off'}\n`);
+        if (cam && !camEnding) cam.stdin.write(`video ${on ? 'on' : 'off'}\n`);   // (ending: the next one told at its start)
+    }
+    function hu(on) {                                       // 0.9.0: camcluster's frames for the head unit
+        if (on === huOn) return;
+        huOn = on;
+        log(`head unit picture ${on ? 'on' : 'off'}`);
+        if (cam && !camEnding) cam.stdin.write(`hu ${on ? 'on' : 'off'}\n`);
     }
 
     // ---- the app: started when the camera is wanted and it is not connected ----
@@ -350,14 +403,51 @@ function main() {
         const t = mono(), v = track.tick(t);
         if (v.state !== lastState) { log(`state ${lastState || '-'} -> ${v.state}`); lastState = v.state; status.state = v.state; push(); }
         if (status.nav === 'waiting' && t - subscribedAt > NAV_SILENT_MS && !lastNavAt) { status.nav = 'no navigation data'; push(); }
+        // 0.10.0: the other picture (front camera / Night Vision): camcluster started again with it; Night Vision read
+        // while camcluster wants frames (its video or hu lines waiting / decoding / stalled)
+        if (cam && !camEnding && camSource !== camSrc()) {
+            camEnding = true;
+            log(`picture: ${camSrc() === 'nv' ? 'night vision' : 'the front camera'}: camcluster again`);
+            try { cam.stdin.end(); } catch (e) { /* gone */ }
+        }
+        nv.stream(camSource === 'nv' && !!cam && (!!WANTS[status.camera] || !!WANTS[status.hu]));
+        // 0.9.0: the head unit's picture while its page is open (it needs no cluster-render)
+        hu(onHu() && viewers.size > 0);
+        if (huOn) sendView(v); else lastView = '';
         if (status.cr === 'unsupported') return;              // not our cluster: nothing drawn
+        // calibrating: the marks in the cluster as before, also with the picture on the head unit
+        const inCluster = !onHu() || !!calibBy;
+        scene.hu(!inCluster);
+        scene.nv(camSource === 'nv');
         scene.show(v, t);
-        video(v.video);
+        video(v.video && inCluster);
         // the app (it asks the camera ECU for the front view) only while the camera is really wanted: the widget shown
         // (iDrive 8) or Turn View switched on (iDrive 7) - camcluster decoding, not merely the video allowed (0.7.0,
         // user 2026-11-15: never start in the background and take Drive Recorder's camera when not in use)
-        if (v.video && CAMERA_UP[status.camera]) startApp();
+        if (v.video && inCluster && CAMERA_UP[status.camera] && camSource === 'front') startApp();
     }, TICK_MS);
+
+    // ---- the head unit's page (0.9.0): the card's pixels in CARD_FILE, its place and the sign's quads each tick ----
+    const viewers = new Set();
+    let lastView = '', cardKey = '', curCal = settings.cal;
+    function writeCard(view) {
+        const key = `${view.icon}|${view.text}|${view.dim ? 1 : 0}|${view.exit}`;
+        if (key === cardKey) return cardKey;
+        const p = C.card(view.icon, view.text, { dim: view.dim, exit: view.exit }), b = Buffer.from(p.rgba);
+        for (let i = 0; i < b.length; i += 4) {                 // the renderer's pictures are premultiplied
+            const a = b[i + 3];
+            if (a < 255) { b[i] = Math.round(b[i] * a / 255); b[i + 1] = Math.round(b[i + 1] * a / 255); b[i + 2] = Math.round(b[i + 2] * a / 255); }
+        }
+        try { fs.writeFileSync(`${CARD_FILE}.new`, b); fs.chmodSync(`${CARD_FILE}.new`, 0o644); fs.renameSync(`${CARD_FILE}.new`, CARD_FILE); cardKey = key; } catch (e) { log(`card: ${e.message}`); }
+        return cardKey;
+    }
+    function sendView(v) {
+        const o = huOverlay(v, curCal, camSource === 'nv');
+        const m = JSON.stringify({ view: { hu: status.hu, card: o.card, cardKey: o.card ? writeCard(v) : '', cardW: C.CARD.w, cardH: C.CARD.h, sign: o.sign } });
+        if (m === lastView) return;
+        lastView = m;
+        viewers.forEach((c) => send(c, `${m}\n`));
+    }
 
     // ---- the control socket ----
     let pushTimer = null, pushedAt = -Infinity;
@@ -376,15 +466,18 @@ function main() {
             clients.forEach((c) => send(c, m));
         }, wait);
     }
-    const applyCal = (c) => scene.setCal(c);
+    const applyCal = (c) => { curCal = c; scene.setCal(c); };
     function calibOff() { track.calib(false); calibBy = null; applyCal(settings.cal); }
     function request(c, q) {
         if (q.op === 'set') {
-            const was = settings.enabled;
+            const was = settings.enabled, wasPic = settings.picture, wasCam = settings.camera;
             settings = mergeSettings(settings, q.settings);
             save();
             // 0.3.2: off keeps the layers - the widget picked says "Turn View is off" (it was black: car 2026-11-14)
-            if (settings.enabled !== was) { track.enabled(settings.enabled); scene.disabled(!settings.enabled); }
+            if (settings.enabled !== was) scene.disabled(!settings.enabled);
+            if (settings.picture !== wasPic) log(`picture on: ${settings.picture === 'hu' ? 'the head unit' : 'the cluster'}`);
+            if (settings.camera !== wasCam) log(`camera: ${settings.camera === 'nv' ? 'night vision' : 'front'}`);
+            track.enabled(tracking());
             if (!calibBy) applyCal(settings.cal);
             push();
         } else if (q.op === 'preview') {
@@ -397,9 +490,13 @@ function main() {
             save(); applyCal(settings.cal); push();
         } else if (q.op === 'camreq' && typeof q.state === 'string') {
             status.camreq = q.state === 'nofront' ? 'refused' : q.state.slice(0, 20); scene.camreq(status.camreq);
-            if (status.camreq === 'rearonly' && status.camera !== 'decoding') setNoFront(true);
+            if (status.camreq === 'rearonly' && status.camera !== 'decoding' && status.hu !== 'decoding') setNoFront(true);
             else if (status.camreq === 'on') setNoFront(false);
             push();
+        } else if (q.op === 'view') {                       // 0.9.0: the app's Camera page shown / gone
+            if (q.on === true) viewers.add(c); else viewers.delete(c);
+            lastView = '';
+            log(`camera page ${q.on === true ? 'open' : 'closed'} (${viewers.size})`);
         } else send(c, stateMsg());                       // 'get' and anything else
     }
     try { fs.unlinkSync(CTL); } catch (e) { /* none yet */ }
@@ -421,6 +518,7 @@ function main() {
         c.on('error', () => {});
         c.on('close', () => {
             clients.delete(c);
+            if (viewers.delete(c)) lastView = '';
             log(`control: a client left (${clients.size})`);
             if (calibBy === c) { log('app gone while calibrating: saved calibration back'); calibOff(); push(); }
             // no app: nobody asks the camera any more (its "refused" would make the next handover read No camera at once)
@@ -431,7 +529,8 @@ function main() {
     srv.on('error', (e) => log(`control socket: ${e.message}`));
     srv.listen(CTL, () => { try { fs.chmodSync(CTL, 0o666); } catch (e) { /* a pipe on the PC */ } });
 
-    const quit = () => { try { if (cam) cam.stdin.end(); } catch (e) { /* gone */ } stop(hm); process.exit(0); };
+    nv.start();
+    const quit = () => { try { if (cam) cam.stdin.end(); } catch (e) { /* gone */ } nv.stop(); stop(hm); process.exit(0); };
     process.on('SIGTERM', quit);
     process.on('SIGINT', quit);
 }
