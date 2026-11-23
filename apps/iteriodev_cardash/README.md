@@ -2,10 +2,10 @@
 
 Live engine data on your iDrive 8 screen: engine speed, boost, power and torque with their peaks, oil, coolant and intake temperatures, battery voltage; fuel and air values with their last 5 minutes; a trip computer with costs; gearbox data (ZF 8HP, read-only, experimental); the engine unit's values in groups; on diesel cars a DPF page (soot load, regenerations, exhaust temperatures, read-only, experimental). Bar ends, fuel price and currency are set on the Settings page.
 
-Version 1.4.1 · iDrive 8 only · package `iteriodev_cardash` · [all apps and how to install](../../README.md)
+Version 1.4.2 · iDrive 8 only · package `iteriodev_cardash` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
-> Version 1.4.1 is not tested on a car yet. Open points: the fuel figure on Trips, whether trips are counted while the screen is closed, Transmission (ZF 8HP variants 0F25D0 and 0F21E0 only) and the DPF page (never run on a diesel).
+> Version 1.4.2 is not tested on a car yet. Open points: the fuel figure on Trips, whether trips are counted while the screen is closed, Transmission (ZF 8HP variants 0F25D0 and 0F21E0 only) and the DPF page (never run on a diesel).
 
 ## Screens
 

@@ -2,7 +2,7 @@
 
 Log the head unit in to your tailnet without a computer: shows Tailscale's state, the login link as a QR code to scan with your phone, the head unit's tailnet name and address, Rename (default mgu), Disconnect / Connect (switched off, still logged in) and Log out. Works with the iDrive controller. Needs the Tailscale tool from the same source.
 
-Version 1.2.0 · iDrive 7 and 8 · package `iteriodev_tailscale` · [all apps and how to install](../../README.md)
+Version 1.2.1 · iDrive 7 and 8 · package `iteriodev_tailscale` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
 > Logging in and connecting work on an iDrive 7 car (MGU18, issue #51). 1.2.0's Disconnect and the iDrive controller are

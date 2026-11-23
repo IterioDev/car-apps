@@ -2,10 +2,10 @@
 
 Reads the fault memory of every control unit in the car and shows each fault with its text; clears it when you ask. Also lists the car's Check Control messages.
 
-Version 1.2.0 · iDrive 8 only · package `iteriodev_dtcscan` · [all apps and how to install](../../README.md)
+Version 1.2.1 · iDrive 8 only · package `iteriodev_dtcscan` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
-> Version 1.2.0 is not tested on a car yet.
+> Version 1.2.1 is not tested on a car yet.
 
 ## Screens
 

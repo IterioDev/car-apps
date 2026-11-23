@@ -2,7 +2,7 @@
 
 Live adjustments for an MHD- or MG Flasher-tuned DME, one tab per tune: switch engine maps at any time, also while driving (MHD maps 1-4, MG Flasher maps 1-5), MG Flasher burble slots 0-5, Max Cooling on (engine running) or off, and open or close the exhaust flap (on MHD its own flap control, held while driving; otherwise BMW's DME job, which the DME takes back after about 20 s or when the car moves). Shows what the DME accepted: neither tune has a read-back here.
 
-Version 1.2.0 · iDrive 8 only · package `iteriodev_liveadjust` · [all apps and how to install](../../README.md)
+Version 1.2.1 · iDrive 8 only · package `iteriodev_liveadjust` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
 > Car-tested: the engine map switch standing still (MHD). Switching while driving (1.1.1), Max Cooling, MHD's own flap control, the 1.1.x screens and the whole MG Flasher tab (1.2.0) are not tested on a car yet.

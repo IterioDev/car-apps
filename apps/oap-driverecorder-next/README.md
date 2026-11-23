@@ -2,7 +2,7 @@
 
 Keeps the car's cameras recording and saves a clip when you ask; watch, lock, delete and copy clips to a USB stick while the car stands still. Over 4 GB the oldest unlocked clips are replaced. The Store installs the Drive Recorder player with it.
 
-Version 2.5.1 (player `iteriodev-drplay` 1.2.6) · iDrive 7 and iDrive 8 · package `oap-driverecorder-next` · [all apps and how to install](../../README.md)
+Version 2.5.2 (player `iteriodev-drplay` 1.2.6) · iDrive 7 and iDrive 8 · package `oap-driverecorder-next` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
 > **Car-tested** (2.4.0 with the player 1.2.3, iDrive 8, G82 with the 360 cameras): recording, saving and watching clips with all cameras. Not tested on a car yet: Copy to USB of these clips (player 1.2.4), front + rear only cars, 2.4.0 on iDrive 7, the iDrive controller (2.5.0).

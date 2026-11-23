@@ -2,10 +2,10 @@
 
 Acceleration timer: stand still, launch, and it times the run with splits and a speed-over-time chart, timed from the launch. Power run: floor it in one gear for power and torque over rpm, with a baseline to compare. Keeps your best times; km/h or mph.
 
-Version 1.2.0 · iDrive 8 only · package `iteriodev_draggy` · [all apps and how to install](../../README.md)
+Version 1.2.1 · iDrive 8 only · package `iteriodev_draggy` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
-> Version 1.2.0 is not tested on a car yet.
+> Version 1.2.1 is not tested on a car yet.
 
 ## Screens
 

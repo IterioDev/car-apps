@@ -2,10 +2,10 @@
 
 The car's service requirements as the instrument cluster has them: engine oil, brakes, brake fluid, vehicle check and inspections, each with the distance and the date left and whether it is due. Read-only: a service is reset in the cluster's own menu or at a workshop. iDrive 8.
 
-Version 1.0.0 · iDrive 8 only · package `iteriodev_service` · [all apps and how to install](../../README.md)
+Version 1.0.1 · iDrive 8 only · package `iteriodev_service` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
-> Version 1.0.0 is not tested on a car yet.
+> Version 1.0.1 is not tested on a car yet.
 
 ## Screens
 

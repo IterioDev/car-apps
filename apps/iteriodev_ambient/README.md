@@ -2,7 +2,7 @@
 
 Any color on the interior ambient light, not only the car's own presets, on one screen: your car's zones in a list (dash, doors, footwell, console, seats, roof: the ones it has), a color bar for any shade, brightness (or follow the car's, dimmer at night), the car's colors as starting points and six presets of your own that keep every zone's color. Each zone can follow the main color, have its own, or keep the car's. A zone with two kinds of light (an X6's dash: a line above, decor below) shows as two rows, each with its own color. Drive modes: a color for each drive mode (Sport, Comfort, Eco Pro, their Plus and Individual, Adaptive) that the light switches to with the mode. Works while the car's own ambient light is switched on. Needs the Comfort tool (the Store installs it with the app).
 
-Version 1.4.3 · iDrive 7 and 8 · package `iteriodev_ambient` · [all apps and how to install](../../README.md)
+Version 1.4.4 · iDrive 7 and 8 · package `iteriodev_ambient` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
 > Bowers & Wilkins speaker and tweeter lights are not controllable: they keep the car's own color (set it in the car's menu, or with the car's colors in the app).
