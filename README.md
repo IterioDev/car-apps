@@ -233,8 +233,9 @@ already listens on the port, tailscaled starts without the proxy and the journal
 > idrive7-apps' renderer (`idrive7-renderd`) first where it runs, as the display itself does, so the apps it draws
 > get them — car-tested on an iDrive 7 with both renderers. 1.0.10 sends each tap to whichever renderer has the
 > display's touch at that moment (or straight to the HMI), so apps on either renderer get their taps when both are
-> installed — car-tested on an iDrive 7 with both renderers. 1.0.11 adds a **MENU** button (iDrive 8): the head unit
-> goes back to the BMW menu, e.g. out of full-screen CarPlay, which takes every tap — not car-tested yet.
+> installed — car-tested on an iDrive 7 with both renderers. 1.0.11 adds a **MENU** button (iDrive 8), 1.0.12 also on
+> iDrive 7: the head unit goes back to the BMW menu, e.g. out of full-screen CarPlay, which takes every tap — not
+> car-tested yet.
 
 The head unit's centre display in a browser on your computer, over your tailnet. Clicks and drags on the picture
 become touches on the screen. Needs the Tailscale tool above (logged in) and a browser: Chrome, Edge, Firefox,
@@ -251,10 +252,10 @@ Safari, or on an iPhone / iPad iOS 17.1 or newer (any browser there).
   taps. To see which renderer that is, the service reads the firewall's touch rule (`nft list ruleset ip`), so it
   runs with the `CAP_NET_ADMIN` capability (still as user `os_7011`). A finger left down (closed tab, lost connection)
   is lifted after 2 s. The iDrive controller is not covered.
-- **MENU** (1.0.11, iDrive 8): the button under the picture does what the controller's MENU key does: the HMI's home
-  screen comes up, also out of full-screen CarPlay (the phone stays connected). A second small service
-  (`iteriodev-screencast-menu.service`, root) asks the HMI for it, the way the Overlays strip opens screens; it starts
-  at the next boot after installing. On iDrive 7 the button answers with an error.
+- **MENU** (iDrive 8 since 1.0.11, iDrive 7 since 1.0.12): the button under the picture does what the controller's
+  MENU key does: the HMI's home screen (iDrive 7: the main menu) comes up, also out of full-screen CarPlay (the phone
+  stays connected). A second small service (`iteriodev-screencast-menu.service`, root) asks the HMI for it, the way
+  the Overlays strip opens screens; it starts at the next boot after installing.
 - **Who can use it:** it answers only through Tailscale (it listens on the head unit's `127.0.0.1:5880`), and
   **anyone on your tailnet can see the screen and tap it**. If you share the tailnet, limit port 5880 with its
   access controls. Taps reach the screen while someone drives; don't use it on a moving car.

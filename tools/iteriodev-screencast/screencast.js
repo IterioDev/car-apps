@@ -288,7 +288,8 @@ function touch(ev, x, y) {
 // ---- MENU: the HMI's Home screen, by the root helper (menu.js, unit iteriodev-screencast-menu) ----------------------
 // 1.0.11: full-screen CarPlay takes every tap (Hmi8 hands them to the phone), so a viewer could not leave it - in the
 // car only the controller's MENU key does. This process (os_7011) may not call the HMI itself (no vsomeip policy for
-// that user): the helper does, one press per connection to its socket, and answers "ok" or "error ...".
+// that user): the helper does, one press per connection to its socket, and answers "ok" or "error ...". 1.0.12: on
+// iDrive 7 too (its HMIControl 0xB039, the main menu state 20000 the MENU key opens).
 const MENU_SOCK = env('SCREENCAST_MENU_SOCK', '/run/iteriodev-screencast-menu/menu.sock');
 function menu(res) {
     let a = '', err = null;

@@ -3,7 +3,8 @@ Description=Screen share: the viewer's MENU button (the HMI's Home screen, e.g. 
 After=vsomeipd.service
 
 [Service]
-# root: the vsomeip policy lets uid 0 call the HMI's HMIControl2; the screen share's own user os_7011 has no policy.
+# root: the vsomeip policy lets uid 0 call the HMI's HMIControl2 (iDrive 8) / HMIControl (iDrive 7); the screen
+# share's own user os_7011 has no policy.
 # One job only (menu.js): a connection to /run/iteriodev-screencast-menu/menu.sock (os_7011's, 0600) = one MENU press.
 RuntimeDirectory=iteriodev-screencast-menu
 RuntimeDirectoryMode=0755
