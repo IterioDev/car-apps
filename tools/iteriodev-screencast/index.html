@@ -16,7 +16,7 @@
 </style>
 </head>
 <body>
-<div id="bar"><b>MGU screen</b><span id="st">connecting...</span><span></span><button id="fs">Full screen</button></div>
+<div id="bar"><b>MGU screen</b><span id="st">connecting...</span><span></span><button id="menu" title="The controller's MENU key: back to the BMW menu, e.g. out of full-screen CarPlay">MENU</button><button id="fs">Full screen</button></div>
 <div id="stage"><video id="v" muted autoplay playsinline disablepictureinpicture></video></div>
 <script src="mux.js"></script>
 <script>
@@ -158,6 +158,19 @@ const lift = () => { if (!down) return; clearInterval(beat); send(3, down); down
 v.addEventListener('pointerup', lift);
 v.addEventListener('pointercancel', lift);
 v.addEventListener('contextmenu', (e) => e.preventDefault());
+// MENU: the controller's MENU key - full-screen CarPlay takes every tap, this is the way back to the BMW menu.
+// The picture shows that it worked; a failure stays on the button for 4 s.
+const mb = document.getElementById('menu');
+mb.onclick = async () => {
+  mb.disabled = true;
+  let why = '';
+  try {
+    const r = await fetch('menu', { method: 'POST', headers: { 'X-Screencast': '1' } });
+    if (!r.ok) why = (await r.text()).trim();
+  } catch (e) { why = e.message; }
+  if (why) mb.textContent = `MENU: ${why}`;
+  setTimeout(() => { mb.textContent = 'MENU'; mb.disabled = false; }, why ? 4000 : 500);
+};
 document.getElementById('fs').onclick = () => {
   const s = document.getElementById('stage');
   (s.requestFullscreen ? s.requestFullscreen() : v.webkitEnterFullscreen && v.webkitEnterFullscreen());

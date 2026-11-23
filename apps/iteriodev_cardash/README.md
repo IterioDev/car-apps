@@ -1,11 +1,11 @@
 # Car Data
 
-Live engine data on your iDrive 8 screen: engine speed, boost, power and torque with their peaks, oil, coolant and intake temperatures, battery voltage; fuel and air values with their last 5 minutes; a trip computer with costs; gearbox data (ZF 8HP, read-only, experimental); the engine unit's values in groups; on diesel cars a DPF page (soot load, regenerations, exhaust temperatures, read-only, experimental). Bar ends, fuel price and currency are set on the Settings page.
+Live engine data on your iDrive 8 screen: engine speed, boost, power and torque with their peaks, oil, coolant and intake temperatures, battery voltage; fuel and air values with their last 5 minutes; a trip computer with costs; gearbox data (ZF 8HP, read-only, experimental); the engine unit's values in groups; on diesel cars a DPF page (soot load, regenerations, exhaust temperatures, read-only, experimental). Bar ends, fuel price and currency are set on the Settings page. Every value shows in the units your car is set to: °C or °F, km or miles, l/100 km, mpg or km/l, litres or gallons, bar, kPa or psi, kW or hp, Nm, lb-ft or kgm.
 
-Version 1.4.2 · iDrive 8 only · package `iteriodev_cardash` · [all apps and how to install](../../README.md)
+Version 1.5.0 · iDrive 8 only · package `iteriodev_cardash` · [all apps and how to install](../../README.md)
 
 > [!NOTE]
-> Version 1.4.2 is not tested on a car yet. Open points: the fuel figure on Trips, whether trips are counted while the screen is closed, Transmission (ZF 8HP variants 0F25D0 and 0F21E0 only) and the DPF page (never run on a diesel).
+> Version 1.5.0 is not tested on a car yet (the car's units are new in it). Open points: the fuel figure on Trips, whether trips are counted while the screen is closed, Transmission (ZF 8HP variants 0F25D0 and 0F21E0 only) and the DPF page (never run on a diesel).
 
 ## Screens
 
@@ -52,3 +52,9 @@ The engine unit's values in groups.
 ![Settings](screenshots/settings.png)
 
 Where each bar turns red, the fuel price and the currency. The currencies run from EUR to TL: with TL a new install's fuel price starts at 75.50 TL/l, the other currencies at 1.80.
+
+### In your car's units
+
+![Engine, a US car](screenshots/engine-us.png)
+
+The units follow the car's own settings (the ones the instrument cluster uses): here a car set to °F, mph, psi, hp and lb-ft. A car set to PS shows hp. The bar ends and the fuel price are set in the units shown (the price per gallon with gallons); trips and settings are kept the same way whatever the units, so switching units in the car loses nothing.

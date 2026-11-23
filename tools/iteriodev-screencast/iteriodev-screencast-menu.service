@@ -1,0 +1,17 @@
+[Unit]
+Description=Screen share: the viewer's MENU button (the HMI's Home screen, e.g. out of full-screen CarPlay)
+After=vsomeipd.service
+
+[Service]
+# root: the vsomeip policy lets uid 0 call the HMI's HMIControl2; the screen share's own user os_7011 has no policy.
+# One job only (menu.js): a connection to /run/iteriodev-screencast-menu/menu.sock (os_7011's, 0600) = one MENU press.
+RuntimeDirectory=iteriodev-screencast-menu
+RuntimeDirectoryMode=0755
+ExecStart=/usr/bin/node /var/opt/iteriodev-screencast/current/menu.js
+# the car's system.conf has DefaultStandardOutput=null: the MENU answers would never reach the journal
+StandardOutput=journal
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

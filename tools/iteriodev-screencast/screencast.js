@@ -9,6 +9,7 @@
 //                 networking) and the kernel buffer seconds of video the uplink hasn't sent yet, out of the server's
 //                 sight: the viewer's count says how much is still on the way.
 //   POST /touch   "<event> <x> <y>": 1 down, 2 move, 3 up; x, y 0..1 of the picture -> one touch PDU
+//   POST /menu    the controller's MENU key: the HMI's Home screen (iteriodev-screencast-menu) -> its answer
 // The stock winston-grabber grabs and encodes (Intel Media SDK), only while someone watches. Listens on
 // 127.0.0.1: tailscaled forwards tailnet connections there, nothing else reaches it.
 const http = require('http');
@@ -266,8 +267,9 @@ function pdu(ev, x, y) {
 // HMI. No renderer order: with two renderers on a car, a fixed one missed the other's apps (1.0.9).
 // Reading the ruleset needs CAP_NET_ADMIN (the unit's AmbientCapabilities); without it, the HMI.
 const DIVERT = /saddr 160\.48\.199\.115 udp dport 30567 notrack udp dport set (\d+)/;
+const NFT = env('SCREENCAST_NFT', '/usr/sbin/nft');
 function touchPort() {
-    try { return +DIVERT.exec(execFileSync('/usr/sbin/nft', ['list', 'ruleset', 'ip'], { encoding: 'utf8', timeout: 1000 }))[1]; }
+    try { return +DIVERT.exec(execFileSync(NFT, ['list', 'ruleset', 'ip'], { encoding: 'utf8', timeout: 1000 }))[1]; }
     catch (e) { return 30567; }   // no divert (or no nft): the HMI
 }
 
@@ -281,6 +283,25 @@ function touch(ev, x, y) {
     if (ev === UP) finger = null;
     // the viewer repeats the position every 0.5 s while the button is down: silence = it is gone, lift the finger
     else finger.guard = setTimeout(() => touch(UP, finger.x, finger.y), 2000);
+}
+
+// ---- MENU: the HMI's Home screen, by the root helper (menu.js, unit iteriodev-screencast-menu) ----------------------
+// 1.0.11: full-screen CarPlay takes every tap (Hmi8 hands them to the phone), so a viewer could not leave it - in the
+// car only the controller's MENU key does. This process (os_7011) may not call the HMI itself (no vsomeip policy for
+// that user): the helper does, one press per connection to its socket, and answers "ok" or "error ...".
+const MENU_SOCK = env('SCREENCAST_MENU_SOCK', '/run/iteriodev-screencast-menu/menu.sock');
+function menu(res) {
+    let a = '', err = null;
+    const c = net.connect(MENU_SOCK);
+    c.setEncoding('utf8');
+    c.setTimeout(15000, () => c.destroy(new Error('no answer')));
+    c.on('data', (d) => { a += d; });
+    c.on('error', (e) => { err = e; });
+    c.on('close', () => {
+        a = err ? `error menu helper: ${err.code || err.message}` : a.trim() || 'error no answer';
+        log(`MENU: ${a}`);
+        end(res, /^ok\b/.test(a) ? 200 : 502, `${a}\n`);
+    });
 }
 
 // ---- http -------------------------------------------------------------------------------------------------
@@ -309,13 +330,14 @@ const server = http.createServer((req, res) => {
         res.on('close', () => { viewers.delete(v); byId.delete(v.id); grabber(); });
         return grabber();
     }
-    if (req.method === 'POST' && (url === '/touch' || url === '/ack')) {
+    if (req.method === 'POST' && (url === '/touch' || url === '/ack' || url === '/menu')) {
         // a custom header: a cross-site form/fetch can't send it without a preflight, which this server refuses
         if (req.headers['x-screencast'] !== '1') return end(res, 403, 'header\n');
         let body = '';
         req.setEncoding('utf8');
         req.on('data', (d) => { body += d; if (body.length > 64) req.destroy(); });
         return req.on('end', () => {
+            if (url === '/menu') return menu(res);
             if (url === '/ack') {
                 const a = /^(\d+) (\d+)$/.exec(body), v = a && byId.get(a[1]);
                 if (!v) return end(res, a ? 404 : 400, 'bad ack\n');
