@@ -22,6 +22,11 @@
  *   0.10.0 nv(on): the picture is Night Vision's - no turn sign or marks (calibrated for the front camera), no front
  *   camera notices; "No Night Vision picture" when it does not come
  *   sc.retarget(target) -> changed (the layers made again there by the next show); sc.drop(); sc.restore(); sc.status()
+ * 0.11.0 iDrive 7 with the IterioDev cluster design: `panel`, its widget slot (the rect the design hosts Waze's map at):
+ * card and sign at the map's proportions scaled to the slot's height (0.8 x h / 480 at y 80 x h / 480), the notice the
+ * same scale; every layer class content (under the design, seen through the slot's hole) but the notice, class overlay
+ * (the design's over band: over its empty plate while there is no camera picture); nothing contends there
+
  * Uploads: geometry once; the card when its icon / text changes, at most once a second (every 3 s while the shared
  * budget's cap is under 3000 KB/s); a notice when its text changes. u_travel is animated by the renderer between ticks
  * (keys 0:travel 200:travel + speed * 0.2, one animation number replaced every tick).
@@ -38,6 +43,8 @@ const SELF_SHOWN = { map: true };
 // iDrive 7's map: the cluster draws its model badge over the top 64 rows and its readouts over the sides (waze-on-cluster
 // PATCH.md "Safe area" 504x368@286,72): the card smaller, at the clear middle's top
 const CARD_MAP = { k: 0.8, y: 80 };
+// iDrive 7's renderer (RAMSES 19): u_travel sent as a uniform every tick, never animated (0.9.1, below)
+const NO_ANIM = { map: true, panel: true };
 
 function camOf(cal) { return { cx: cal.x, cy: cal.h, cz: 0, crx: -cal.pitch, cry: -cal.yaw, crz: 0, fov: cal.fov }; }
 
@@ -53,15 +60,19 @@ function createScene(cr, o) {
     const place = (w, h, at) => (at === 'top'
         ? { x: Math.round(rect.x + (rect.w - w) / 2), y: rect.y + 16, w, h }
         : { x: Math.round(rect.x + (rect.w - w) / 2), y: Math.round(rect.y + (rect.h - h) / 2), w, h });
+    // the card's scale and top: iDrive 7's map CARD_MAP; the design's slot (panel) the same scaled to its height
+    const cardScale = () => (target === 'map' ? CARD_MAP : target === 'panel' ? { k: CARD_MAP.k * rect.h / 480, y: Math.round(CARD_MAP.y * rect.h / 480) } : null);
     function cardRect() {
-        if (target !== 'map') return place(C.CARD.w, C.CARD.h, 'top');
-        const w = Math.round(C.CARD.w * CARD_MAP.k), h = Math.round(C.CARD.h * CARD_MAP.k);
-        return { x: Math.round(rect.x + (rect.w - w) / 2), y: rect.y + CARD_MAP.y, w, h };
+        const m = cardScale();
+        if (!m) return place(C.CARD.w, C.CARD.h, 'top');
+        const w = Math.round(C.CARD.w * m.k), h = Math.round(C.CARD.h * m.k);
+        return { x: Math.round(rect.x + (rect.w - w) / 2), y: rect.y + m.y, w, h };
     }
+    const noticeRect = () => { const k = target === 'panel' ? cardScale().k : 1; return place(Math.round(C.NOTICE.w * k), Math.round(C.NOTICE.h * k), 'mid'); };
     // the sign's highest top (NDC y of the rect): SIGN_GAP px under the card
     function signTop() { const c = cardRect(); return 1 - 2 * (c.y + c.h + SIGN_GAP - rect.y) / rect.h; }
     function make() {
-        const base = { target, klass: KLASS, visible: false, contend: SELF_SHOWN[target] ? 1 : 0 };
+        const base = { target, klass: target === 'panel' ? 'content' : KLASS, visible: false, contend: SELF_SHOWN[target] ? 1 : 0 };
         const mesh = (z) => cr.mesh(Object.assign({}, base, rect, { z, near: 0.5, far: 150 }, camOf(cal)));
         refs = { chevrons: mesh(10), marks: mesh(15) };
         cr.part(refs.chevrons, 1, { vs: SH.CHEVRON_VS, fs: SH.CHEVRON_FS, depth: false, cull: 'none', blend: 'alpha' });
@@ -70,7 +81,7 @@ function createScene(cr, o) {
         cr.geometry(refs.marks, 1, SH.marksGeometry());
         refs.card = cr.image(Object.assign({}, base, cardRect(), { z: 20, iw: C.CARD.w, ih: C.CARD.h }));
         refs.shade = cr.effect(Object.assign({}, base, rect, { z: 30, fs: SH.SHADE_FS }));
-        refs.notice = cr.image(Object.assign({}, base, place(C.NOTICE.w, C.NOTICE.h, 'mid'), { z: 31, iw: C.NOTICE.w, ih: C.NOTICE.h }));
+        refs.notice = cr.image(Object.assign({}, base, noticeRect(), { klass: 'overlay', z: 31, iw: C.NOTICE.w, ih: C.NOTICE.h }));
         cr.uniform(refs.shade, 'u_size', [rect.w, rect.h]);
         vis = {}; uni = {}; travelSent = false; animAt = -Infinity; cardKey = ''; cardAt = -Infinity; noticeKey = null;
         log(`scene: layers made on ${target} at ${rect.w}x${rect.h}@${rect.x},${rect.y}`);
@@ -109,7 +120,7 @@ function createScene(cr, o) {
             if (!moved) return;
             ['chevrons', 'marks', 'shade'].forEach((n) => cr.set(refs[n], rect));
             cr.set(refs.card, cardRect());
-            cr.set(refs.notice, place(C.NOTICE.w, C.NOTICE.h, 'mid'));
+            cr.set(refs.notice, noticeRect());
             cr.uniform(refs.shade, 'u_size', [rect.w, rect.h]);
         },
         camera(s) { if (s !== camera) { camera = s; cameraSince = now(); } },
@@ -162,7 +173,7 @@ function createScene(cr, o) {
                 // iDrive 7's renderer (RAMSES 19) rebuilds its whole animation system for every replaced animation:
                 // there the uniform alone, every tick; iDrive 8: the uniform + one animation per ANIM_MS (its keys span
                 // that long; each a scene change cluster-render sends to the cluster - car 2026-11-07: the head unit lagged)
-                if (SELF_SHOWN[target]) uniform('u_travel', view.travel);
+                if (NO_ANIM[target]) uniform('u_travel', view.travel);
                 else if (!travelSent || t - animAt >= ANIM_MS) {
                     animAt = t; travelSent = true;
                     cr.uniform(refs.chevrons, 'u_travel', [view.travel], { part: 1 });

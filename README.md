@@ -348,6 +348,14 @@ camera.
   Vision screen then stays black** (and may store a video-input fault code each time the Night Vision button is pressed);
   uninstall the tool to get it back. The picture is read only while Turn View shows it. On a car without Night Vision
   the choice is not shown. Car-tested on iDrive 7 (G12: the picture at 30 a second); not on iDrive 8 yet.
+- **In the IterioDev cluster design (tool 0.11.0, iDrive 7):** with the cluster design's ID8 Road or ID8 Sport, Turn
+  View can show in the design's centre widget, where Waze's map shows: switch *Turn View* on in the cluster design
+  app's centre widget list (off by default; design tool 0.3.27 or newer), then pick it with the BC button. The camera
+  starts when it is picked and Turn View is switched on in its own app (iDrive 7: off at every start, as before);
+  switched off, the widget says *Turn View is off*. Waze's map sends nothing while Turn View shows, and Turn View holds
+  no video while another widget shows. The camera sender now uses Waze on cluster's ways to save the link in every mode:
+  packed colour blocks (a sharper picture for the same ~3 MB/s), the part shown made at its size on the head unit's GPU
+  (the CPU when that cannot), the renderer's frame-rate hold, and no stale picture when it shows again. Not car-tested yet.
 
 - **iDrive 8:** Turn View's own widget, **Turn View AR** in the cluster's widget menu (a Cluster renderer drop-in, read
   at its next start), with its own picture in the menu like BMW's widgets (tool 0.7.1). The camera is sent only while

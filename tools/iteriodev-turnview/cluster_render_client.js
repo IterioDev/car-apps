@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 // Copyright (C) 2026 Robert Nisipeanu
-// Vendored into iteriodev-turnview from robertnisipeanu/idrive-apps cluster-render 0.3.6 (js/), one change marked
-// "iteriodev-turnview" (animate's opts.anim).
+// Vendored into iteriodev-turnview from robertnisipeanu/idrive-apps cluster-render 0.3.6 (js/), two changes marked
+// "iteriodev-turnview" (animate's opts.anim; 0.11.0: the `host` event emitted, as the current client does).
 /**
  * Node 8 client for the cluster render service (../PROTOCOL.md): an app's
  * layers on the instrument cluster and the HUD. Copy this file into an app's
@@ -222,6 +222,8 @@ class ClusterRender extends EventEmitter {
             this.emit('budget', ev.cap_kb_per_s, ev.max_kb_per_s, ev.reason);
         } else if (ev.ev === 'error') {
             this.emit('refused', ev.op, ev.ref, ev.reason);
+        } else if (ev.ev === 'host') {   // iteriodev-turnview 0.11.0: (target, ev); ev.into '' = not hosted any more
+            this.emit('host', ev.target, ev);
         } else if (ev.ev === 'status') {
             this.emit('status', ev.text);
         }
